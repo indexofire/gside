@@ -1,3 +1,7 @@
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+# Large reference databases (not in git — use `gside db setup`)
+data/db/refseq_panel/
+data/db/mash_refseq/
+data/db/sourmash/

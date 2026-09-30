@@ -17,6 +17,8 @@ import json
 import sys
 from typing import Any
 
+from .db import run_db_command
+
 
 def _run_species(args: argparse.Namespace) -> int:
     contigs = args.contigs
@@ -34,7 +36,7 @@ def _run_species(args: argparse.Namespace) -> int:
 
                 results[mode] = identify_by_ani(contigs, mode=mode, db_dir=args.db_dir).to_dict()
             elif mode == "sourmash":
-                from gside.analysis.sourmash_identifier import identify_sourmash
+                from gside.analysis.sourmash_identifier import identify_by_sourmash as identify_sourmash
 
                 results[mode] = identify_sourmash(contigs, db_dir=args.db_dir).to_dict()
         except Exception as e:  # noqa: BLE001 — CLI 边界：单法失败不终止其他方法
@@ -106,6 +108,15 @@ def main(argv: list[str] | None = None) -> int:
         "--db-dir", default=None, help="Database root (default: $GSIDE_DB_DIR or data/db)"
     )
     p_species.set_defaults(func=_run_species)
+
+    p_db = sub.add_parser("db", help="Manage reference databases (status/setup/list)")
+    p_db.add_argument("subcommand", nargs="?", default="status", help="status|setup|list")
+    p_db.add_argument("--tier", default="panel", help="mini|panel|mash|all")
+    p_db.add_argument("--source", default="", help="Copy from existing bacmap data/db path")
+    p_db.set_defaults(func=lambda a: run_db_command(
+        [a.subcommand] if a.subcommand != "setup" else ["setup", a.tier, "--source", a.source]
+        if a.source else ["setup", a.tier]
+    ))
 
     parser.add_argument("--version", action="store_true")
     args = parser.parse_args(argv)
