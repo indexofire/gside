@@ -1,10 +1,28 @@
 [workspace]
 authors = ["indexofire <indexofire@gmail.com>"]
-channels = ["conda-forge"]
+channels = ["conda-forge", "bioconda"]
 name = "gside"
 platforms = ["linux-64"]
 version = "0.1.0"
 
 [tasks]
+docs = "uv run mkdocs serve"
+docs-build = "uv run mkdocs build --strict"
 
 [dependencies]
+blast = ">=2.16"
+skani = "0.3.*"
+mash = ">=2.3"
+mmseqs2 = ">=15"
+
+[pypi-dependencies]
+gside = { path = ".", editable = true }
+
+[feature.dev.dependencies]
+mkdocs = ">=1.6"
+mkdocs-material = ">=9.0"
+mkdocs-static-i18n = ">=1.2"
+
+[environments]
+default = { features = [], solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }

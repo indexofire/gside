@@ -1,0 +1,62 @@
+site_name: gside
+site_description: Genome Species IDentification Engine — 多层病原微生物物种鉴定 CLI
+site_author: indexofire
+site_url: https://github.com/indexofire/gside
+
+repo_name: indexofire/gside
+repo_url: https://github.com/indexofire/gside
+
+exclude_docs: |
+  README.md
+  README.en.md
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      languages:
+        - locale: zh
+          default: true
+          name: 简体中文
+          build: true
+        - locale: en
+          name: English
+          build: true
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: teal
+      toggle:
+        icon: material/weather-night
+        name: 暗色模式
+    - scheme: slate
+      primary: teal
+      toggle:
+        icon: material/weather-sunny
+        name: 亮色模式
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - 首页: index.md
+  - 安装指南:
+    - 快速安装: installation/quick-start.md
+    - 数据库管理: installation/databases.md
+  - 用法:
+    - CLI 参考: usage/cli.md
+    - 物种鉴定模式: usage/modes.md
+  - 架构:
+    - 分层设计: architecture/layers.md
+  - 参考:
+    - 标记规则格式: reference/marker-rules.md
+    - JSON 输出契约: reference/json-contract.md
