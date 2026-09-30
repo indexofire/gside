@@ -25,3 +25,4 @@ coverage.xml
 # OS
 .DS_Store
 Thumbs.db
+!data/panel_manifest/
