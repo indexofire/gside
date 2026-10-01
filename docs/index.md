@@ -1,50 +1,54 @@
-# gside — 基因组物种鉴定引擎
+# gside — Genome Species IDentification Engine
 
-独立的病原微生物物种鉴定 CLI 工具，从 hermes-bacmap 架构拆分而来。
+An independent pathogen species identification CLI tool, extracted from the
+hermes-bacmap architecture.
 
-## 概述
+## Overview
 
-gside（**G**enome **S**pecies **ID**entification **E**ngine）提供多层次的物种鉴定能力，
-可作为独立命令行工具使用，也可被智能体平台（如 hermes-bacmap）集成调用。
+gside (**G**enome **S**pecies **ID**entification **E**ngine) provides
+multi-layer species identification capabilities as a standalone command-line
+tool. It can be used independently or integrated into agent platforms
+(e.g., hermes-bacmap).
 
 ```
-底层工具     blastn / skani / mash / sourmash / mmseqs2
-                ↑
-gside          物种鉴定引擎：靶基因组合规则 + ANI 多后端 + 层级仲裁
-                ↑
-hermes-bacmap  Hermes 桥：GOM 入库 / smk 编排 / gbrain 记忆
+Tools        blastn / skani / mash / sourmash / mmseqs2
+               ↑
+gside        Species ID engine: marker rules + ANI backends + arbitration
+               ↑
+hermes-bacmap  Hermes bridge: GOM storage / smk orchestration / gbrain memory
 ```
 
-## 鉴定层次
+## Identification Layers
 
-| 层次 | CLI mode | 底层引擎 | 原理 | 验证 |
-|---|---|---|---|---|
-| **L1** | `marker` | blastn | 靶基因组合规则（38 条，81 序列） | 17/17 |
-| **L2** | `panel` | skani | ANI 比对精选参考面板（291 基因组） | 17/17 |
-| **L2** | `mash_refseq` | mash | MinHash 距离（RefSeq sketch） | 17/17 |
-| **L2** | `sourmash` | sourmash | GTDB gather（LCA 分类） | 需下库 |
-| **仲裁** | `all` | — | 层级共识（ANI 层 > marker 层） | ✓ |
+| Layer | CLI mode | Engine | Method | Validated |
+|-------|----------|--------|--------|-----------|
+| **L1** | `marker` | blastn | Target gene combination rules (38 rules, 81 sequences) | 17/17 |
+| **L2** | `panel` | skani | ANI against curated reference panel (291 genomes) | 17/17 |
+| **L2** | `mash_refseq` | mash | MinHash distance (RefSeq sketch) | 17/17 |
+| **L2** | `sourmash` | sourmash | GTDB gather (LCA classification) | DB required |
+| **Arbitration** | `all` | — | Layer consensus (ANI > marker) | ✓ |
 
-## 快速开始
+## Quick Start
 
 ```bash
-# 安装
+# Install
 pixi install && pip install -e .
 
-# 物种鉴定
+# Species identification
 gside species contigs.fna --mode marker
 gside species contigs.fna --mode panel
 gside species contigs.fna --mode all
 
-# 数据库管理
+# Database management
 gside db status
 gside db setup --tier all
 ```
 
-## 输出
+## Output
 
-所有模式输出统一的 JSON 格式（GOM 兼容契约），包含 `analysis_type`、
-`method`、`database`、`result`、`verdict` 字段，可直接被下游系统消费。
+All modes produce a unified JSON format (GOM-compatible contract) containing
+`analysis_type`, `method`, `database`, `result`, and `verdict` fields —
+directly consumable by downstream systems.
 
 ## License
 

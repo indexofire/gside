@@ -1,19 +1,19 @@
-# 数据库管理
+# Database Management
 
-gside 的参考数据库通过 `gside db` 子命令管理，支持分层数据库安装。
+gside reference databases are managed via the `gside db` subcommand with tiered installation.
 
-## 数据库分层
+## Database Tiers
 
-| Tier | 包含 | 大小 | 用途 |
-|---|---|---|---|
-| **mini** | marker_rules.yaml + markers_v2.fasta + BLAST 库 | ~1MB | 靶基因组合鉴定（L1） |
-| **panel** | refseq_panel（291 基因组 skani sketch） | ~2.7GB | ANI 鉴定（L2） |
-| **mash** | mash_refseq（RefSeq MinHash sketch） | ~331MB | 距离鉴定（L2） |
-| **all** | panel + mash | ~3GB | 全层次能力 |
+| Tier | Contents | Size | Purpose |
+|------|----------|------|---------|
+| **mini** | marker_rules.yaml + markers_v2.fasta + BLAST db | ~1MB | Target gene identification (L1) |
+| **panel** | refseq_panel (291 genomes, skani sketch) | ~88MB | ANI identification (L2) |
+| **mash** | mash_refseq (RefSeq MinHash sketch) | ~179MB | Distance identification (L2) |
+| **all** | panel + mash | ~267MB | Full capability |
 
-## 命令
+## Commands
 
-### 查看状态
+### Check status
 
 ```bash
 gside db status
@@ -27,41 +27,41 @@ gside database status
   ✅ mash_refseq      tier=mash   path=data/db/mash_refseq
 ```
 
-### 安装/更新
+### Install / update
 
 ```bash
-gside db setup --tier panel          # 仅面板（ANI）
-gside db setup --tier mash           # 仅 MinHash
-gside db setup --tier all            # 全部
+gside db setup --tier panel          # Panel only (ANI)
+gside db setup --tier mash           # MinHash only
+gside db setup --tier all            # Everything
 ```
 
-### 从 bacmap 复制
+### Copy from bacmap
 
-已有 hermes-bacmap 环境的用户可直接复制数据库：
+Users with an existing hermes-bacmap installation can copy databases directly:
 
 ```bash
 gside db setup --tier all --source ~/repos/github/hermes-bacmap/data/db
 ```
 
-### 查看可用 tier
+### List available tiers
 
 ```bash
 gside db list
 ```
 
-## 数据库路径
+## Database Paths
 
-默认路径可通过环境变量覆盖：
+Default paths can be overridden via environment variables:
 
-| 变量 | 默认值 | 说明 |
-|---|---|---|
-| `GSIDE_DATA_DIR` | `<repo>/data` | 标记规则等小型参考数据 |
-| `GSIDE_DB_DIR` | `<data>/db` | 大型数据库（panel/mash） |
-| `GSIDE_PIXI_BIN` | 自动发现 | 生信二进制目录 |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GSIDE_DATA_DIR` | `<repo>/data` | Small reference data (marker rules) |
+| `GSIDE_DB_DIR` | `<data>/db` | Large databases (panel/mash) |
+| `GSIDE_PIXI_BIN` | Auto-detected | Bioinformatics binary directory |
 
-## 自定义标记规则
+## Custom Marker Rules
 
-编辑 `data/reference/species/marker_rules.yaml`：
+Edit `data/reference/species/marker_rules.yaml`:
 
 ```yaml
 - species: Mycobacterium_tuberculosis
@@ -73,11 +73,11 @@ gside db list
   exclude_genes: [some_cross_reactive_gene]
 ```
 
-然后重建 BLAST 库：
+Then rebuild the BLAST database:
 
 ```bash
 cd data/reference/species
 makeblastdb -in markers_v2.fasta -dbtype nucl -out markers_v2_blastdb
 ```
 
-无需修改代码——规则即数据。
+No code changes required — rules are data.

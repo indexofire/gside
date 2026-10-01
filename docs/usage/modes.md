@@ -1,101 +1,108 @@
-# 物种鉴定模式
+# Identification Modes
 
-## 分层架构
+## Layered Architecture
 
-gside 的鉴定按证据强度分层，高层覆盖低层（记录不致命）：
+gside's identification is layered by evidence strength — higher layers
+override lower ones (recorded, not fatal):
 
 ```
-L3  GTDB-Tk（标准模式，需重型环境）          [层权威=3]
-L2  panel skani / mash_refseq / sourmash    [层权威=2]
-L1  marker 靶基因组合规则                    [层权威=1]
+L3  GTDB-Tk (standard mode, requires heavy environment)     [authority=3]
+L2  panel skani / mash_refseq / sourmash                    [authority=2]
+L1  marker target gene combination rules                    [authority=1]
 ```
 
-## L1: marker（靶基因组合）
+## L1: marker (Target Gene Combination)
 
-### 原理
+### Principle
 
-对 contigs 执行一次 BLAST（vs markers_v2 库，81 条序列），将命中基因与
-38 条组合规则匹配（数据驱动，`marker_rules.yaml`）。
+Performs a single BLAST scan of contigs against the markers_v2 database
+(81 sequences), then matches detected genes against 38 combination rules
+(data-driven, `marker_rules.yaml`).
 
-### 规则机制
+### Rule Mechanism
 
 ```yaml
 - species: Campylobacter_jejuni
-  genes: [mapa, hipo, cadf]     # 候选标记
-  min_hits: 2                     # 至少命中 2 个
-  min_identity: 90                # 每个基因 ≥90% 一致性
-  exclude_genes: [ceue]           # 排除守卫：ceuE 存在 → 倾向 C_coli
+  genes: [mapa, hipo, cadf]     # candidate markers
+  min_hits: 2                     # at least 2 must hit
+  min_identity: 90                # each gene ≥90% identity
+  exclude_genes: [ceue]           # exclusion guard: ceuE present → prefer C_coli
 ```
 
-### 交叉反应防护
+### Cross-Reaction Guards
 
-- **exclude_genes**：排除规则防止近缘种误判（如 C.jejuni vs C.coli）
-- **tlh 近缘守卫**：单基因 <90% 命中 → 判定抑制为 Unknown（V.alginolyticus 案例）
-- **coverage 门槛**：全局 ≥60%（防短 HSP 高一致性误报）
+- **exclude_genes**: exclusion rules prevent near-relative misidentification
+  (e.g., C.jejuni vs C.coli)
+- **tlh near-relative guard**: single-gene <90% hit → suppressed to Unknown
+  (V.alginolyticus case study)
+- **coverage threshold**: global ≥60% (prevents short-HSP high-identity false fires)
 
-### 适用场景
+### Use Cases
 
-- 快速初筛（分钟级）
-- 无需大数据库（mini tier 内置）
-- 近缘种丰富的属（沙门菌/大肠/弯曲菌等）需配合 L2 确认
+- Rapid initial screening (minutes)
+- No large database needed (mini tier bundled)
+- Species-rich genera (Salmonella/E.coli/Campylobacter) should confirm with L2
 
-## L2: panel（ANI 精选面板）
+## L2: panel (ANI Curated Panel)
 
-### 原理
+### Principle
 
-skani 对 contigs 与精选参考面板（291 基因组，30 启用物种）做全基因组 ANI 比对。
+skani performs whole-genome ANI comparison of contigs against a curated
+reference panel (291 genomes, 30 enabled pathogen species).
 
-### 判定阈值
+### Thresholds
 
-| ANI | 覆盖率 | 判定 |
-|---|---|---|
-| ≥95% | ≥70% | species=命中参考基因组的物种，confidence=high |
-| 90-95% | ≥70% | confidence=medium（建议复核） |
+| ANI | Coverage | Call |
+|-----|----------|------|
+| ≥95% | ≥70% | species=matched reference, confidence=high |
+| 90-95% | ≥70% | confidence=medium (review recommended) |
 | <90% | — | Unknown |
 
-### 适用场景
+### Use Cases
 
-- 精确物种确认（属级分辨率）
-- 近缘种区分（marker 层无法判别时）
-- panel tier 数据库（2.7GB）
+- Precise species confirmation (subspecies resolution)
+- Near-relative discrimination (when marker layer cannot distinguish)
+- Requires panel tier database (~88MB)
 
-## L2: mash_refseq（MinHash 距离）
+## L2: mash_refseq (MinHash Distance)
 
-### 原理
+### Principle
 
-mash 对 contigs 与 RefSeq 全库 sketch（159MB）做 MinHash 距离估算。
+mash computes MinHash distance between contigs and the entire RefSeq sketch
+(~179MB).
 
-### 适用场景
+### Use Cases
 
-- 广谱筛查（覆盖 RefSeq 全部原核生物）
-- 快速（秒级）
-- 精度低于 panel ANI（MinHash 是估算）
+- Broad-spectrum screening (covers all RefSeq prokaryotes)
+- Fast (seconds)
+- Lower precision than panel ANI (MinHash is an estimate)
 
-## L2: sourmash（GTDB gather）
+## L2: sourmash (GTDB gather)
 
-### 原理
+### Principle
 
-sourmash gather 对 contigs 做 LCA 分类，基于 GTDB 分类框架。
+sourmash gather performs LCA classification based on the GTDB taxonomic
+framework.
 
-### 适用场景
+### Use Cases
 
-- 需要与 GTDB 分类体系对齐时
-- 混合样本（gather 可分解）
-- 需 3.7GB sourmash GTDB 库
+- Alignment with GTDB taxonomy
+- Mixed samples (gather can decompose)
+- Requires 3.7GB sourmash GTDB database
 
-## all 模式（多法仲裁）
+## all Mode (Multi-Method Arbitration)
 
-运行所有可用方法，按层级仲裁取最优：
+Runs all available methods and arbitrates by layer:
 
 ```
-ANI 层 (panel/mash/sourmash) high-confidence 命中 > marker 层命中
+ANI layer (panel/mash/sourmash) high-confidence hit > marker layer hit
 ```
 
 ```bash
 gside species contigs.fna --mode all
 ```
 
-输出包含所有方法结果 + 最终 verdict：
+Output includes all method results plus final verdict:
 
 ```json
 {
@@ -105,19 +112,19 @@ gside species contigs.fna --mode all
     "basis": ["panel"]
   },
   "methods": {
-    "marker": { "species": "Campylobacter_jejuni", ... },
-    "panel": { "result": { "species": "...", "ani": 100.0, ... } },
-    "mash_refseq": { "result": { "species": "...", ... } }
+    "marker": { "species": "Campylobacter_jejuni", "..." : "..." },
+    "panel": { "result": { "species": "...", "ani": 100.0, "..." : "..." } },
+    "mash_refseq": { "result": { "species": "...", "..." : "..." } }
   }
 }
 ```
 
-## 方法选择建议
+## Method Selection Guide
 
-| 场景 | 推荐 mode | 理由 |
-|---|---|---|
-| 快速初筛 | `marker` | 秒级，零外部依赖 |
-| 精确鉴定 | `panel` | ANI 金标准 |
-| 广谱筛查 | `mash_refseq` | 覆盖全 RefSeq |
-| 综合判定 | `all` | 多法互补 + 仲裁 |
-| 近缘种区分 | `panel` 或 `all` | marker 可能交叉反应 |
+| Scenario | Recommended mode | Rationale |
+|----------|-----------------|-----------|
+| Rapid screening | `marker` | Seconds, zero external dependencies |
+| Precise identification | `panel` | ANI gold standard |
+| Broad-spectrum scan | `mash_refseq` | Covers all RefSeq |
+| Comprehensive | `all` | Multi-method complementary + arbitration |
+| Near-relative discrimination | `panel` or `all` | marker may cross-react |

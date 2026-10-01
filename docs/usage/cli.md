@@ -1,69 +1,69 @@
-# CLI 参考
+# CLI Reference
 
 ## gside species
 
-物种鉴定主命令。
+Main species identification command.
 
-### 用法
+### Usage
 
 ```bash
-gside species <contigs.fasta> [选项]
+gside species <contigs.fasta> [options]
 ```
 
-### 参数
+### Arguments
 
-| 参数 | 类型 | 默认 | 说明 |
-|---|---|---|---|
-| `contigs` | 位置参数 | — | 组装后的 contigs FASTA 文件 |
-| `--mode` | 选项 | `marker` | 鉴定模式（见下） |
-| `--db-dir` | 选项 | 自动 | 数据库根目录 |
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `contigs` | positional | — | Assembled contigs FASTA file |
+| `--mode` | option | `marker` | Identification mode (see below) |
+| `--db-dir` | option | auto | Database root directory |
 
-### 鉴定模式
+### Identification Modes
 
-| Mode | 说明 | 数据库需求 |
-|---|---|---|
-| `marker` | 靶基因组合规则（blastn） | mini（内置） |
-| `panel` | ANI 比对精选面板（skani） | panel tier |
-| `mash_refseq` | MinHash 距离（mash） | mash tier |
-| `sourmash` | sourmash GTDB gather | sourmash GTDB 库 |
-| `all` | 运行全部可用方法 + 仲裁 | 按需 |
+| Mode | Description | Database Required |
+|------|-------------|-------------------|
+| `marker` | Target gene combination rules (blastn) | mini (bundled) |
+| `panel` | ANI against curated panel (skani) | panel tier |
+| `mash_refseq` | MinHash distance (mash) | mash tier |
+| `sourmash` | sourmash GTDB gather | sourmash GTDB db |
+| `all` | Run all available methods + arbitrate | as needed |
 
-### 示例
+### Examples
 
 ```bash
-# 靶基因鉴定（最快，无需额外数据库）
+# Target gene identification (fastest, no extra database needed)
 gside species contigs.fna --mode marker
 
-# ANI 鉴定（精确）
+# ANI identification (precise)
 gside species contigs.fna --mode panel
 
-# 多法仲裁
+# Multi-method arbitration
 gside species contigs.fna --mode all
 
-# 指定数据库目录
+# Specify database directory
 gside species contigs.fna --mode panel --db-dir /path/to/dbs
 ```
 
 ## gside db
 
-数据库管理子命令。
+Database management subcommand.
 
-### 子命令
+### Subcommands
 
-| 子命令 | 说明 |
-|---|---|
-| `status` | 显示数据库就绪状态 |
-| `list` | 列出可用 tier |
-| `setup` | 安装/更新数据库 |
+| Subcommand | Description |
+|------------|-------------|
+| `status` | Show database readiness status |
+| `list` | List available tiers |
+| `setup` | Install/update databases |
 
-### setup 选项
+### setup Options
 
-| 选项 | 默认 | 说明 |
-|---|---|---|
+| Option | Default | Description |
+|--------|---------|-------------|
 | `--tier` | `panel` | mini / panel / mash / all |
-| `--source` | — | 从现有 bacmap 数据库复制 |
+| `--source` | — | Copy from existing bacmap databases |
 
-### 示例
+### Examples
 
 ```bash
 gside db status

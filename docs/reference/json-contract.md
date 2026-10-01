@@ -1,8 +1,8 @@
-# JSON 输出契约
+# JSON Output Contract
 
-所有 gside 输出均为统一 JSON 格式，与 GOM（Genome Object Model）兼容。
+All gside output is unified JSON, compatible with GOM (Genome Object Model).
 
-## 单方法输出（--mode marker/panel/mash_refseq）
+## Single-Method Output (--mode marker/panel/mash_refseq)
 
 ```json
 {
@@ -26,7 +26,7 @@
           "coverage": 100.0
         }
       ],
-      "all_hits": [...],
+      "all_hits": [],
       "notes": [],
       "rule_evidence": "hipo+cadf+mapa (3/2 required)"
     }
@@ -39,7 +39,7 @@
 }
 ```
 
-## 多方法仲裁输出（--mode all）
+## Multi-Method Arbitration Output (--mode all)
 
 ```json
 {
@@ -48,7 +48,7 @@
   "version": "0.1.0",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
-    "marker": { ... },
+    "marker": {},
     "panel": {
       "method": "panel",
       "database": {
@@ -70,7 +70,7 @@
         ]
       }
     },
-    "mash_refseq": { ... }
+    "mash_refseq": {}
   },
   "verdict": {
     "species": "Campylobacter jejuni subsp. jejuni NCTC 11168",
@@ -80,32 +80,32 @@
 }
 ```
 
-## 字段说明
+## Field Reference
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `analysis_type` | str | 固定为 `species_identification` |
-| `tool` | str | 固定为 `gside` |
-| `version` | str | gside 版本号 |
-| `methods` | dict | 每个运行的方法的结果（key = mode 名） |
-| `methods.<mode>.species` | str | 该方法判定的物种（Unknown 表示无法判定） |
+| Field | Type | Description |
+|-------|------|-------------|
+| `analysis_type` | str | Always `species_identification` |
+| `tool` | str | Always `gside` |
+| `version` | str | gside version |
+| `methods` | dict | Results per method (key = mode name) |
+| `methods.<mode>.species` | str | Species called by this method |
 | `methods.<mode>.confidence` | str | high / medium / low |
-| `methods.<mode>.error` | str | 方法执行错误（仅失败时出现） |
-| `verdict.species` | str | 最终仲裁判定 |
-| `verdict.confidence` | str | 最终置信度 |
-| `verdict.basis` | list[str] | 判定依据的方法列表 |
+| `methods.<mode>.error` | str | Method execution error (only on failure) |
+| `verdict.species` | str | Final arbitrated call |
+| `verdict.confidence` | str | Final confidence |
+| `verdict.basis` | list[str] | Methods that contributed to the verdict |
 
-## ANI 方法特有字段（panel / mash_refseq）
+## ANI-Specific Fields (panel / mash_refseq)
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `result.ani` | float | 最高 ANI 值（0-100） |
-| `result.aligned_fraction` | float | 比对覆盖比例 |
-| `result.top_hits` | list | 前 N 个命中（genome/species/ani/af） |
+| Field | Type | Description |
+|-------|------|-------------|
+| `result.ani` | float | Highest ANI value (0-100) |
+| `result.aligned_fraction` | float | Alignment coverage fraction |
+| `result.top_hits` | list | Top N hits (genome/species/ani/af) |
 
-## GOM 兼容
+## GOM Integration
 
-输出格式可直接映射到 GOM ANALYSIS 对象的 `payload`：
+Output format maps directly to a GOM ANALYSIS object's `payload`:
 
 ```python
 import json, subprocess
@@ -116,7 +116,7 @@ result = subprocess.run(
 )
 payload = json.loads(result.stdout)
 
-# 直接作为 GOM payload 入库
+# Store directly as GOM payload
 gos.create(GenomeObject(
     object_type=ObjectType.ANALYSIS,
     payload=payload,
