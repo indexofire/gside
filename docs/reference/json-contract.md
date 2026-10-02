@@ -1,8 +1,10 @@
 # JSON Output Contract
 
-All gside output is unified JSON, compatible with GOM (Genome Object Model).
+All gside output is unified JSON printed to stdout.
 
-## Single-Method Output (--mode marker/panel/mash_refseq)
+## Single-Method Output (--mode marker/panel/mash_refseq/sourmash)
+
+Example with `--mode marker` (marker results are flat; no `result` wrapper):
 
 ```json
 {
@@ -38,6 +40,9 @@ All gside output is unified JSON, compatible with GOM (Genome Object Model).
   }
 }
 ```
+
+The ANI modes (`panel`, `mash_refseq`) and `sourmash` instead nest their
+findings under a `result` object, as the `all` example below shows.
 
 ## Multi-Method Arbitration Output (--mode all)
 
@@ -103,23 +108,29 @@ All gside output is unified JSON, compatible with GOM (Genome Object Model).
 | `result.aligned_fraction` | float | Alignment coverage fraction |
 | `result.top_hits` | list | Top N hits (genome/species/ani/af) |
 
-## GOM Integration
+## Consuming the output
 
-Output format maps directly to a GOM ANALYSIS object's `payload`:
+The JSON is self-describing, so consuming it from Python needs nothing
+beyond the standard library:
 
 ```python
-import json, subprocess
+import json
+import subprocess
 
 result = subprocess.run(
     ["gside", "species", "contigs.fna", "--mode", "all"],
-    capture_output=True, text=True,
+    capture_output=True,
+    text=True,
 )
 payload = json.loads(result.stdout)
 
-# Store directly as GOM payload
-gos.create(GenomeObject(
-    object_type=ObjectType.ANALYSIS,
-    payload=payload,
-    ...
-))
+verdict = payload["verdict"]
+print(verdict["species"], verdict["confidence"])
+
+for mode, entry in payload["methods"].items():
+    if "error" in entry:
+        print(f"{mode}: failed — {entry['error']}")
 ```
+
+A method that failed carries an `error` key instead of a species call, and
+in `all` mode the remaining methods still contribute to the verdict.

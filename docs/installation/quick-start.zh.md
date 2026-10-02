@@ -1,6 +1,6 @@
 # 快速安装
 
-从零搭建 gside 到跑通物种鉴定。预计耗时 5–15 分钟（含数据库）。
+从零搭建 gside 到跑通物种鉴定。预计耗时 5~15 分钟（含数据库）。
 
 ## 前置条件
 
@@ -44,20 +44,12 @@ gside 采用分层数据库设计：
 
 | Tier | 内容 | 大小 | 状态 |
 |---|---|---|---|
-| mini | 标记规则 + 序列 | ~1MB | ✅ 随仓库分发 |
-| panel | 精选参考面板（skani sketch） | ~2.7GB | 需 `gside db setup` |
-| mash | RefSeq MinHash sketch | ~331MB | 需 `gside db setup` |
-| all | panel + mash | ~3GB | 一次性全装 |
+| mini | 标记规则 + 序列 + BLAST 库 | ~1MB | ✅ 随仓库分发 |
+| panel | 精选参考面板（skani sketch，291 基因组） | ~130MB | 需 `gside db setup` |
+| mash | RefSeq MinHash sketch | ~179MB | 需 `gside db setup` |
+| all | panel + mash | ~310MB | 一次性全装 |
 
 详见[数据库管理](databases.md)。
-
-## 从 bacmap 复制数据库（本地开发）
-
-如果已有 hermes-bacmap 的数据库：
-
-```bash
-gside db setup --tier all --source /path/to/hermes-bacmap/data/db
-```
 
 ## 下一步
 

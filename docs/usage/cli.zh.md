@@ -14,11 +14,13 @@ gside species <contigs.fasta> [选项]
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| `contigs` | 位置参数 | — | 组装后的 contigs FASTA 文件 |
+| `contigs` | 位置参数 | 无 | 组装后的 contigs FASTA 文件 |
 | `--mode` | 选项 | `marker` | 鉴定模式（见下） |
 | `--db-dir` | 选项 | 自动 | 数据库根目录 |
 
 ### 鉴定模式
+
+共 5 种模式，默认 `marker`：
 
 | Mode | 说明 | 数据库需求 |
 |---|---|---|
@@ -26,7 +28,7 @@ gside species <contigs.fasta> [选项]
 | `panel` | ANI 比对精选面板（skani） | panel tier |
 | `mash_refseq` | MinHash 距离（mash） | mash tier |
 | `sourmash` | sourmash GTDB gather | sourmash GTDB 库 |
-| `all` | 运行全部可用方法 + 仲裁 | 按需 |
+| `all` | 运行全部 4 种方法 + 仲裁 | 按需 |
 
 ### 示例
 
@@ -37,7 +39,10 @@ gside species contigs.fna --mode marker
 # ANI 鉴定（精确）
 gside species contigs.fna --mode panel
 
-# 多法仲裁
+# sourmash GTDB gather
+gside species contigs.fna --mode sourmash
+
+# 多法仲裁（marker + panel + mash_refseq + sourmash）
 gside species contigs.fna --mode all
 
 # 指定数据库目录
@@ -61,14 +66,14 @@ gside species contigs.fna --mode panel --db-dir /path/to/dbs
 | 选项 | 默认 | 说明 |
 |---|---|---|
 | `--tier` | `panel` | mini / panel / mash / all |
-| `--source` | — | 从现有 bacmap 数据库复制 |
+| `--source` | 无 | 从本地已有数据目录复制 |
 
 ### 示例
 
 ```bash
 gside db status
 gside db setup --tier all
-gside db setup --tier panel --source ~/bacmap/data/db
+gside db setup --tier panel --source /path/to/existing/db
 ```
 
 ## gside --version

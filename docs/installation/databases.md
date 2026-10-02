@@ -7,9 +7,12 @@ gside reference databases are managed via the `gside db` subcommand with tiered 
 | Tier | Contents | Size | Purpose |
 |------|----------|------|---------|
 | **mini** | marker_rules.yaml + markers_v2.fasta + BLAST db | ~1MB | Target gene identification (L1) |
-| **panel** | refseq_panel (291 genomes, skani sketch) | ~88MB | ANI identification (L2) |
+| **panel** | refseq_panel (291 genomes, skani sketch) | ~130MB | ANI identification (L2) |
 | **mash** | mash_refseq (RefSeq MinHash sketch) | ~179MB | Distance identification (L2) |
-| **all** | panel + mash | ~267MB | Full capability |
+| **all** | panel + mash | ~310MB | Full capability |
+
+The `sourmash` mode uses a separate GTDB database (`sourmash_gtdb`) that is
+not covered by the tiers above.
 
 ## Commands
 
@@ -21,26 +24,35 @@ gside db status
 
 ```
 gside database status
-──────────────────────────────────────────
+───────────────────────────────────────────────
   ✅ markers_v2       tier=mini   path=data/reference/species
   ✅ refseq_panel     tier=panel  path=data/db/refseq_panel
   ✅ mash_refseq      tier=mash   path=data/db/mash_refseq
+
+  Run 'gside db setup --tier <tier>' to provision
 ```
 
 ### Install / update
 
 ```bash
-gside db setup --tier panel          # Panel only (ANI)
+gside db setup --tier panel          # Panel only (ANI), the default tier
 gside db setup --tier mash           # MinHash only
 gside db setup --tier all            # Everything
 ```
 
-### Copy from bacmap
+With no `--tier` given, setup defaults to `panel`. Panel tries a pre-built
+sketch from the GitHub release first and falls back to building from the
+bundled manifest (downloading genomes from NCBI). The mash sketch is
+downloaded from Zenodo and MD5-verified. Setup returns a non-zero exit code
+if any step reports an error.
 
-Users with an existing hermes-bacmap installation can copy databases directly:
+### Copy from an existing local database directory
+
+If you already have the databases on disk (for example from another machine
+or a previous checkout), skip the download and copy them directly:
 
 ```bash
-gside db setup --tier all --source ~/repos/github/hermes-bacmap/data/db
+gside db setup --tier all --source /path/to/existing/data/db
 ```
 
 ### List available tiers

@@ -3,12 +3,11 @@
 ## Layered Architecture
 
 gside's identification is layered by evidence strength — higher layers
-override lower ones (recorded, not fatal):
+override lower ones:
 
 ```
-L3  GTDB-Tk (standard mode, requires heavy environment)     [authority=3]
-L2  panel skani / mash_refseq / sourmash                    [authority=2]
-L1  marker target gene combination rules                    [authority=1]
+L2  panel (skani) / mash_refseq (mash) / sourmash (GTDB gather)   [authority=2]
+L1  marker target gene combination rules                          [authority=1]
 ```
 
 ## L1: marker (Target Gene Combination)
@@ -18,6 +17,15 @@ L1  marker target gene combination rules                    [authority=1]
 Performs a single BLAST scan of contigs against the markers_v2 database
 (81 sequences), then matches detected genes against 38 combination rules
 (data-driven, `marker_rules.yaml`).
+
+### Thresholds
+
+| Gate | Value | Description |
+|------|-------|-------------|
+| Global minimum identity | 85% | Hits below this are discarded outright |
+| Global minimum coverage | 60% | Prevents short-HSP high-identity false fires |
+| Rule minimum identity | 90% default | Per-rule override via `min_identity` |
+| High confidence | average identity ≥ 90% | `confidence=high`, otherwise `medium` |
 
 ### Rule Mechanism
 
@@ -35,7 +43,7 @@ Performs a single BLAST scan of contigs against the markers_v2 database
   (e.g., C.jejuni vs C.coli)
 - **tlh near-relative guard**: single-gene <90% hit → suppressed to Unknown
   (V.alginolyticus case study)
-- **coverage threshold**: global ≥60% (prevents short-HSP high-identity false fires)
+- **coverage gate**: global ≥60% (prevents short-HSP high-identity false fires)
 
 ### Use Cases
 
@@ -52,17 +60,17 @@ reference panel (291 genomes, 30 enabled pathogen species).
 
 ### Thresholds
 
-| ANI | Coverage | Call |
-|-----|----------|------|
-| ≥95% | ≥70% | species=matched reference, confidence=high |
-| 90-95% | ≥70% | confidence=medium (review recommended) |
-| <90% | — | Unknown |
+| ANI | Aligned fraction | Call |
+|-----|------------------|------|
+| ≥95% | ≥0.65 | species=matched reference, confidence=high |
+| 93-95% | ≥0.65 | confidence=medium (review recommended) |
+| <93% | — | Unknown |
 
 ### Use Cases
 
 - Precise species confirmation (subspecies resolution)
 - Near-relative discrimination (when marker layer cannot distinguish)
-- Requires panel tier database (~88MB)
+- Requires panel tier database (~130MB)
 
 ## L2: mash_refseq (MinHash Distance)
 
@@ -70,6 +78,14 @@ reference panel (291 genomes, 30 enabled pathogen species).
 
 mash computes MinHash distance between contigs and the entire RefSeq sketch
 (~179MB).
+
+### Thresholds
+
+| Mash identity | Call |
+|---------------|------|
+| ≥0.97 | confidence=high |
+| 0.90-0.97 | confidence=medium |
+| <0.90 | Unknown |
 
 ### Use Cases
 
@@ -84,18 +100,33 @@ mash computes MinHash distance between contigs and the entire RefSeq sketch
 sourmash gather performs LCA classification based on the GTDB taxonomic
 framework.
 
+### Thresholds
+
+| f_unique_weighted | Call |
+|-------------------|------|
+| ≥0.90 | confidence=high (unless a mixture is flagged) |
+| 0.70-0.90 | confidence=medium |
+| <0.70 | Mixed/Unknown |
+
+When two or more gathered lineages each reach `f_unique_weighted` ≥ 0.10,
+the result carries a `possible_mixture` flag and the high-confidence branch
+is withheld.
+
 ### Use Cases
 
 - Alignment with GTDB taxonomy
-- Mixed samples (gather can decompose)
-- Requires 3.7GB sourmash GTDB database
+- Mixed samples (gather decomposes the query and can flag `possible_mixture`)
+- Requires the sourmash GTDB database
 
 ## all Mode (Multi-Method Arbitration)
 
-Runs all available methods and arbitrates by layer:
+Runs all available methods and arbitrates. A single-method failure does not
+abort the run: the error goes into that method's JSON entry and arbitration
+uses the methods that succeeded.
 
 ```
-ANI layer (panel/mash/sourmash) high-confidence hit > marker layer hit
+Layer 2 (panel/mash_refseq/sourmash) beats layer 1 (marker);
+within the same layer, high confidence beats lower confidence.
 ```
 
 ```bash
@@ -126,5 +157,6 @@ Output includes all method results plus final verdict:
 | Rapid screening | `marker` | Seconds, zero external dependencies |
 | Precise identification | `panel` | ANI gold standard |
 | Broad-spectrum scan | `mash_refseq` | Covers all RefSeq |
+| GTDB-aligned call | `sourmash` | LCA classification under GTDB |
 | Comprehensive | `all` | Multi-method complementary + arbitration |
 | Near-relative discrimination | `panel` or `all` | marker may cross-react |

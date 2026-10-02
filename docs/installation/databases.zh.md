@@ -6,10 +6,10 @@ gside 的参考数据库通过 `gside db` 子命令管理，支持分层数据�
 
 | Tier | 包含 | 大小 | 用途 |
 |---|---|---|---|
-| **mini** | marker_rules.yaml + markers_v2.fasta + BLAST 库 | ~1MB | 靶基因组合鉴定（L1） |
-| **panel** | refseq_panel（291 基因组 skani sketch） | ~2.7GB | ANI 鉴定（L2） |
-| **mash** | mash_refseq（RefSeq MinHash sketch） | ~331MB | 距离鉴定（L2） |
-| **all** | panel + mash | ~3GB | 全层次能力 |
+| **mini** | marker_rules.yaml + markers_v2.fasta + 预建 BLAST 库 | ~1MB | 靶基因组合鉴定（L1），随仓库分发 |
+| **panel** | refseq_panel（291 基因组 skani sketch） | ~130MB | ANI 鉴定（L2） |
+| **mash** | mash_refseq（RefSeq MinHash sketch） | ~179MB | 距离鉴定（L2） |
+| **all** | panel + mash | ~310MB | 全层次能力 |
 
 ## 命令
 
@@ -30,18 +30,12 @@ gside database status
 ### 安装/更新
 
 ```bash
-gside db setup --tier panel          # 仅面板（ANI）
+gside db setup --tier panel          # 仅面板（ANI），默认
 gside db setup --tier mash           # 仅 MinHash
 gside db setup --tier all            # 全部
 ```
 
-### 从 bacmap 复制
-
-已有 hermes-bacmap 环境的用户可直接复制数据库：
-
-```bash
-gside db setup --tier all --source ~/repos/github/hermes-bacmap/data/db
-```
+不带 `--tier` 时默认安装 `panel`。
 
 ### 查看可用 tier
 
@@ -80,4 +74,4 @@ cd data/reference/species
 makeblastdb -in markers_v2.fasta -dbtype nucl -out markers_v2_blastdb
 ```
 
-无需修改代码——规则即数据。
+无需修改代码：规则即数据。

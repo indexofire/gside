@@ -1,8 +1,11 @@
 # JSON 输出契约
 
-所有 gside 输出均为统一 JSON 格式，与 GOM（Genome Object Model）兼容。
+所有 gside 输出为统一 JSON（stdout）。
 
-## 单方法输出（--mode marker/panel/mash_refseq）
+`marker` 方法的结果为扁平结构（无 `result` 包装）；`panel`、`mash_refseq`、
+`sourmash` 的结果嵌套在 `result` 字段内。
+
+## 单方法输出（--mode marker）
 
 ```json
 {
@@ -70,7 +73,8 @@
         ]
       }
     },
-    "mash_refseq": { ... }
+    "mash_refseq": { ... },
+    "sourmash": { ... }
   },
   "verdict": {
     "species": "Campylobacter jejuni subsp. jejuni NCTC 11168",
@@ -87,9 +91,11 @@
 | `analysis_type` | str | 固定为 `species_identification` |
 | `tool` | str | 固定为 `gside` |
 | `version` | str | gside 版本号 |
+| `contigs` | str | 输入 contigs 文件路径 |
 | `methods` | dict | 每个运行的方法的结果（key = mode 名） |
 | `methods.<mode>.species` | str | 该方法判定的物种（Unknown 表示无法判定） |
 | `methods.<mode>.confidence` | str | high / medium / low |
+| `methods.<mode>.result` | dict | ANI/sourmash 方法的嵌套结果（marker 无此层） |
 | `methods.<mode>.error` | str | 方法执行错误（仅失败时出现） |
 | `verdict.species` | str | 最终仲裁判定 |
 | `verdict.confidence` | str | 最终置信度 |
@@ -103,9 +109,9 @@
 | `result.aligned_fraction` | float | 比对覆盖比例 |
 | `result.top_hits` | list | 前 N 个命中（genome/species/ani/af） |
 
-## GOM 兼容
+## 消费输出
 
-输出格式可直接映射到 GOM ANALYSIS 对象的 `payload`：
+用 subprocess 调用 gside，再用标准库 json 解析 stdout：
 
 ```python
 import json, subprocess
@@ -116,10 +122,12 @@ result = subprocess.run(
 )
 payload = json.loads(result.stdout)
 
-# 直接作为 GOM payload 入库
-gos.create(GenomeObject(
-    object_type=ObjectType.ANALYSIS,
-    payload=payload,
-    ...
-))
+print(payload["verdict"]["species"])      # 最终判定
+print(payload["verdict"]["confidence"])   # 最终置信度
+for name, method in payload["methods"].items():
+    if "error" in method:
+        print(f"{name} failed: {method['error']}")
 ```
+
+注意：gside 恒以退出码 0 结束。判断鉴定成败应读取 JSON 内容
+（`methods.<mode>.error` 与 `verdict`），而不是依赖退出码。

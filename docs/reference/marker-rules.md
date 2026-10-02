@@ -19,12 +19,12 @@ rules:
       - <gene2>
     min_hits: <int>                   # optional: minimum hits (default 1)
     min_identity: <float>             # optional: minimum identity % (default 90)
-    min_coverage: <float>             # optional: minimum coverage % (default 50)
     exclude_genes:                    # optional: exclusion guard
       - <cross_reactive_gene>
-    priority_over:                    # optional: priority declaration
-      - <other_species>
+    min_coverage: <float>             # optional: see caveat below
     note: <str>                       # optional: documentation
+    co_detect_note: <str>             # optional: documentation for
+                                      # co-detection conflicts
 ```
 
 ## Field Reference
@@ -41,8 +41,9 @@ Candidate marker gene names (lowercase). These genes must exist in
 
 ### min_hits
 
-Minimum number of genes that must hit. Setting 2 means at least 2 genes from
-the `genes` list must reach thresholds for the species to be called.
+Minimum number of genes that must hit (default 1). Setting 2 means at least
+2 genes from the `genes` list must reach thresholds for the species to be
+called.
 
 Multi-gene combinations significantly reduce cross-reactions (e.g.,
 C.jejuni's 2-of-3 design).
@@ -71,9 +72,18 @@ Typical usage — Campylobacter species discrimination:
   # no exclusion: jejuni genomes naturally contain ceuE homologs
 ```
 
-### priority_over
+### min_coverage
 
-Declares this species takes priority over others (e.g., DEC over
+Documented per-rule coverage intent. **Caveat**: rule-level `min_coverage`
+is currently ignored by the engine. The global coverage gate (60%, see
+below) is what actually applies. Treat this field as documentation until it
+is wired into the engine.
+
+### note / co_detect_note
+
+Free-text documentation fields. They carry no runtime effect. Use `note` for
+general context and `co_detect_note` to record how to interpret the rule
+when its markers co-occur with another species' markers (e.g., DEC vs
 Shigella_EIEC).
 
 ## Global Thresholds
@@ -84,7 +94,7 @@ The engine layer defines global gates (in `multigene_identifier.py`):
 |-----------|-------|-------------|
 | `_MIN_IDENTITY` | 85.0 | Global minimum identity |
 | `_MIN_COVERAGE` | 60.0 | Global minimum coverage (prevents short-HSP false fires) |
-| `_HIGH_CONF` | 90.0 | High confidence threshold |
+| `_HIGH_CONF` | 90.0 | High confidence threshold (average identity of matched genes) |
 
 Rule-level `min_identity` can override the global value (but not below 85).
 

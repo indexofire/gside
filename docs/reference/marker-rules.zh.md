@@ -1,6 +1,7 @@
 # 标记规则格式
 
-`marker_rules.yaml` 定义靶基因组合鉴定规则——新增物种只需添加规则条目，无需修改代码。
+`marker_rules.yaml` 定义靶基因组合鉴定规则。新增物种只需添加规则条目，
+无需修改代码。
 
 ## 文件位置
 
@@ -18,19 +19,19 @@ rules:
       - <gene2>
     min_hits: <int>                 # 可选：最少命中数（默认 1）
     min_identity: <float>           # 可选：最低一致性 %（默认 90）
-    min_coverage: <float>           # 可选：最低覆盖率 %（默认 50）
+    min_coverage: <float>           # 可选：最低覆盖率 %（当前被引擎忽略，生效全局 60）
     exclude_genes:                  # 可选：排除守卫
       - <cross_reactive_gene>
-    priority_over:                  # 可选：优先级声明
-      - <other_species>
-    note: <str>                     # 可选：注释
+    note: <str>                     # 可选：注释（文档性）
+    co_detect_note: <str>           # 可选：共检出说明（文档性）
 ```
 
 ## 字段说明
 
 ### species
 
-物种名，使用注册表键名（空格→下划线）。如 `Campylobacter_jejuni`、`V_parahaemolyticus`。
+物种名，使用注册表键名（空格转下划线）。如 `Campylobacter_jejuni`、
+`V_parahaemolyticus`。
 
 ### genes
 
@@ -52,7 +53,7 @@ rules:
 
 **排除守卫**：如果这些基因在样本中检测到，则该物种的判定被抑制。
 
-典型用法——弯曲菌种间区分：
+典型用法，弯曲菌种间区分：
 
 ```yaml
 - species: Campylobacter_coli
@@ -64,9 +65,15 @@ rules:
   # 无排除：jejuni 基因组天然含 ceuE 同源体
 ```
 
-### priority_over
+### min_coverage
 
-声明本物种优先于其他物种（如 DEC 优先于 Shigella_EIEC）。
+规则级最低覆盖率百分比。**当前引擎忽略该字段**：覆盖率门槛实际由全局
+`_MIN_COVERAGE`（60）生效，在规则中设置 min_coverage 不会改变判定。
+
+### note 与 co_detect_note
+
+文档性字段。记录规则设计意图与近缘种共检出提示，仅供规则维护者参考，
+不参与判定逻辑。
 
 ## 全局阈值
 
@@ -79,6 +86,7 @@ rules:
 | `_HIGH_CONF` | 90.0 | 高置信度分界 |
 
 规则中的 `min_identity` 可以覆盖全局值（但不会低于 85）。
+规则级 `min_coverage` 当前被忽略，实际生效全局 60。
 
 ## 新增物种示例
 
@@ -96,6 +104,9 @@ rules:
 ```
 
 然后：
-1. 将对应基因序列追加到 `markers_v2.fasta`（`>markers_v2~~~mpb64~~~ACC 描述 [物种] role=primary`）
-2. 重建 BLAST 库：`makeblastdb -in markers_v2.fasta -dbtype nucl -out markers_v2_blastdb`
+
+1. 将对应基因序列追加到 `markers_v2.fasta`，FASTA 头格式：
+   `>markers_v2~~~mpb64~~~ACC 描述 [物种] role=primary`
+2. 重建 BLAST 库：
+   `makeblastdb -in markers_v2.fasta -dbtype nucl -out markers_v2_blastdb`
 3. 运行 `gside species test.fna --mode marker` 验证

@@ -16,9 +16,11 @@ gside species <contigs.fasta> [options]
 |----------|------|---------|-------------|
 | `contigs` | positional | — | Assembled contigs FASTA file |
 | `--mode` | option | `marker` | Identification mode (see below) |
-| `--db-dir` | option | auto | Database root directory |
+| `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
 
 ### Identification Modes
+
+Five modes are available. `marker` is the default.
 
 | Mode | Description | Database Required |
 |------|-------------|-------------------|
@@ -28,6 +30,9 @@ gside species <contigs.fasta> [options]
 | `sourmash` | sourmash GTDB gather | sourmash GTDB db |
 | `all` | Run all available methods + arbitrate | as needed |
 
+In `all` mode a failure in one method does not abort the run: the error is
+recorded in that method's JSON entry and the remaining methods continue.
+
 ### Examples
 
 ```bash
@@ -36,6 +41,12 @@ gside species contigs.fna --mode marker
 
 # ANI identification (precise)
 gside species contigs.fna --mode panel
+
+# MinHash distance against RefSeq
+gside species contigs.fna --mode mash_refseq
+
+# GTDB gather classification
+gside species contigs.fna --mode sourmash
 
 # Multi-method arbitration
 gside species contigs.fna --mode all
@@ -61,14 +72,14 @@ Database management subcommand.
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--tier` | `panel` | mini / panel / mash / all |
-| `--source` | — | Copy from existing bacmap databases |
+| `--source` | — | Copy from an existing local database directory instead of downloading |
 
 ### Examples
 
 ```bash
 gside db status
 gside db setup --tier all
-gside db setup --tier panel --source ~/bacmap/data/db
+gside db setup --tier panel --source /path/to/existing/data/db
 ```
 
 ## gside --version

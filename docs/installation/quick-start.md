@@ -1,6 +1,6 @@
 # Quick Start
 
-From zero to species identification in 5–15 minutes (including databases).
+From zero to species identification in 5 to 15 minutes (including databases).
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ cd gside
 pixi install
 ```
 
-Automatically fetches blast, skani, mash, mmseqs2, etc.
+Automatically fetches blast, skani, mash, sourmash, etc.
 
 ### 3. Python package
 
@@ -45,19 +45,18 @@ gside uses a tiered database design:
 | Tier | Contents | Size | Status |
 |------|----------|------|--------|
 | mini | Marker rules + sequences | ~1MB | ✅ Bundled with repo |
-| panel | Curated reference panel (skani sketch) | ~88MB | Requires `gside db setup` |
+| panel | Curated reference panel (skani sketch) | ~130MB | Requires `gside db setup` |
 | mash | RefSeq MinHash sketch | ~179MB | Requires `gside db setup` |
-| all | panel + mash | ~267MB | One-time install |
+| all | panel + mash | ~310MB | One-time install |
 
-See [Databases](databases.md) for details.
-
-## Copy from bacmap (local development)
-
-If you already have hermes-bacmap's databases:
+The `marker` mode works out of the box with the bundled mini tier. The
+`panel`, `mash_refseq`, and `all` modes need a one-time database download:
 
 ```bash
-gside db setup --tier all --source /path/to/hermes-bacmap/data/db
+gside db setup --tier all
 ```
+
+See [Databases](databases.md) for details.
 
 ## Next Steps
 
