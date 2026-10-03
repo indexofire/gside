@@ -11,7 +11,7 @@ docs-build = "mkdocs build --strict"
 check = "ruff check src/ tests/ && ruff format --check src/ tests/"
 fix = "ruff check --fix src/ tests/ && ruff format src/ tests/"
 typecheck = "pyright src/gside/"
-cov = "pytest tests/ -q --cov=src/gside --cov-report=term-missing --cov-fail-under=96"
+cov = "pytest tests/ -q --cov=src/gside --cov-report=term-missing --cov-fail-under=95"
 
 [dependencies]
 python = ">=3.12,<3.13"

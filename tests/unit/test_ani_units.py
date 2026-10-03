@@ -20,8 +20,6 @@ from gside.analysis.ani_identifier import (
 )
 from gside.engine.backends.skani import AniHit
 
-_REPO = Path(__file__).resolve().parents[2]
-
 
 def _completed(stdout: str = "", returncode: int = 0, stderr: str = ""):
     return types.SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
@@ -37,11 +35,6 @@ def taxadb(tmp_path):
 
 
 class TestTaxaMap:
-    def test_real_panel_map(self):
-        mapping = _load_taxa_map(_REPO / "data" / "db" / "L2_ani")
-        assert len(mapping) == 291
-        assert mapping["GCF_000005845.2_ASM584v2_genomic.fna"].startswith("Escherichia coli")
-
     def test_fixture_map(self, taxadb):
         assert _load_taxa_map(taxadb)["GCF_A"] == "Escherichia coli K12"
 

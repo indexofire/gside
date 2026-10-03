@@ -46,6 +46,16 @@ class TestMashSelfIdentity:
         assert 0.0 <= r["identity"] <= 1.0
 
 
+@pytest.mark.skipif(not (_PANEL / "metadata.tsv").is_file(), reason="panel metadata missing")
+class TestPanelTaxaMap:
+    def test_real_panel_map_has_291_genomes(self):
+        from gside.analysis.ani_identifier import _load_taxa_map
+
+        mapping = _load_taxa_map(_PANEL)
+        assert len(mapping) == 291
+        assert mapping["GCF_000005845.2_ASM584v2_genomic.fna"].startswith("Escherichia coli")
+
+
 _MASH_GOLDENS = {
     "GCF_000006945.2_ASM694v2_genomic.fna": ("Salmonella_enterica", 1.0),
     "GCF_000009085.1_ASM908v1_genomic.fna": ("Campylobacter_jejuni", 1.0),

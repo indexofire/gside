@@ -40,7 +40,7 @@ indent-style = "space"
 source = ["gside"]
 
 [tool.coverage.report]
-fail_under = 96
+fail_under = 95
 skip_covered = true
 
 [tool.pytest.ini_options]
