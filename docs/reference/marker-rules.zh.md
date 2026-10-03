@@ -6,7 +6,7 @@
 ## 文件位置
 
 ```
-data/db/L1_marker/marker_rules.yaml
+data/db/D1_marker/marker_rules.yaml
 ```
 
 ## 规则结构

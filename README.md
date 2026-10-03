@@ -66,7 +66,7 @@ gside --version
 
 ## 自定义规则
 
-编辑 `data/db/L1_marker/marker_rules.yaml`，字段为 `species` / `genes` /
+编辑 `data/db/D1_marker/marker_rules.yaml`，字段为 `species` / `genes` /
 `min_hits` / `min_identity` / `exclude_genes`。修改 fasta 后重建 BLAST 库即生效，
 无需改代码：
 

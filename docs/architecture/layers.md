@@ -47,10 +47,10 @@ gside/
 │                                   (present but not yet wired into the CLI)
 ├── data/
 │   └── db/                 Per-scheme directories (one folder per method)
-│       ├── L1_marker/      marker rules + fasta + BLAST db (tracked in git)
-│       ├── L2_ani/         skani sketch + genomes (gitignored) + manifests/ (tracked recipe)
-│       ├── L3_mash/        mash sketch (gitignored)
-│       └── L4_sourmash/    GTDB reps k=31 + lineages (via db setup)
+│       ├── D1_marker/      marker rules + fasta + BLAST db (tracked in git)
+│       ├── D2_ani/         skani sketch + genomes (gitignored) + manifests/ (tracked recipe)
+│       ├── D3_mash/        mash sketch (gitignored)
+│       └── D4_sourmash/    GTDB reps k=31 + lineages (via db setup)
 └── tests/
 ```
 

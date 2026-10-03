@@ -38,10 +38,10 @@ gside/
 │       └── species_canon.py          物种名规范化（未接入 CLI）
 ├── data/
 │   └── db/                 按方案分目录（一法一文件夹）
-│       ├── L1_marker/      标记规则 + fasta + BLAST 库（git 跟踪）
-│       ├── L2_ani/         skani sketch + 基因组（gitignored）+ manifests/（跟踪的配方）
-│       ├── L3_mash/        mash sketch（gitignored）
-│       └── L4_sourmash/    GTDB reps k=31 + lineages（db setup 安装）
+│       ├── D1_marker/      标记规则 + fasta + BLAST 库（git 跟踪）
+│       ├── D2_ani/         skani sketch + 基因组（gitignored）+ manifests/（跟踪的配方）
+│       ├── D3_mash/        mash sketch（gitignored）
+│       └── D4_sourmash/    GTDB reps k=31 + lineages（db setup 安装）
 └── tests/
 ```
 

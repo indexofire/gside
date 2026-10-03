@@ -7,9 +7,9 @@ gside reference databases are managed via the `gside db` subcommand with tiered 
 | Tier | Contents | Size | Purpose |
 |------|----------|------|---------|
 | **mini** | marker_rules.yaml + markers.fasta + BLAST db | ~1MB | Target gene identification (L1) |
-| **panel** | L2_ani (291 genomes, skani sketch) | ~130MB | ANI identification (L2) |
-| **mash** | L3_mash (RefSeq MinHash sketch) | ~179MB | Distance identification (L2) |
-| **sourmash** | L4_sourmash (GTDB reps k=31 + lineages) | ~3.9GB | Gather classification (sourmash) |
+| **panel** | D2_ani (291 genomes, skani sketch) | ~130MB | ANI identification (L2) |
+| **mash** | D3_mash (RefSeq MinHash sketch) | ~179MB | Distance identification (L2) |
+| **sourmash** | D4_sourmash (GTDB reps k=31 + lineages) | ~3.9GB | Gather classification (sourmash) |
 | **all** | panel + mash | ~310MB | Full capability (excludes sourmash) |
 
 ### Directory naming
@@ -18,16 +18,16 @@ gside reference databases are managed via the `gside db` subcommand with tiered 
 
 | Old name | New name | Method |
 |----------|----------|--------|
-| `refseq_panel` | `L2_ani` | panel (skani ANI) |
-| `mash_refseq` | `L3_mash` | mash_refseq (MinHash) |
-| `sourmash_gtdb` | `L4_sourmash` | sourmash (GTDB gather) |
+| `refseq_panel` | `D2_ani` | panel (skani ANI) |
+| `mash_refseq` | `D3_mash` | mash_refseq (MinHash) |
+| `sourmash_gtdb` | `D4_sourmash` | sourmash (GTDB gather) |
 
 Migrate an existing checkout with:
 
 ```bash
-mv data/db/refseq_panel data/db/L2_ani
-mv data/db/mash_refseq data/db/L3_mash
-mkdir -p data/db/L4_sourmash
+mv data/db/refseq_panel data/db/D2_ani
+mv data/db/mash_refseq data/db/D3_mash
+mkdir -p data/db/D4_sourmash
 ```
 
 Note: the prebuilt GitHub Release archive still contains the inner
@@ -44,10 +44,10 @@ gside db status
 ```
 gside database status
 ───────────────────────────────────────────────
-  ✅ markers          tier=mini   path=data/db/L1_marker
-  ✅ L2_ani        tier=panel  path=data/db/L2_ani
-  ✅ L3_mash         tier=mash   path=data/db/L3_mash
-  ✅ L4_sourmash     tier=sourmash path=data/db/L4_sourmash
+  ✅ markers          tier=mini   path=data/db/D1_marker
+  ✅ D2_ani        tier=panel  path=data/db/D2_ani
+  ✅ D3_mash         tier=mash   path=data/db/D3_mash
+  ✅ D4_sourmash     tier=sourmash path=data/db/D4_sourmash
 
   Run 'gside db setup --tier <tier>' to provision
 ```
@@ -98,7 +98,7 @@ Default paths can be overridden via environment variables:
 
 ## Custom Marker Rules
 
-Edit `data/db/L1_marker/marker_rules.yaml`:
+Edit `data/db/D1_marker/marker_rules.yaml`:
 
 ```yaml
 - species: Mycobacterium_tuberculosis
@@ -113,7 +113,7 @@ Edit `data/db/L1_marker/marker_rules.yaml`:
 Then rebuild the BLAST database:
 
 ```bash
-cd data/db/L1_marker
+cd data/db/D1_marker
 makeblastdb -in markers.fasta -dbtype nucl -out markers_blastdb
 ```
 

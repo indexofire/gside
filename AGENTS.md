@@ -205,18 +205,18 @@ tests/
     └── test_cli.py           # Real-BLAST smoke + arbitration unit tests
 data/
 ├── db/
-│   ├── L1_marker/            # mini tier, TRACKED in git: rules + fasta + blastdb
-│   ├── L2_ani/               # panel tier (skani sketch + genomes), gitignored
+│   ├── D1_marker/            # mini tier, TRACKED in git: rules + fasta + blastdb
+│   ├── D2_ani/               # panel tier (skani sketch + genomes), gitignored
 │   │                         # except manifests/ (tracked build recipe)
-│   ├── L3_mash/              # mash tier (mash.msh), gitignored
-│   └── L4_sourmash/          # GTDB reps k31 + lineages, via db setup (3.9GB)
+│   ├── D3_mash/              # mash tier (mash.msh), gitignored
+│   └── D4_sourmash/          # GTDB reps k31 + lineages, via db setup (3.9GB)
 docs/
 ├── index.md / index.zh.md    # + architecture|installation|usage|reference/, same pairing
 └── (nav in mkdocs.yml; en default, zh secondary; build with --strict)
 ```
 
 - Keep modules focused and small; no circular imports
-- L1 runtime data lives in `data/db/L1_marker/` (tracked); large L2 databases are
+- L1 runtime data lives in `data/db/D1_marker/` (tracked); large L2 databases are
   gitignored and provisioned via `gside db setup`
 
 ---

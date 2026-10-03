@@ -6,7 +6,7 @@ adding new species requires only a rule entry, no code changes.
 ## File Location
 
 ```
-data/db/L1_marker/marker_rules.yaml
+data/db/D1_marker/marker_rules.yaml
 ```
 
 ## Rule Structure
