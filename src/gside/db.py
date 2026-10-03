@@ -35,7 +35,7 @@ MASH_ZENODO_URL = "https://zenodo.org/records/22664519/files/RefSeqSketches_237.
 MASH_MD5 = "dee53b23af3ab120333f9eb1b95ae60f"
 # Pinned SHA256 digests (hex) of downloaded artifacts. An empty string means
 # no checksum is pinned yet; _verify_sha256 prints a warning and skips.
-PANEL_SHA256 = ""
+PANEL_SHA256 = "f9bdbeeaa744a6ed9fafef98e854d309eebc8d060df787345c2d7cdd1e36e595"
 SOURMASH_SIG_SHA256 = ""
 SOURMASH_LINEAGES_SHA256 = "98bceab27a50f08b2f777ca7bdfb57c88aabe5ce1fa54cfb103dd0ad51b67624"
 SOURMASH_FARM_BASE = "https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs226"

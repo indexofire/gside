@@ -158,6 +158,7 @@ class TestPanelRelease:
             _write_tar(Path(dst), ["panel.sketch/sketches.db"])
 
         monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "PANEL_SHA256", "")
         msg = _try_download_panel_release(dst)
         assert msg == "downloaded from GitHub Release (pre-built sketch)"
 
@@ -169,6 +170,7 @@ class TestPanelRelease:
             _write_tar(Path(dst), ["other/file.txt"])
 
         monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "PANEL_SHA256", "")
         msg = _try_download_panel_release(dst)
         assert msg.startswith("ERROR: downloaded archive did not contain")
 
@@ -344,7 +346,9 @@ class TestSourmashRenameErrors:
 
 class TestPinnedChecksumConstants:
     def test_constants(self):
-        assert db.PANEL_SHA256 == ""
+        assert db.PANEL_SHA256 == (
+            "f9bdbeeaa744a6ed9fafef98e854d309eebc8d060df787345c2d7cdd1e36e595"
+        )
         assert db.SOURMASH_SIG_SHA256 == ""
         assert db.SOURMASH_LINEAGES_SHA256 == (
             "98bceab27a50f08b2f777ca7bdfb57c88aabe5ce1fa54cfb103dd0ad51b67624"
@@ -415,6 +419,7 @@ class TestTarExtractionSafety:
             _write_tar(Path(d), ["panel.sketch/sketches.db", "panel.sketch/nested/deep/file.txt"])
 
         monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "PANEL_SHA256", "")
         msg = _try_download_panel_release(dst)
         assert msg == "downloaded from GitHub Release (pre-built sketch)"
         assert (dst / "panel.sketch" / "sketches.db").is_file()
