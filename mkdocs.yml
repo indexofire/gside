@@ -51,6 +51,7 @@ nav:
   - Installation:
     - Quick Start: installation/quick-start.md
     - Databases: installation/databases.md
+    - Marker Database: installation/marker-database.md
   - Usage:
     - CLI Reference: usage/cli.md
     - Identification Modes: usage/modes.md
