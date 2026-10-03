@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -68,63 +69,35 @@ def _load_rules() -> list[dict[str, Any]]:
 
 
 def _blast_contigs(contigs_fasta: str) -> list[dict[str, Any]]:
-    import subprocess
+    from gside.config import which
+    from gside.engine._env import require_bin
+    from gside.engine.backends.blast import BlastBackend
 
-    from gside.config import pixi_path
-
-    blastn = None
-    for candidate in ["blastn"]:
-        result = subprocess.run(
-            ["sh", "-c", f"command -v {candidate}"],
-            capture_output=True,
-            text=True,
-            env={"PATH": pixi_path()},
-        )
-        if result.returncode == 0:
-            blastn = result.stdout.strip()
-            break
-    if not blastn:
-        blastn = "blastn"
+    blastn = require_bin(
+        "blastn",
+        hint="blastn not found — install via pixi (conda) or point GSIDE_PIXI_BIN at a bin dir",
+        resolver=which,
+    )
 
     db = str(SPECIES_DB_DIR / "L1_marker" / "markers_blastdb")
-    result = subprocess.run(
-        [
-            blastn,
-            "-query",
-            str(contigs_fasta),
-            "-db",
-            db,
-            "-outfmt",
-            "6 sseqid pident length slen",
-            "-evalue",
-            "1e-10",
-            "-word_size",
-            "11",
-            "-num_threads",
-            "4",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=600,
+    backend = BlastBackend(binary=blastn)
+    engine_hits = backend.find(
+        query=Path(contigs_fasta),
+        db_path=db,
+        evalue=1e-10,
+        word_size=11,
     )
     hits = []
-    for line in result.stdout.splitlines():
-        cols = line.split("\t")
-        if len(cols) < 4:
-            continue
-        seqid = cols[0]
-        pident = float(cols[1])
-        aln_len = float(cols[2])
-        subj_len = float(cols[3])
-        coverage = aln_len / subj_len * 100 if subj_len > 0 else 0
+    for hit in engine_hits:
+        seqid = hit.subject_id
         parts = seqid.split("~~~")
         gene = parts[1].lower() if len(parts) >= 2 else seqid.lower()
         hits.append(
             {
                 "gene": gene,
-                "identity": pident,
-                "coverage": round(coverage, 1),
-                "ref_len": int(subj_len),
+                "identity": hit.identity,
+                "coverage": round(hit.subject_coverage, 1),
+                "ref_len": hit.subject_length,
                 "seqid": seqid,
             }
         )

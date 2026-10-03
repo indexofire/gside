@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -50,23 +49,21 @@ def _skani_search(query: str | Path, db: Path) -> list[AniHit]:
 
 
 def _mash_dist(query: str | Path, msh: Path) -> list[tuple[str, float]]:
-    import shutil
+    from gside.config import which
+    from gside.engine._env import require_bin
+    from gside.engine.backends.kmer import MashBackend
 
-    from gside.config import pixi_path
-
-    mash = shutil.which("mash", path=pixi_path()) or shutil.which("mash") or "mash"
-    result = subprocess.run(
-        [mash, "dist", str(msh), str(query)], capture_output=True, text=True, timeout=600
+    mash = require_bin(
+        "mash",
+        hint="mash not found — install via pixi (conda) or point GSIDE_PIXI_BIN at a bin dir",
+        resolver=which,
     )
-    rows: list[tuple[str, float]] = []
-    for ln in result.stdout.splitlines():
-        cols = ln.split("\t")
-        if len(cols) >= 3:
-            try:
-                rows.append((cols[0], 1.0 - float(cols[2])))
-            except ValueError:
-                continue
-    return rows
+    # mash CLI is `dist <reference> <query>`: output column 0 carries the
+    # reference (sketch DB genome) IDs, so the sketch goes in the first slot.
+    # MashBackend.distance() places its first positional there; max_distance=1.0
+    # is mash's own default cutoff, i.e. no extra filtering vs. a bare `mash dist`.
+    results = MashBackend(binary=mash).distance(Path(msh), Path(query), max_distance=1.0)
+    return [(r.reference_id, 1.0 - r.distance) for r in results]
 
 
 def _mash_species(ref_id: str) -> str:
@@ -113,6 +110,10 @@ def identify_by_ani(
         msh = base / "mash.msh"
         if not msh.exists():
             msh = base / "payload.bin"
+        if not msh.exists():
+            raise RuntimeError(
+                f"mash sketch DB not found in {base} (run: gside db setup --tier mash)"
+            )
         mash_rows = _mash_dist(contigs, msh)
         mash_top = sorted(mash_rows, key=lambda r: -r[1])[:_TOP_N]
         best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)

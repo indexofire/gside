@@ -100,11 +100,19 @@ class TestRunSpeciesBatch:
         assert _run_species(["a.fna"], "marker", None, "md") == 0
         assert capsys.readouterr().out.startswith("| contigs |")
 
-    def test_identify_one_missing_file_is_unknown(self, tmp_path):
-        # Missing query never raises: blastn finds nothing, verdict is Unknown.
-        payload = _identify_one(str(tmp_path / "nope.fna"), "marker", None)
-        assert payload["methods"]["marker"]["species"] == "Unknown"
+    def test_identify_one_missing_file_surfaces_error(self, tmp_path, capsys):
+        missing = str(tmp_path / "nope.fna")
+        assert _run_species([missing], "marker", None) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert "error" in payload["methods"]["marker"]
         assert payload["verdict"]["species"] == "Unknown"
+        assert payload["verdict"]["confidence"] == "low"
+
+    def test_identify_one_mash_missing_db_surfaces_error(self, tmp_path):
+        payload = _identify_one("q.fna", "mash_refseq", db_dir=str(tmp_path))
+        assert "gside db setup --tier mash" in payload["methods"]["mash_refseq"]["error"]
+        assert payload["verdict"]["species"] == "Unknown"
+        assert payload["verdict"]["confidence"] == "low"
 
 
 class TestMainGroup:

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import subprocess
+import types
 from pathlib import Path
 
 import pytest
 
+from gside import config
 from gside.analysis import ani_identifier as ani
 from gside.analysis.ani_identifier import (
     AniIdResult,
@@ -20,11 +23,16 @@ from gside.engine.backends.skani import AniHit
 _REPO = Path(__file__).resolve().parents[2]
 
 
+def _completed(stdout: str = "", returncode: int = 0, stderr: str = ""):
+    return types.SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
+
+
 @pytest.fixture()
 def taxadb(tmp_path):
     (tmp_path / "metadata.tsv").write_text(
         "genome\tspecies\nGCF_A\tEscherichia coli K12\nGCF_B\tVibrio cholerae\n"
     )
+    (tmp_path / "mash.msh").write_bytes(b"")
     return tmp_path
 
 
@@ -143,11 +151,69 @@ class TestMashThresholds:
         assert r["species"] == "Unknown"
 
     def test_bad_distance_skipped(self, monkeypatch):
-        import subprocess
-        import types
-
-        def completed(stdout=""):
-            return types.SimpleNamespace(returncode=0, stdout=stdout, stderr="")
-
-        monkeypatch.setattr(subprocess, "run", lambda *a, **k: completed("refX\tq\tbadfloat"))
+        monkeypatch.setattr(config, "which", lambda tool: "/fake/mash")
+        monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed("refX\tq\tbadfloat"))
         assert ani._mash_dist("q.fna", "db.msh") == []
+
+
+class TestMashDelegation:
+    def test_routes_through_mash_backend(self, monkeypatch, tmp_path):
+        from gside.engine.backends import kmer as kmer_mod
+
+        calls: dict[str, object] = {}
+
+        class _KD:
+            def __init__(self, ref: str, dist: float) -> None:
+                self.reference_id = ref
+                self.distance = dist
+
+        class _M:
+            def __init__(self, kmer_size=21, sketch_size=1000, threads=4, binary=None):
+                calls["ctor"] = binary
+
+            def distance(self, query, reference, max_distance=0.1, **kw):
+                calls["find"] = (query, reference, max_distance)
+                return [_KD("GCF_A", 0.5), _KD("GCF_B", 0.25)]
+
+        monkeypatch.setattr(kmer_mod, "MashBackend", _M)
+        monkeypatch.setattr(config, "which", lambda tool: "/fake/mash")
+        rows = ani._mash_dist("q.fna", tmp_path / "mash.msh")
+        assert rows == [("GCF_A", 0.5), ("GCF_B", 0.75)]
+        assert calls["ctor"] == "/fake/mash"
+        assert calls["find"] == (tmp_path / "mash.msh", Path("q.fna"), 1.0)
+
+
+class TestMashFailures:
+    def test_missing_db_raises_with_setup_hint(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed(""))
+        with pytest.raises(RuntimeError, match="gside db setup --tier mash"):
+            identify_by_ani("q.fna", mode="mash_refseq", db_dir=tmp_path)
+
+    def test_missing_binary_raises_with_fix_hint(self, monkeypatch, tmp_path):
+        (tmp_path / "mash.msh").write_bytes(b"")
+        monkeypatch.setattr(config, "which", lambda tool: None)
+        monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed(""))
+        with pytest.raises(RuntimeError, match=r"mash not found.*GSIDE_PIXI_BIN"):
+            ani._mash_dist("q.fna", tmp_path / "mash.msh")
+
+    def test_nonzero_exit_raises_runtime_error(self, monkeypatch, tmp_path):
+        (tmp_path / "mash.msh").write_bytes(b"")
+        monkeypatch.setattr(config, "which", lambda tool: "/fake/mash")
+        monkeypatch.setattr(
+            subprocess,
+            "run",
+            lambda *a, **k: _completed("", returncode=1, stderr="mash exploded"),
+        )
+        with pytest.raises(RuntimeError, match=r"mash dist failed \(exit 1\)"):
+            ani._mash_dist("q.fna", tmp_path / "mash.msh")
+
+    def test_failure_message_carries_stderr(self, monkeypatch, tmp_path):
+        (tmp_path / "mash.msh").write_bytes(b"")
+        monkeypatch.setattr(config, "which", lambda tool: "/fake/mash")
+        monkeypatch.setattr(
+            subprocess,
+            "run",
+            lambda *a, **k: _completed("", returncode=2, stderr="sketch version mismatch"),
+        )
+        with pytest.raises(RuntimeError, match="sketch version mismatch"):
+            ani._mash_dist("q.fna", tmp_path / "mash.msh")
