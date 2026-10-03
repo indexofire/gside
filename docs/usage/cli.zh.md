@@ -68,11 +68,19 @@ gside species contigs.fna --mode panel --db-dir /path/to/dbs
 | `--tier` | `panel` | mini / panel / mash / sourmash / all |
 | `--source` | 无 | 从本地已有数据目录复制 |
 
+`all` **仅安装 panel + mash**（约 310MB）。sourmash GTDB 库（约 3.9GB）不含
+在 `all` 内，需单独安装：
+
+```bash
+gside db setup --tier sourmash
+```
+
 ### 示例
 
 ```bash
 gside db status
 gside db setup --tier all
+gside db setup --tier sourmash   # 不含在 --tier all 内（~3.9GB）
 gside db setup --tier panel --source /path/to/existing/db
 ```
 

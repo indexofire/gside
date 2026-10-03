@@ -67,6 +67,10 @@ bundled manifest (downloading genomes from NCBI). The mash sketch is
 downloaded from Zenodo and MD5-verified. Setup returns a non-zero exit code
 if any step reports an error.
 
+`--tier all` installs panel + mash only. The sourmash GTDB database
+(~3.9GB) is never included in `all`; run `gside db setup --tier sourmash`
+separately to provision it.
+
 ### Copy from an existing local database directory
 
 If you already have the databases on disk (for example from another machine

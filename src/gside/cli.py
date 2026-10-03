@@ -106,7 +106,7 @@ def db_status_cmd() -> None:
     type=click.Choice(TIERS),
     default="panel",
     show_default=True,
-    help="Database tier to install.",
+    help="Database tier to install (all = panel + mash; sourmash is separate).",
 )
 @click.option(
     "--source",

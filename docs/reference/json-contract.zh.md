@@ -84,6 +84,16 @@
 }
 ```
 
+## 多输入文件
+
+`gside species` 一次可接受多个 contigs 文件，顶层 JSON 结构随文件数量变化：
+
+- **1 个文件**：单个 JSON 对象，即上文示例的结构
+- **多个文件**：JSON **数组**，每个输入文件对应一个对象，按输入顺序排列
+
+`--format tsv` 与 `--format md` 是默认 `json` 之外的两种输出格式：每个输入
+文件渲染一行（TSV 或 Markdown 表格），而非嵌套对象。
+
 ## 字段说明
 
 | 字段 | 类型 | 说明 |
@@ -129,5 +139,14 @@ for name, method in payload["methods"].items():
         print(f"{name} failed: {method['error']}")
 ```
 
-注意：gside 恒以退出码 0 结束。判断鉴定成败应读取 JSON 内容
-（`methods.<mode>.error` 与 `verdict`），而不是依赖退出码。
+## 退出码
+
+`gside species` 恒以退出码 0 结束，即使一个或多个方法失败。判断鉴定成败
+应读取 JSON 内容（`methods.<mode>.error` 与 `verdict`），而不是依赖退出码。
+
+| 命令 | 退出码 | 行为 |
+|---|---|---|
+| `gside species` | 恒为 0 | 单法失败写入 `methods.<mode>.error`，不影响退出码 |
+| `gside db setup` | 0 / 1 | 任一安装结果消息含 `ERROR` 时为 1，否则为 0 |
+| `gside db`（未知子命令） | 1 | 输出 `unknown subcommand: ...` |
+| `gside validate` | 0 / 非零 | 无单法错误保护，失败直接抛出并以非零退出 |

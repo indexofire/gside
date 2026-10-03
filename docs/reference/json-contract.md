@@ -85,6 +85,19 @@ findings under a `result` object, as the `all` example below shows.
 }
 ```
 
+## Multiple Input Files
+
+`gside species` accepts several contigs files in one run. The top-level JSON
+shape depends on how many:
+
+- **1 file**: a single JSON object, as in the examples above
+- **2+ files**: a JSON **array** of those objects, one per input file, in
+  input order
+
+The `--format tsv` and `--format md` options are alternatives to the default
+`json`: they render one row per input file (TSV or Markdown table) instead of
+nested objects.
+
 ## Field Reference
 
 | Field | Type | Description |
@@ -134,3 +147,16 @@ for mode, entry in payload["methods"].items():
 
 A method that failed carries an `error` key instead of a species call, and
 in `all` mode the remaining methods still contribute to the verdict.
+
+## Exit Codes
+
+`gside species` always exits 0, even when one or more methods fail. Judge
+success by the JSON content (`methods.<mode>.error` and `verdict`), not by
+the exit code.
+
+| Command | Exit code | Behavior |
+|---------|-----------|----------|
+| `gside species` | always 0 | Per-method failures go to `methods.<mode>.error`, never the exit code |
+| `gside db setup` | 0 / 1 | 1 iff any setup result message contains `ERROR`, else 0 |
+| `gside db` (unknown subcommand) | 1 | Prints `unknown subcommand: ...` |
+| `gside validate` | 0 / non-zero | No per-method error guard; failures raise and exit non-zero |

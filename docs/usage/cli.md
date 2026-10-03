@@ -74,11 +74,19 @@ Database management subcommand.
 | `--tier` | `panel` | mini / panel / mash / sourmash / all |
 | `--source` | — | Copy from an existing local database directory instead of downloading |
 
+`all` installs **panel + mash only** (~310MB). The sourmash GTDB database
+(~3.9GB) is never part of `all`; provision it separately:
+
+```bash
+gside db setup --tier sourmash
+```
+
 ### Examples
 
 ```bash
 gside db status
 gside db setup --tier all
+gside db setup --tier sourmash   # not included in --tier all (~3.9GB)
 gside db setup --tier panel --source /path/to/existing/data/db
 ```
 

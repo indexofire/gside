@@ -60,6 +60,9 @@ gside db setup --tier all            # panel + mash（不含 sourmash）
 
 不带 `--tier` 时默认安装 `panel`。
 
+`--tier all` 仅安装 panel + mash。sourmash GTDB 库（约 3.9GB）不含在 `all`
+内，需另行执行 `gside db setup --tier sourmash` 单独安装。
+
 ### 查看可用 tier
 
 ```bash
