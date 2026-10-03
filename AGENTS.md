@@ -96,9 +96,9 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-10-03): 299 tests, total coverage **97%** — all modules 100%
-except: ani 94%, multigene 99%, taxonomic 93% (quarantined), cli 99%,
-db 91%, kma 93%, kmer 99%, read_mapper 99%. Enforced by `[tool.coverage.report] fail_under = 96` in `pyproject.toml`;
+Baseline (2026-10-03): 330 tests, total coverage **97%** — all modules 100%
+except: ani 93%, multigene 98%, taxonomic 93% (quarantined), cli 99%,
+db 92%, kma 94%, kmer 99%, read_mapper 99%. Enforced by `[tool.coverage.report] fail_under = 96` in `pyproject.toml`;
 raise it every time coverage climbs.
 
 ---
@@ -254,5 +254,6 @@ testpaths = ["tests"]
 - **Panel thresholds**: ANI ≥ 95 + AF ≥ 0.65 → high; 93–95 → medium. Mash identity ≥ 0.97 → high, 0.90–0.97 → medium.
 - **Arbitration is layer-first**: `(layer, confidence)` tuple — any L2 hit beats any L1 hit (`cli.py:_arbitrate`).
 - **`sourmash` needs its GTDB db**: provisioned via pixi (`sourmash>=4.9`) + `gside db setup --tier sourmash` (~3.9GB rs226 reps, renamed in place); `gather` output is read from `-o` file, never `--csv -` (unsupported flag).
-- **`engine/` is mostly aspirational**: only `SkaniBackend` is consumed; the marker path shells out to `blastn` directly. Don't assume backends are wired. `KmaBackend` imports cleanly (`parse_db_header` ported verbatim into `gside/utils.py`) but has no in-repo callers and no provisioned binary.
+- **DB download verification**: `db.py` pins digests (`MASH_MD5`, `SOURMASH_LINEAGES_SHA256`); empty constants (`PANEL_SHA256`, `SOURMASH_SIG_SHA256`) mean warn-and-skip. Tar extraction uses `filter="data"`. `PANEL_RELEASE_URL` currently 404s (no GitHub release published) — panel setup falls back to manifest build; pin the SHA256 once a release exists.
+- **`engine/` is wired for the species-ID hot paths**: marker → `BlastBackend`, panel → `SkaniBackend`, mash_refseq → `MashBackend` (analysis layer resolves binaries via `require_bin` and injects them with `binary=`; outputs are byte-equivalent to the former inline subprocess calls). Shared scaffolding lives in `engine/_env.py` (`require_bin`/`run_checked`; backends pass their module-level `which` as `resolver=` to keep test monkeypatch points). Still unconsumed: `KmaBackend`, `Mmseqs2Backend`, `MinimapBackend`, `ReadMapper`, `SequenceMatcher` — `KmaBackend` imports cleanly (`parse_db_header` ported verbatim into `gside/utils.py`) but has no in-repo callers and no provisioned binary.
 - **FASTA header contract**: `>markers~~~<gene>~~~<desc> role=<primary|confirm|typing|virulence>`; parser takes `split("~~~")[1]` — the `markers` prefix itself is never validated.
