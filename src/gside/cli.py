@@ -225,6 +225,7 @@ def _render_table(payloads: list[dict[str, Any]], markdown: bool) -> str:
                 errors,
             ]
         )
+
     def _clean(cell: str) -> str:
         return cell.replace("|", "/").replace("\n", " ").replace("\t", " ").replace("\r", " ")
 
