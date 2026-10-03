@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 
 _REPO = Path(__file__).resolve().parents[2]
-_GENOMES = _REPO / "data" / "db" / "L2_ani" / "genomes"
-_SKETCH = _REPO / "data" / "db" / "L2_ani" / "panel.sketch"
+_GENOMES = _REPO / "data" / "db" / "D2_ani" / "genomes"
+_SKETCH = _REPO / "data" / "db" / "D2_ani" / "panel.sketch"
 
 _CASES = {
     "GCF_000006945.2_ASM694v2_genomic.fna": ("Salmonella", "Salmonella"),

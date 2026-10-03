@@ -84,7 +84,7 @@ def _lineage_map(path: Path) -> dict[str, str]:
 
 
 def _db_version(db_dir: Path) -> str:
-    manifest = db_dir.parent / "manifests" / "L4_sourmash.json"
+    manifest = db_dir.parent / "manifests" / "D4_sourmash.json"
     if manifest.is_file():
         try:
             checksum = json.loads(manifest.read_text()).get("checksum", "")
@@ -95,9 +95,9 @@ def _db_version(db_dir: Path) -> str:
 
 
 def identify_by_sourmash(contigs: str | Path, db_dir: str | Path | None = None) -> SourmashIdResult:
-    base = Path(db_dir) if db_dir else SPECIES_DB_DIR / "L4_sourmash"
+    base = Path(db_dir) if db_dir else SPECIES_DB_DIR / "D4_sourmash"
     partition = _gather_and_tax(contigs, base)
-    database = {"name": "L4_sourmash", "version": _db_version(base)}
+    database = {"name": "D4_sourmash", "version": _db_version(base)}
 
     best_fuw = max((p["f_unique_weighted"] for p in partition), default=0.0)
     flags: list[str] = []

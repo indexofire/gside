@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 
 _REPO = Path(__file__).resolve().parents[2]
-_PANEL = _REPO / "data" / "db" / "L2_ani"
-_MASH = _REPO / "data" / "db" / "L3_mash"
+_PANEL = _REPO / "data" / "db" / "D2_ani"
+_MASH = _REPO / "data" / "db" / "D3_mash"
 _K12 = _PANEL / "genomes" / "GCF_000005845.2_ASM584v2_genomic.fna"
 
 _has_skani = shutil.which("skani") is not None
@@ -71,7 +71,7 @@ class TestMashGoldens:
     def test_mash_golden(self, fna, expected):
         from gside.analysis.ani_identifier import identify_by_ani
 
-        genome = _REPO / "data" / "db" / "L2_ani" / "genomes" / fna
+        genome = _REPO / "data" / "db" / "D2_ani" / "genomes" / fna
         if not genome.is_file():
             pytest.skip("genome missing")
         want_species, want_identity = expected

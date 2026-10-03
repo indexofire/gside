@@ -2,11 +2,11 @@
 .pixi/*
 !.pixi/config.toml
 # Large reference databases (not in git — use `gside db setup`)
-# NOTE: data/db/L2_ani/manifests/ (panel build recipe) stays git-tracked
-# despite the dir-level ignore below; use `git add -f` for new recipe files.
-data/db/L2_ani/
-data/db/L3_mash/
-data/db/L4_sourmash/
+# D2_ani contents are ignored except the manifests/ build recipe.
+data/db/D2_ani/*
+!data/db/D2_ani/manifests/
+data/db/D3_mash/
+data/db/D4_sourmash/
 site/
 
 # Python

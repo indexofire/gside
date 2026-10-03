@@ -40,8 +40,8 @@ def _touch(path: str | Path) -> Path:
 class TestStatus:
     def test_empty_all_not_ready(self, root):
         status = db_status()
-        assert set(status) == {"markers", "L2_ani", "L3_mash", "L4_sourmash"}
-        assert [status[k]["tier"] for k in ("markers", "L2_ani", "L3_mash")] == [
+        assert set(status) == {"markers", "D2_ani", "D3_mash", "D4_sourmash"}
+        assert [status[k]["tier"] for k in ("markers", "D2_ani", "D3_mash")] == [
             "mini",
             "panel",
             "mash",
@@ -49,20 +49,20 @@ class TestStatus:
         assert not any(v["ready"] for v in status.values())
 
     def test_ready_branches(self, root):
-        _touch(root / "L1_marker" / "markers.fasta")
-        _touch(root / "L2_ani" / "panel.sketch" / "sketches.db")
-        _touch(root / "L3_mash" / "payload.bin")
-        _touch(root / "L4_sourmash" / "gtdb-reps-k31.zip")
-        _touch(root / "L4_sourmash" / "lineages.csv")
+        _touch(root / "D1_marker" / "markers.fasta")
+        _touch(root / "D2_ani" / "panel.sketch" / "sketches.db")
+        _touch(root / "D3_mash" / "payload.bin")
+        _touch(root / "D4_sourmash" / "gtdb-reps-k31.zip")
+        _touch(root / "D4_sourmash" / "lineages.csv")
         status = db_status()
         assert all(v["ready"] for v in status.values())
 
     def test_panel_sketch_as_file(self, root):
-        _touch(root / "L2_ani" / "panel.sketch")
+        _touch(root / "D2_ani" / "panel.sketch")
         assert _check_panel()
 
     def test_mash_msh(self, root):
-        _touch(root / "L3_mash" / "mash.msh")
+        _touch(root / "D3_mash" / "mash.msh")
         assert _check_mash()
 
 
@@ -75,26 +75,26 @@ class TestSetupTiers:
             db_setup("wat")
 
     def test_already_ready(self, root):
-        _touch(root / "L2_ani" / "panel.sketch" / "sketches.db")
-        _touch(root / "L3_mash" / "mash.msh")
-        assert db_setup("panel") == {"L2_ani": "already ready"}
-        assert db_setup("mash") == {"L3_mash": "already ready"}
+        _touch(root / "D2_ani" / "panel.sketch" / "sketches.db")
+        _touch(root / "D3_mash" / "mash.msh")
+        assert db_setup("panel") == {"D2_ani": "already ready"}
+        assert db_setup("mash") == {"D3_mash": "already ready"}
 
 
 class TestCopyFromSource:
     def test_copy_exact_dir(self, root, tmp_path):
-        src = tmp_path / "L3_mash"
+        src = tmp_path / "D3_mash"
         _touch(src / "mash.msh")
-        assert _copy_from_source(str(src), "L3_mash") == f"copied from {src}"
-        assert (root / "L3_mash" / "mash.msh").is_file()
+        assert _copy_from_source(str(src), "D3_mash") == f"copied from {src}"
+        assert (root / "D3_mash" / "mash.msh").is_file()
 
     def test_copy_parent_appends_name(self, root, tmp_path):
-        _touch(tmp_path / "L2_ani" / "panel.sketch" / "sketches.db")
-        assert _copy_from_source(str(tmp_path), "L2_ani").startswith("copied from")
-        assert (root / "L2_ani" / "panel.sketch" / "sketches.db").is_file()
+        _touch(tmp_path / "D2_ani" / "panel.sketch" / "sketches.db")
+        assert _copy_from_source(str(tmp_path), "D2_ani").startswith("copied from")
+        assert (root / "D2_ani" / "panel.sketch" / "sketches.db").is_file()
 
     def test_missing_source(self, root, tmp_path):
-        msg = _copy_from_source(str(tmp_path / "nope"), "L2_ani")
+        msg = _copy_from_source(str(tmp_path / "nope"), "D2_ani")
         assert msg.startswith("ERROR: source not found")
 
 
@@ -105,7 +105,7 @@ def _write_gz(path: Path, payload: bytes = b"fake-sketch") -> None:
 
 class TestMashDownload:
     def test_md5_mismatch_cleans_up(self, root, monkeypatch, tmp_path):
-        dst = root / "L3_mash"
+        dst = root / "D3_mash"
         dst.mkdir(parents=True)
 
         def fake_download(url, dst):
@@ -114,10 +114,10 @@ class TestMashDownload:
         monkeypatch.setattr(db, "_download_file", fake_download)
         msg = _download_mash_zenodo(dst)
         assert msg.startswith("ERROR: MD5 mismatch")
-        assert not (root / "L3_mash" / "mash.msh.gz").exists()
+        assert not (root / "D3_mash" / "mash.msh.gz").exists()
 
     def test_happy_path(self, root, monkeypatch, tmp_path):
-        dst = root / "L3_mash"
+        dst = root / "D3_mash"
         dst.mkdir(parents=True)
         buf = io.BytesIO()
         with gzip.open(buf, "wb") as fh:
@@ -138,7 +138,7 @@ class TestMashDownload:
             raise OSError("offline")
 
         monkeypatch.setattr(db, "_download_file", boom)
-        assert _download_mash_zenodo(root / "L3_mash").startswith("ERROR: Zenodo")
+        assert _download_mash_zenodo(root / "D3_mash").startswith("ERROR: Zenodo")
 
 
 def _write_tar(path: Path, names: list[str]) -> None:
@@ -151,7 +151,7 @@ def _write_tar(path: Path, names: list[str]) -> None:
 
 class TestPanelRelease:
     def test_valid_tarball(self, root, monkeypatch, tmp_path):
-        dst = root / "L2_ani"
+        dst = root / "D2_ani"
         dst.mkdir(parents=True)
 
         def fake_download(url, dst):
@@ -163,7 +163,7 @@ class TestPanelRelease:
         assert msg == "downloaded from GitHub Release (pre-built sketch)"
 
     def test_invalid_tarball(self, root, monkeypatch):
-        dst = root / "L2_ani"
+        dst = root / "D2_ani"
         dst.mkdir(parents=True)
 
         def fake_download(url, dst):
@@ -179,7 +179,7 @@ class TestPanelRelease:
             raise OSError("offline")
 
         monkeypatch.setattr(db, "_download_file", boom)
-        assert _try_download_panel_release(root / "L2_ani") is None
+        assert _try_download_panel_release(root / "D2_ani") is None
 
 
 class TestBuildFromManifest:
@@ -216,7 +216,7 @@ class TestRunDbCommand:
     def test_status_and_list(self, root, capsys):
         assert run_db_command(["status"]) == 0
         assert run_db_command(["list"]) == 0
-        assert "L3_mash" in capsys.readouterr().out
+        assert "D3_mash" in capsys.readouterr().out
 
     def test_unknown_subcommand(self):
         assert run_db_command(["wat"]) == 1
@@ -226,27 +226,27 @@ class TestRunDbCommand:
         assert run_db_command(["setup", "panel"]) == 1
 
     def test_setup_ok(self, root):
-        _touch(root / "L2_ani" / "panel.sketch" / "sketches.db")
+        _touch(root / "D2_ani" / "panel.sketch" / "sketches.db")
         assert run_db_command(["setup", "panel"]) == 0
 
 
 class TestSourmashTier:
     def test_already_ready(self, root):
-        _touch(root / "L4_sourmash" / "gtdb-reps-k31.zip")
-        _touch(root / "L4_sourmash" / "lineages.csv")
-        assert db_setup("sourmash") == {"L4_sourmash": "already ready"}
+        _touch(root / "D4_sourmash" / "gtdb-reps-k31.zip")
+        _touch(root / "D4_sourmash" / "lineages.csv")
+        assert db_setup("sourmash") == {"D4_sourmash": "already ready"}
 
     def test_status_row(self, root):
-        _touch(root / "L4_sourmash" / "gtdb-reps-k31.zip")
-        _touch(root / "L4_sourmash" / "lineages.csv")
-        assert db_status()["L4_sourmash"]["ready"]
+        _touch(root / "D4_sourmash" / "gtdb-reps-k31.zip")
+        _touch(root / "D4_sourmash" / "lineages.csv")
+        assert db_status()["D4_sourmash"]["ready"]
 
     def test_download_failure(self, root, monkeypatch):
         def boom(url, dst):
             raise OSError("offline")
 
         monkeypatch.setattr(db, "_download_file", boom)
-        msg = db_setup("sourmash")["L4_sourmash"]
+        msg = db_setup("sourmash")["D4_sourmash"]
         assert msg.startswith("ERROR: farm download failed")
 
     def test_download_renames_in_place(self, root, monkeypatch, tmp_path):
@@ -255,16 +255,16 @@ class TestSourmashTier:
 
         monkeypatch.setattr(db, "_download_file", fake_download)
         monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
-        msg = db_setup("sourmash")["L4_sourmash"]
+        msg = db_setup("sourmash")["D4_sourmash"]
         assert msg.startswith("downloaded from farm.cse.ucdavis.edu")
-        assert (root / "L4_sourmash" / "gtdb-reps-k31.zip").is_file()
-        assert (root / "L4_sourmash" / "lineages.csv").is_file()
+        assert (root / "D4_sourmash" / "gtdb-reps-k31.zip").is_file()
+        assert (root / "D4_sourmash" / "lineages.csv").is_file()
 
     def test_copy_from_source(self, root, tmp_path):
-        src = tmp_path / "L4_sourmash"
+        src = tmp_path / "D4_sourmash"
         _touch(src / "gtdb-reps-k31.zip")
         _touch(src / "lineages.csv")
-        assert db_setup("sourmash", source=str(tmp_path))["L4_sourmash"].startswith("copied from")
+        assert db_setup("sourmash", source=str(tmp_path))["D4_sourmash"].startswith("copied from")
 
 
 class TestSetupDownloadPaths:
@@ -274,20 +274,20 @@ class TestSetupDownloadPaths:
         monkeypatch.setattr(
             db, "_build_panel_from_manifest", lambda dst: calls.append(dst) or "built!"
         )
-        assert db_setup("panel")["L2_ani"] == "built!"
-        assert calls[0] == root / "L2_ani"
+        assert db_setup("panel")["D2_ani"] == "built!"
+        assert calls[0] == root / "D2_ani"
 
     def test_panel_download_success(self, root, monkeypatch):
         monkeypatch.setattr(db, "_try_download_panel_release", lambda dst: "downloaded!")
-        assert db_setup("panel")["L2_ani"] == "downloaded!"
+        assert db_setup("panel")["D2_ani"] == "downloaded!"
 
     def test_mash_download_path(self, root, monkeypatch):
         monkeypatch.setattr(db, "_download_mash_zenodo", lambda dst: "dl!")
-        assert db_setup("mash")["L3_mash"] == "dl!"
+        assert db_setup("mash")["D3_mash"] == "dl!"
 
     def test_sourmash_download_path(self, root, monkeypatch):
         monkeypatch.setattr(db, "_download_sourmash_farm", lambda dst: "dl!")
-        assert db_setup("sourmash")["L4_sourmash"] == "dl!"
+        assert db_setup("sourmash")["D4_sourmash"] == "dl!"
 
 
 class TestRunSetupArgs:
@@ -312,12 +312,12 @@ class TestRunSetupArgs:
 
 class TestSetupSourcePaths:
     def test_panel_source(self, root, tmp_path):
-        _touch(tmp_path / "src" / "L2_ani" / "panel.sketch" / "sketches.db")
-        assert db_setup("panel", source=str(tmp_path / "src"))["L2_ani"].startswith("copied from")
+        _touch(tmp_path / "src" / "D2_ani" / "panel.sketch" / "sketches.db")
+        assert db_setup("panel", source=str(tmp_path / "src"))["D2_ani"].startswith("copied from")
 
     def test_mash_source(self, root, tmp_path):
-        _touch(tmp_path / "src" / "L3_mash" / "mash.msh")
-        assert db_setup("mash", source=str(tmp_path / "src"))["L3_mash"].startswith("copied from")
+        _touch(tmp_path / "src" / "D3_mash" / "mash.msh")
+        assert db_setup("mash", source=str(tmp_path / "src"))["D3_mash"].startswith("copied from")
 
 
 class TestSourmashRenameErrors:
@@ -327,11 +327,11 @@ class TestSourmashRenameErrors:
 
         monkeypatch.setattr(db, "_download_file", fake_download)
         monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
-        dst = root / "L4_sourmash"
+        dst = root / "D4_sourmash"
         dst.mkdir(parents=True)
         # Pre-existing directory at the rename target makes os.rename fail.
         (dst / "lineages.csv").mkdir()
-        msg = db_setup("sourmash")["L4_sourmash"]
+        msg = db_setup("sourmash")["D4_sourmash"]
         assert msg.startswith("ERROR:")
 
     def test_incomplete(self, root, monkeypatch):
@@ -341,7 +341,7 @@ class TestSourmashRenameErrors:
         monkeypatch.setattr(db, "_download_file", fake_download)
         monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
         monkeypatch.setattr(db, "_check_sourmash", lambda: False)
-        assert db_setup("sourmash")["L4_sourmash"].startswith("ERROR: download incomplete")
+        assert db_setup("sourmash")["D4_sourmash"].startswith("ERROR: download incomplete")
 
 
 class TestPinnedChecksumConstants:
@@ -388,7 +388,7 @@ class TestVerifySha256:
 
 class TestTarExtractionSafety:
     def test_traversal_member_rejected(self, root, monkeypatch):
-        dst = root / "L2_ani"
+        dst = root / "D2_ani"
         dst.mkdir(parents=True)
 
         def fake_download(url, d):
@@ -400,7 +400,7 @@ class TestTarExtractionSafety:
         assert not (root / "evil.txt").exists()
 
     def test_absolute_path_member_rejected(self, root, monkeypatch):
-        dst = root / "L2_ani"
+        dst = root / "D2_ani"
         dst.mkdir(parents=True)
 
         def fake_download(url, d):
@@ -412,7 +412,7 @@ class TestTarExtractionSafety:
         assert not (root / "evil-abs.txt").exists()
 
     def test_benign_nested_tar_still_extracts(self, root, monkeypatch):
-        dst = root / "L2_ani"
+        dst = root / "D2_ani"
         dst.mkdir(parents=True)
 
         def fake_download(url, d):
@@ -438,7 +438,7 @@ def _tar_bytes(names: list[str]) -> bytes:
 
 class TestPanelChecksumVerification:
     def test_pinned_match_extracts(self, root, monkeypatch):
-        dst = root / "L2_ani"
+        dst = root / "D2_ani"
         dst.mkdir(parents=True)
         archive_bytes = _tar_bytes(["panel.sketch/sketches.db"])
 
@@ -452,7 +452,7 @@ class TestPanelChecksumVerification:
         assert (dst / "panel.sketch" / "sketches.db").is_file()
 
     def test_pinned_mismatch_fails_closed(self, root, monkeypatch):
-        dst = root / "L2_ani"
+        dst = root / "D2_ani"
         dst.mkdir(parents=True)
 
         def fake_download(url, d):
@@ -466,7 +466,7 @@ class TestPanelChecksumVerification:
         assert not (dst / "panel.sketch").exists()
 
     def test_unpinned_warns_and_continues(self, root, monkeypatch, capsys):
-        dst = root / "L2_ani"
+        dst = root / "D2_ani"
         dst.mkdir(parents=True)
 
         def fake_download(url, d):
@@ -485,7 +485,7 @@ class TestSourmashChecksumVerification:
             Path(d).write_bytes(b"x")
 
         monkeypatch.setattr(db, "_download_file", fake_download)
-        dst = root / "L4_sourmash"
+        dst = root / "D4_sourmash"
         dst.mkdir(parents=True)
         msg = db._download_sourmash_farm(dst)
         assert msg.startswith("ERROR: SHA256 mismatch for gtdb-rs226-reps.lineages.csv")
@@ -499,7 +499,7 @@ class TestSourmashChecksumVerification:
 
         monkeypatch.setattr(db, "_download_file", fake_download)
         monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
-        dst = root / "L4_sourmash"
+        dst = root / "D4_sourmash"
         dst.mkdir(parents=True)
         msg = db._download_sourmash_farm(dst)
         assert msg.startswith("downloaded from farm.cse.ucdavis.edu")
@@ -510,7 +510,7 @@ class TestSourmashChecksumVerification:
 
 class TestMashStreamingMd5:
     def test_multichunk_hash_without_whole_file_read(self, root, monkeypatch):
-        dst = root / "L3_mash"
+        dst = root / "D3_mash"
         dst.mkdir(parents=True)
         payload = b"a" * (2 * 1024 * 1024 + 123)
         buf = io.BytesIO()

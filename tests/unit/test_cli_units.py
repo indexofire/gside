@@ -186,8 +186,8 @@ class TestDbCommands:
         import gside.db as dbmod
 
         self._db(tmp_path, monkeypatch)
-        (tmp_path / "db" / "L2_ani" / "panel.sketch").mkdir(parents=True)
-        (tmp_path / "db" / "L2_ani" / "panel.sketch" / "sketches.db").write_bytes(b"x")
+        (tmp_path / "db" / "D2_ani" / "panel.sketch").mkdir(parents=True)
+        (tmp_path / "db" / "D2_ani" / "panel.sketch" / "sketches.db").write_bytes(b"x")
         assert CliRunner().invoke(main, ["db", "setup", "--tier", "panel"]).exit_code == 0
         monkeypatch.setattr(dbmod, "db_setup", lambda tier, source: {"x": "ERROR: boom"})
         assert CliRunner().invoke(main, ["db", "setup", "--tier", "panel"]).exit_code == 1

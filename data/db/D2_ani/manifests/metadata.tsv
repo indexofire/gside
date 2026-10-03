@@ -1,0 +1,292 @@
+fna	species
+GCF_000005845.2_ASM584v2_genomic.fna	Escherichia coli str. K-12 substr. MG1655
+GCF_000006745.1_ASM674v1_genomic.fna	Vibrio cholerae O1 biovar El Tor str. N16961
+GCF_000006765.1_ASM676v1_genomic.fna	Pseudomonas aeruginosa PAO1
+GCF_000006785.2_ASM678v2_genomic.fna	Streptococcus pyogenes M1 GAS
+GCF_000006845.1_ASM684v1_genomic.fna	Neisseria gonorrhoeae FA 1090
+GCF_000006885.1_ASM688v1_genomic.fna	Streptococcus pneumoniae TIGR4
+GCF_000006925.2_ASM692v2_genomic.fna	Shigella flexneri 2a str. 301
+GCF_000006945.2_ASM694v2_genomic.fna	Salmonella enterica subsp. enterica serovar Typhimurium str. LT2
+GCF_000007045.1_ASM704v1_genomic.fna	Streptococcus pneumoniae R6
+GCF_000007265.1_ASM726v1_genomic.fna	Streptococcus agalactiae 2603V/R
+GCF_000007285.1_ASM728v1_genomic.fna	Streptococcus pyogenes MGAS8232
+GCF_000007405.1_ASM740v1_genomic.fna	Shigella flexneri 2a str. 2457T
+GCF_000007425.1_ASM742v1_genomic.fna	Streptococcus pyogenes MGAS315
+GCF_000007445.1_ASM744v1_genomic.fna	Escherichia coli CFT073
+GCF_000007545.1_ASM754v1_genomic.fna	Salmonella enterica subsp. enterica serovar Typhi str. Ty2
+GCF_000007785.1_ASM778v1_genomic.fna	Enterococcus faecalis V583
+GCF_000008105.1_ASM810v1_genomic.fna	Salmonella enterica subsp. enterica serovar Choleraesuis str. SC-B67
+GCF_000008285.1_ASM828v1_genomic.fna	Listeria monocytogenes serotype 4b str. F2365
+GCF_000008805.1_ASM880v1_genomic.fna	Neisseria meningitidis MC58
+GCF_000008865.2_ASM886v2_genomic.fna	Escherichia coli O157:H7 str. Sakai
+GCF_000009005.1_ASM900v1_genomic.fna	Staphylococcus aureus RF122
+GCF_000009085.1_ASM908v1_genomic.fna	Campylobacter jejuni subsp. jejuni NCTC 11168 = ATCC 700819
+GCF_000009105.1_ASM910v1_genomic.fna	Neisseria meningitidis Z2491
+GCF_000009205.2_ASM920v2_genomic.fna	Clostridioides difficile 630
+GCF_000009385.1_ASM938v1_genomic.fna	Streptococcus pyogenes str. Manfredo
+GCF_000009465.1_ASM946v1_genomic.fna	Neisseria meningitidis FAM18
+GCF_000009505.1_ASM950v1_genomic.fna	Salmonella enterica subsp. enterica serovar Enteritidis str. P125109
+GCF_000009525.1_ASM952v1_genomic.fna	Salmonella enterica subsp. enterica serovar Gallinarum str. 287/91
+GCF_000009565.1_ASM956v1_genomic.fna	Escherichia coli BL21(DE3)
+GCF_000009585.1_ASM958v1_genomic.fna	Staphylococcus aureus subsp. aureus ST398
+GCF_000009645.1_ASM964v1_genomic.fna	Staphylococcus aureus subsp. aureus N315
+GCF_000009665.1_ASM966v1_genomic.fna	Staphylococcus aureus subsp. aureus Mu50
+GCF_000009745.1_ASM974v1_genomic.fna	Vibrio vulnificus YJ016
+GCF_000009885.1_ASM988v1_genomic.fna	Klebsiella pneumoniae subsp. pneumoniae NTUH-K2044
+GCF_000010245.2_ASM1024v1_genomic.fna	Escherichia coli str. K-12 substr. W3110
+GCF_000010385.1_ASM1038v1_genomic.fna	Escherichia coli SE11
+GCF_000010465.1_ASM1046v1_genomic.fna	Staphylococcus aureus subsp. aureus str. Newman
+GCF_000010485.1_ASM1048v1_genomic.fna	Escherichia coli SE15
+GCF_000010745.1_ASM1074v1_genomic.fna	Escherichia coli O103:H2 str. 12009
+GCF_000010765.1_ASM1076v1_genomic.fna	Escherichia coli O111:H- str. 11128
+GCF_000011265.1_ASM1126v1_genomic.fna	Staphylococcus aureus subsp. aureus MW2
+GCF_000011285.1_ASM1128v1_genomic.fna	Streptococcus pyogenes SSI-1
+GCF_000011505.1_ASM1150v1_genomic.fna	Staphylococcus aureus subsp. aureus MRSA252
+GCF_000011525.1_ASM1152v1_genomic.fna	Staphylococcus aureus subsp. aureus MSSA476
+GCF_000011865.1_ASM1186v1_genomic.fna	Campylobacter jejuni RM1221
+GCF_000011885.1_ASM1188v1_genomic.fna	Salmonella enterica subsp. enterica serovar Paratyphi A str. ATCC 9150
+GCF_000012005.1_ASM1200v1_genomic.fna	Shigella dysenteriae Sd197
+GCF_000012025.1_ASM1202v1_genomic.fna	Shigella boydii Sb227
+GCF_000012705.1_ASM1270v1_genomic.fna	Streptococcus agalactiae A909
+GCF_000013265.1_ASM1326v1_genomic.fna	Escherichia coli UTI89
+GCF_000013425.1_ASM1342v1_genomic.fna	Staphylococcus aureus subsp. aureus NCTC 8325
+GCF_000013585.1_ASM1358v1_genomic.fna	Shigella flexneri 5 str. 8401
+GCF_000014105.1_ASM1410v1_genomic.fna	Neisseria meningitidis 053442
+GCF_000014625.1_ASM1462v1_genomic.fna	Pseudomonas aeruginosa UCBPP-PA14
+GCF_000014805.1_ASM1480v1_genomic.fna	Aeromonas hydrophila subsp. hydrophila ATCC 7966
+GCF_000015085.1_ASM1508v1_genomic.fna	Campylobacter fetus subsp. fetus 82-40
+GCF_000015525.1_ASM1552v1_genomic.fna	Campylobacter jejuni subsp. jejuni 81-176
+GCF_000016045.1_ASM1604v1_genomic.fna	Salmonella enterica subsp. enterica serovar Newport str. SL254
+GCF_000016245.1_ASM1624v1_genomic.fna	Vibrio cholerae O395
+GCF_000016305.1_ASM1630v1_genomic.fna	Klebsiella pneumoniae subsp. pneumoniae MGH 78578
+GCF_000017665.1_ASM1766v1_genomic.fna	Cronobacter sakazakii ATCC BAA-894
+GCF_000017905.1_ASM1790v1_genomic.fna	Campylobacter jejuni subsp. jejuni 81116
+GCF_000018185.1_ASM1818v1_genomic.fna	Streptococcus suis GZ1
+GCF_000018385.1_ASM1838v1_genomic.fna	Salmonella enterica subsp. enterica serovar Paratyphi C str. RKS4594
+GCF_000018445.1_ASM1844v1_genomic.fna	Acinetobacter baumannii ACICU
+GCF_000018705.1_ASM1870v1_genomic.fna	Salmonella enterica subsp. enterica serovar Paratyphi B str. SPB7
+GCF_000018965.1_ASM1896v1_genomic.fna	Streptococcus pneumoniae 70585
+GCF_000018985.1_ASM1898v1_genomic.fna	Streptococcus pneumoniae JJA
+GCF_000019205.1_ASM1920v1_genomic.fna	Campylobacter lari RM2100
+GCF_000019565.1_ASM1956v1_genomic.fna	Klebsiella variicola
+GCF_000020105.1_ASM2010v1_genomic.fna	Neisseria gonorrhoeae NCCP11945
+GCF_000020185.1_ASM2018v1_genomic.fna	Shigella boydii CDC 3083-94
+GCF_000020705.1_ASM2070v1_genomic.fna	Salmonella enterica subsp. enterica serovar Heidelberg str. SL476
+GCF_000021185.1_ASM2118v1_genomic.fna	Listeria monocytogenes HCC23
+GCF_000021245.2_ASM2124v2_genomic.fna	Acinetobacter baumannii AB0057
+GCF_000021605.1_ASM2160v1_genomic.fna	Vibrio cholerae M66-2
+GCF_000022245.1_ASM2224v1_genomic.fna	Shigella flexneri 2002017
+GCF_000022585.1_ASM2258v1_genomic.fna	Vibrio cholerae MJ-1236
+GCF_000022925.1_ASM2292v1_genomic.fna	Listeria monocytogenes 08-5923
+GCF_000025425.1_ASM2542v1_genomic.fna	Campylobacter jejuni subsp. jejuni IA3902
+GCF_000025465.1_ASM2546v1_genomic.fna	Klebsiella variicola At-22
+GCF_000026645.1_ASM2664v1_genomic.fna	Pseudomonas aeruginosa LESB58
+GCF_000026705.1_ASM2670v1_genomic.fna	Listeria monocytogenes serotype 4b str. CLIP 80459
+GCF_000026745.1_ASM2674v1_genomic.fna	Streptococcus suis BM407
+GCF_000026965.1_ASM2696v1_genomic.fna	Neisseria meningitidis 8013
+GCF_000027145.1_ASM2714v1_genomic.fna	Listeria seeligeri serovar 1/2b str. SLCC3954
+GCF_000039765.1_ASM3976v1_genomic.fna	Vibrio vulnificus CMCP6
+GCF_000060285.1_ASM6028v1_genomic.fna	Listeria welshimeri serovar 6b str. SLCC5334
+GCF_000069245.1_ASM6924v1_genomic.fna	Acinetobacter baumannii AYE
+GCF_000083565.1_ASM8356v1_genomic.fna	Neisseria meningitidis alpha14
+GCF_000085225.1_ASM8522v1_genomic.fna	Clostridioides difficile CD196
+GCF_000092525.1_ASM9252v1_genomic.fna	Shigella sonnei Ss046
+GCF_000148705.1_ASM14870v1_genomic.fna	Campylobacter jejuni subsp. jejuni M1
+GCF_000152165.1_ASM15216v1_genomic.fna	Neisseria meningitidis alpha710
+GCF_000156855.2_ASM15685v2_genomic.fna	Neisseria gonorrhoeae MS11
+GCF_000166455.1_ASM16645v2_genomic.fna	Vibrio cholerae O1 str. 2010EL-1786
+GCF_000168335.1_ASM16833v1_genomic.fna	Pseudomonas aeruginosa PACS2
+GCF_000168575.2_ASM16857v2_genomic.fna	Listeria monocytogenes FSL R2-561
+GCF_000168595.2_ASM16859v2_genomic.fna	Listeria monocytogenes Finland 1998
+GCF_000171795.2_ASM17179v2_genomic.fna	Campylobacter jejuni subsp. jejuni CG8421
+GCF_000172575.2_ASM17257v2_genomic.fna	Enterococcus faecalis OG1RF
+GCF_000174395.2_ASM17439v2_genomic.fna	Enterococcus faecium DO
+GCF_000184205.1_ASM18420v1_genomic.fna	Campylobacter jejuni subsp. jejuni S3
+GCF_000186665.3_ASM18666v4_genomic.fna	Acinetobacter baumannii D1279779
+GCF_000187205.2_ASM18720v4_genomic.fna	Acinetobacter baumannii MDR-TJ
+GCF_000188215.1_ASM18821v1_genomic.fna	Acinetobacter baumannii 1656-2
+GCF_000191145.1_ASM19114v1_genomic.fna	Acinetobacter pittii PHEA-2
+GCF_000195795.1_ASM19579v1_genomic.fna	Listeria innocua Clip11262
+GCF_000196035.1_ASM19603v1_genomic.fna	Listeria monocytogenes EGD-e
+GCF_000196055.1_ASM19605v1_genomic.fna	Streptococcus agalactiae NEM316
+GCF_000196095.1_ASM19609v1_genomic.fna	Vibrio parahaemolyticus RIMD 2210633
+GCF_000196395.1_ASM19639v1_genomic.fna	Aeromonas salmonicida subsp. salmonicida A449
+GCF_000204115.1_ASM20411v1_genomic.fna	Aeromonas veronii B565
+GCF_000210415.1_ASM21041v1_genomic.fna	Clostridioides difficile CF5
+GCF_000210435.1_ASM21043v1_genomic.fna	Clostridioides difficile M120
+GCF_000210455.1_ASM21045v1_genomic.fna	Clostridioides difficile 2007855
+GCF_000211255.2_ASM21125v2_genomic.fna	Enterococcus faecalis 62
+GCF_000215745.1_ASM21574v1_genomic.fna	Klebsiella aerogenes KCTC 2190
+GCF_000220485.1_ASM22048v1_genomic.fna	Klebsiella pneumoniae KCTC 2242
+GCF_000223945.1_ASM22394v2_genomic.fna	Pseudomonas aeruginosa 19BR
+GCF_000226275.2_ASM22627v2_genomic.fna	Acinetobacter baumannii MDR-ZJ06
+GCF_000240095.2_ASM24009v3_genomic.fna	Elizabethkingia anophelis Ag1
+GCF_000240185.1_ASM24018v2_genomic.fna	Klebsiella pneumoniae subsp. pneumoniae HS11286
+GCF_000250855.1_ASM25085v1_genomic.fna	Vibrio cholerae IEC224
+GCF_000250945.2_ASM25094v2_genomic.fna	Enterococcus faecium Aus0004
+GCF_000252975.1_ASM25297v1_genomic.fna	Listeria ivanovii subsp. ivanovii PAM 55
+GCF_000252995.1_ASM25299v1_genomic.fna	Salmonella bongori NCTC 12419
+GCF_000259175.1_ASM25917v1_genomic.fna	Providencia stuartii MRSN 2154
+GCF_000263215.1_ASM26321v1_genomic.fna	Cronobacter sakazakii ES15
+GCF_000281195.1_ASM28119v1_genomic.fna	Enterococcus faecalis D32
+GCF_000281435.2_ASM28143v2_genomic.fna	Klebsiella pneumoniae subsp. pneumoniae KPNIH10
+GCF_000283715.1_ASM28371v1_genomic.fna	Shigella sonnei 53G
+GCF_000286435.2_ASM28643v2_genomic.fna	Morganella morganii subsp. morganii KT
+GCF_000294365.1_ASM29436v1_genomic.fna	Klebsiella pneumoniae subsp. pneumoniae 1084
+GCF_000299135.1_ASM29913v1_genomic.fna	Streptococcus agalactiae GD201008-001
+GCF_000302575.1_ASM30257v1_genomic.fna	Acinetobacter baumannii TYTH-1
+GCF_000317915.1_ASM31791v1_genomic.fna	Enterococcus faecalis str. Symbioflor 1
+GCF_000328405.1_ASM32840v1_genomic.fna	Vibrio parahaemolyticus BB22OP
+GCF_000334515.1_ASM33451v1_genomic.fna	Klebsiella aerogenes EA1509E
+GCF_000336405.1_ASM33640v1_genomic.fna	Enterococcus faecium ATCC 8459 = NRRL B-2354
+GCF_000336425.1_ASM33642v1_genomic.fna	Serratia marcescens WW4
+GCF_000339015.1_ASM33901v1_genomic.fna	Cronobacter sakazakii SP291
+GCF_000354175.2_ASM35417v2_genomic.fna	Vibrio alginolyticus NBRC 15630 = ATCC 17749
+GCF_000364385.3_ASM36438v3_genomic.fna	Klebsiella pneumoniae
+GCF_000367425.1_ASM36742v1_genomic.fna	Klebsiella ornithinolytica B6
+GCF_000401555.1_ASM40155v1_genomic.fna	Aeromonas hydrophila ML09-119
+GCF_000406765.2_ASM40676v2_genomic.fna	Klebsiella pneumoniae 500_1420
+GCF_000417225.2_ASM41722v2_genomic.fna	Klebsiella pneumoniae DMC1097
+GCF_000419385.1_ASM41938v1_genomic.fna	Acinetobacter baumannii BJAB07104
+GCF_000422085.1_ASM42208v1_genomic.fna	Serratia liquefaciens ATCC 27592
+GCF_000430405.1_ASM43040v1_genomic.fna	Vibrio parahaemolyticus O1:Kuk str. FDA_R31
+GCF_000430425.1_ASM43042v1_genomic.fna	Vibrio parahaemolyticus O1:K33 str. CDC_K4557
+GCF_000439255.1_ASM43925v1_genomic.fna	Salmonella bongori N268-08
+GCF_000464515.2_ASM46451v2_genomic.fna	Aeromonas veronii Hm21
+GCF_000465235.1_ASM46523v1_genomic.fna	Campylobacter coli CVM N29710
+GCF_000494775.2_ASM49477v2_genomic.fna	Campylobacter coli 15-537360
+GCF_000495935.2_ASM49593v2_genomic.fna	Elizabethkingia anophelis NUHP1
+GCF_000504545.1_ASM50454v1_genomic.fna	Cronobacter malonaticus
+GCF_000513215.1_DB11_genomic.fna	Serratia marcescens subsp. marcescens Db11
+GCF_000568495.1_ASM56849v1_genomic.fna	Vibrio parahaemolyticus UCM-V493
+GCF_000583755.1_ASM58375v1_genomic.fna	Campylobacter coli RM1875
+GCF_000583775.1_ASM58377v1_genomic.fna	Campylobacter coli RM4661
+GCF_000737555.1_ASM73755v1_genomic.fna	Enterococcus faecium T110
+GCF_000743955.1_ASM74395v1_genomic.fna	Shigella flexneri 2003036
+GCF_000743995.1_ASM74399v1_genomic.fna	Shigella flexneri Shi06HN006
+GCF_000754345.1_ASM75434v1_genomic.fna	Providencia stuartii
+GCF_000763515.1_ASM76351v1_genomic.fna	Listeria ivanovii subsp. ivanovii
+GCF_000770115.1_ASM77011v2_genomic.fna	Vibrio harveyi
+GCF_000783735.2_ASM78373v2_genomic.fna	Shigella flexneri
+GCF_000783775.2_ASM78377v2_genomic.fna	Aeromonas caviae
+GCF_000783915.2_ASM78391v2_genomic.fna	Serratia marcescens
+GCF_000783935.2_ASM78393v2_genomic.fna	Klebsiella planticola
+GCF_000783955.2_ASM78395v2_genomic.fna	Morganella morganii
+GCF_000812205.2_ASM81220v2_genomic.fna	Klebsiella variicola
+GCF_000814165.3_ASM81416v3_genomic.fna	Acinetobacter nosocomialis
+GCF_000829965.1_ASM82996v1_genomic.fna	Klebsiella ornithinolytica
+GCF_000831485.1_ASM83148v1_genomic.fna	Streptococcus iniae
+GCF_000975245.1_ASM97524v1_genomic.fna	Serratia liquefaciens
+GCF_000982825.1_ASM98282v1_genomic.fna	Cronobacter sakazakii
+GCF_001021855.1_ASM102185v1_genomic.fna	Shigella flexneri G1663
+GCF_001021995.1_ASM102199v1_genomic.fna	Klebsiella aerogenes
+GCF_001022115.1_ASM102211v1_genomic.fna	Klebsiella oxytoca
+GCF_001027225.1_ASM102722v1_genomic.fna	Shigella boydii
+GCF_001047225.1_ASM104722v1_genomic.fna	Neisseria gonorrhoeae
+GCF_001188185.2_ASM118818v2_genomic.fna	Vibrio parahaemolyticus
+GCF_001244315.1_ASM124431v1_genomic.fna	Vibrio parahaemolyticus
+GCF_001277215.2_ASM127721v2_genomic.fna	Cronobacter malonaticus LMG 23826
+GCF_001278905.1_ASM127890v1_genomic.fna	Klebsiella quasipneumoniae
+GCF_001304775.1_ASM130477v1_genomic.fna	Vibrio parahaemolyticus
+GCF_001433415.1_ASM143341v1_genomic.fna	Vibrio parahaemolyticus
+GCF_001447335.1_ASM144733v1_genomic.fna	Aeromonas schubertii
+GCF_001457635.1_NCTC7465_genomic.fna	Streptococcus pneumoniae
+GCF_001469735.1_ASM146973v1_genomic.fna	Vibrio alginolyticus
+GCF_001558295.2_ASM155829v2_genomic.fna	Shigella sonnei
+GCF_001558415.2_ASM155841v2_genomic.fna	Vibrio fluvialis
+GCF_001558475.2_ASM155847v2_genomic.fna	Vibrio mimicus
+GCF_001558495.2_ASM155849v2_genomic.fna	Vibrio parahaemolyticus
+GCF_001572725.1_ASM157272v1_genomic.fna	Serratia rubidaea
+GCF_001577285.1_ASM157728v1_genomic.fna	Acinetobacter pittii
+GCF_001593245.1_ASM159324v1_genomic.fna	Aeromonas veronii
+GCF_001617545.1_ASM161754v1_genomic.fna	Acinetobacter pittii
+GCF_001767355.1_ASM176735v1_genomic.fna	Vibrio mimicus
+GCF_001874625.1_ASM187462v1_genomic.fna	Providencia rettgeri
+GCF_001885145.1_ASM188514v1_genomic.fna	Streptococcus iniae
+GCF_001922905.2_Sh41s_genomic.fna	Cronobacter turicensis
+GCF_001932555.1_ASM193255v1_genomic.fna	Acinetobacter haemolyticus
+GCF_001941805.1_ASM194180v1_genomic.fna	Acinetobacter junii
+GCF_001952955.1_ASM195295v1_genomic.fna	Vibrio fluvialis
+GCF_002012285.1_ASM201228v1_genomic.fna	Acinetobacter pittii
+GCF_002022105.1_ASM202210v1_genomic.fna	Elizabethkingia meningoseptica
+GCF_002022145.1_ASM202214v1_genomic.fna	Elizabethkingia meningoseptica
+GCF_002055515.1_ASM205551v1_genomic.fna	Acinetobacter calcoaceticus
+GCF_002082665.1_ASM208266v1_genomic.fna	Acinetobacter nosocomialis
+GCF_002119785.2_ASM211978v3_genomic.fna	Acinetobacter lwoffii
+GCF_002142635.1_ASM214263v1_genomic.fna	Shigella sonnei
+GCF_002165245.3_ASM216524v3_genomic.fna	Acinetobacter junii
+GCF_002224265.1_ASM222426v1_genomic.fna	Vibrio vulnificus NBRC 15645 = ATCC 27562
+GCF_002224605.1_ASM222460v1_genomic.fna	Shigella sonnei
+GCF_002285935.1_ASM228593v1_genomic.fna	Aeromonas dhakensis
+GCF_002393505.1_ASM239350v1_genomic.fna	Providencia alcalifaciens
+GCF_002741615.1_ASM274161v1_genomic.fna	Shigella dysenteriae
+GCF_002813065.1_ASM281306v1_genomic.fna	Acinetobacter haemolyticus
+GCF_002943855.1_ASM294385v1_genomic.fna	Shigella dysenteriae
+GCF_002949175.1_ASM294917v1_genomic.fna	Shigella boydii
+GCF_002949345.1_ASM294934v1_genomic.fna	Shigella dysenteriae
+GCF_002949415.1_ASM294941v1_genomic.fna	Shigella dysenteriae
+GCF_002949475.1_ASM294947v1_genomic.fna	Shigella boydii
+GCF_002950395.1_ASM295039v1_genomic.fna	Shigella sonnei
+GCF_002951295.1_ASM295129v1_genomic.fna	Acinetobacter nosocomialis
+GCF_002984195.1_ASM298419v1_genomic.fna	Providencia rettgeri
+GCF_002993105.1_ASM299310v1_genomic.fna	Acinetobacter radioresistens
+GCF_003258335.1_ASM325833v1_genomic.fna	Acinetobacter radioresistens
+GCF_003294855.2_ASM329485v2_genomic.fna	Aeromonas caviae
+GCF_003323815.1_ASM332381v1_genomic.fna	Acinetobacter haemolyticus
+GCF_003516125.1_ASM351612v3_genomic.fna	Cronobacter sakazakii
+GCF_003925855.2_ASM392585v2_genomic.fna	Aeromonas caviae
+GCF_004151415.2_ASM415141v2_genomic.fna	Acinetobacter lwoffii
+GCF_004919485.1_ASM491948v1_genomic.fna	Aeromonas schubertii
+GCF_005519305.1_ASM551930v1_genomic.fna	Acinetobacter radioresistens
+GCF_006094455.1_ASM609445v1_genomic.fna	Morganella morganii subsp. morganii
+GCF_008245025.1_ASM824502v1_genomic.fna	Campylobacter lari subsp. concheus
+GCF_008369605.1_ASM836960v1_genomic.fna	Vibrio cholerae
+GCF_008693705.1_ASM869370v1_genomic.fna	Aeromonas veronii
+GCF_008694045.1_ASM869404v1_genomic.fna	Klebsiella planticola
+GCF_009035845.1_ASM903584v1_genomic.fna	Acinetobacter baumannii
+GCF_009730395.1_ASM973039v1_genomic.fna	Campylobacter coli
+GCF_009734005.1_ASM973400v2_genomic.fna	Enterococcus faecium
+GCF_013030075.1_ASM1303007v1_genomic.fna	Neisseria gonorrhoeae
+GCF_013372245.1_ASM1337224v1_genomic.fna	Campylobacter upsaliensis RM3940
+GCF_013702185.1_ASM1370218v1_genomic.fna	Providencia alcalifaciens
+GCF_014717515.1_ASM1471751v1_genomic.fna	Acinetobacter seifertii
+GCF_014717695.1_ASM1471769v1_genomic.fna	Acinetobacter seifertii
+GCF_015697685.1_ASM1569768v1_genomic.fna	Listeria seeligeri
+GCF_016026735.1_ASM1602673v1_genomic.fna	Serratia rubidaea
+GCF_016064815.1_ASM1606481v1_genomic.fna	Acinetobacter seifertii
+GCF_016127195.1_ASM1612719v1_genomic.fna	Aeromonas jandaei
+GCF_016865345.1_ASM1686534v1_genomic.fna	Aeromonas jandaei
+GCF_016939475.1_ASM1693947v1_genomic.fna	Acinetobacter calcoaceticus
+GCF_017310235.1_ASM1731023v1_genomic.fna	Aeromonas dhakensis
+GCF_018336855.1_ASM1833685v1_genomic.fna	Acinetobacter junii
+GCF_018885085.1_ASM1888508v1_genomic.fna	Clostridioides difficile
+GCF_019048105.1_ASM1904810v1_genomic.fna	Providencia rettgeri
+GCF_020099175.1_ASM2009917v1_genomic.fna	Klebsiella quasipneumoniae
+GCF_020271745.1_ASM2027174v1_genomic.fna	Providencia alcalifaciens
+GCF_020405305.1_ASM2040530v1_genomic.fna	Aeromonas dhakensis
+GCF_020525545.1_ASM2052554v1_genomic.fna	Klebsiella variicola subsp. variicola
+GCF_021165835.1_ASM2116583v1_genomic.fna	Acinetobacter calcoaceticus
+GCF_022354085.1_ASM2235408v1_genomic.fna	Shigella dysenteriae
+GCF_022869645.1_ASM2286964v1_genomic.fna	Neisseria meningitidis
+GCF_023650915.1_ASM2365091v1_genomic.fna	Vibrio alginolyticus
+GCF_028355655.1_ASM2835565v1_genomic.fna	Aeromonas salmonicida
+GCF_028596125.1_ASM2859612v1_genomic.fna	Listeria innocua
+GCF_029024105.1_ASM2902410v1_genomic.fna	Acinetobacter lwoffii
+GCF_030060435.1_ASM3006043v1_genomic.fna	Vibrio harveyi
+GCF_030291735.1_ASM3029173v1_genomic.fna	Serratia marcescens
+GCF_030505655.1_ASM3050565v1_genomic.fna	Klebsiella ornithinolytica
+GCF_035747985.1_ASM3574798v1_genomic.fna	Providencia stuartii
+GCF_041021905.1_XH1679_genomic.fna	Acinetobacter nosocomialis
+GCF_041222865.1_ASM4122286v1_genomic.fna	Cronobacter turicensis
+GCF_059427185.1_ASM5942718v1_genomic.fna	Campylobacter upsaliensis
+GCF_900475035.1_41965_F01_genomic.fna	Streptococcus pyogenes
+GCF_900476005.1_51438_H01_genomic.fna	Aeromonas caviae
+GCF_900636985.1_45889_C01_genomic.fna	Klebsiella oxytoca
+GCF_949788565.1_23495_7_283_h_nanopore_genomic.fna	Streptococcus agalactiae
+GCF_004008975.1_ASM400897v1_genomic.fna	Bordetella pertussis
+GCF_001457455.1_NCTC11397_genomic.fna	Corynebacterium diphtheriae
+GCF_020736045.1_ASM2073604v1_genomic.fna	Haemophilus influenzae
+GCF_025998455.1_ASM2599845v1_genomic.fna	Helicobacter pylori
+GCF_001941585.1_ASM194158v1_genomic.fna	Legionella pneumophila
+GCF_900660465.1_50648_A01-3_genomic.fna	Mycoplasmoides pneumoniae
+GCF_000253175.1_ASM25317v1_genomic.fna	Yersinia enterocolitica subsp. palearctica Y11

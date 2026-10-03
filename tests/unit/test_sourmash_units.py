@@ -53,20 +53,20 @@ class TestLineageMap:
 
 class TestDbVersion:
     def test_default_rs226(self, tmp_path):
-        assert _db_version(tmp_path / "L4_sourmash") == "RS226"
+        assert _db_version(tmp_path / "D4_sourmash") == "RS226"
 
     def test_checksum(self, tmp_path):
-        (tmp_path / "L4_sourmash").mkdir()
+        (tmp_path / "D4_sourmash").mkdir()
         manifests = tmp_path / "manifests"
         manifests.mkdir()
-        (manifests / "L4_sourmash.json").write_text('{"checksum": "abcdef123456"}')
-        assert _db_version(tmp_path / "L4_sourmash") == "abcdef12"
+        (manifests / "D4_sourmash.json").write_text('{"checksum": "abcdef123456"}')
+        assert _db_version(tmp_path / "D4_sourmash") == "abcdef12"
 
 
 class TestToDict:
     def test_shape(self):
         d = SourmashIdResult(
-            method="sourmash", database={"name": "L4_sourmash"}, result={"a": 1}
+            method="sourmash", database={"name": "D4_sourmash"}, result={"a": 1}
         ).to_dict()
         assert d["analysis_type"] == "species_identification"
         assert d["result"] == {"a": 1}
@@ -146,11 +146,11 @@ class TestGatherAndTax:
         assert out[0] == {"lineage": "s__Vp", "f_unique_weighted": 0.0}
 
     def test_bad_json_version(self, tmp_path):
-        (tmp_path / "L4_sourmash").mkdir()
+        (tmp_path / "D4_sourmash").mkdir()
         manifests = tmp_path / "manifests"
         manifests.mkdir()
-        (manifests / "L4_sourmash.json").write_text("{not json")
-        assert _db_version(tmp_path / "L4_sourmash") == "RS226"
+        (manifests / "D4_sourmash.json").write_text("{not json")
+        assert _db_version(tmp_path / "D4_sourmash") == "RS226"
 
 
 class TestMissingBinary:

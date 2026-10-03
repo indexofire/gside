@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 _REPO = Path(__file__).resolve().parents[2]
-_ECOLI = _REPO / "data" / "db" / "L2_ani" / "genomes" / "GCF_000005845.2_ASM584v2_genomic.fna"
+_ECOLI = _REPO / "data" / "db" / "D2_ani" / "genomes" / "GCF_000005845.2_ASM584v2_genomic.fna"
 
 _has_skani = shutil.which("skani") is not None
 
@@ -78,7 +78,7 @@ class TestBuildErrors:
             Path(__file__).resolve().parents[2]
             / "data"
             / "db"
-            / "L2_ani"
+            / "D2_ani"
             / "genomes"
             / "GCF_000005845.2_ASM584v2_genomic.fna"
         )

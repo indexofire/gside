@@ -20,7 +20,7 @@ from gside.config import which as _which  # noqa: E402
 
 _HAS_BIN = _which("blastn") is not None
 
-CONTIGS = _PROJECT.parent / "data/db/L1_marker/markers.fasta"
+CONTIGS = _PROJECT.parent / "data/db/D1_marker/markers.fasta"
 
 
 @pytest.mark.skipif(not _HAS_BIN, reason="blastn not available")

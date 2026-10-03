@@ -26,7 +26,7 @@ from typing import Any
 
 from .config import SPECIES_DB_DIR, which
 
-_MANIFEST_DIR = SPECIES_DB_DIR / "L2_ani" / "manifests"
+_MANIFEST_DIR = SPECIES_DB_DIR / "D2_ani" / "manifests"
 
 PANEL_RELEASE_URL = (
     "https://github.com/indexofire/gside/releases/download/db-v0.1/panel.sketch.tar.gz"
@@ -51,22 +51,22 @@ _TIERS: dict[str, dict[str, Any]] = {
     "panel": {
         "description": "Curated reference panel for ANI (skani)",
         "size": "~130MB sketch / ~1GB genomes",
-        "items": ["L2_ani"],
+        "items": ["D2_ani"],
     },
     "mash": {
         "description": "RefSeq MinHash sketch",
         "size": "~179MB",
-        "items": ["L3_mash"],
+        "items": ["D3_mash"],
     },
     "sourmash": {
         "description": "GTDB gather database (sourmash, sketch k=31)",
         "size": "~3.9GB",
-        "items": ["L4_sourmash"],
+        "items": ["D4_sourmash"],
     },
     "all": {
         "description": "panel + mash",
         "size": "~310MB sketches",
-        "items": ["L2_ani", "L3_mash"],
+        "items": ["D2_ani", "D3_mash"],
     },
 }
 
@@ -79,16 +79,16 @@ _CHUNK = 1024 * 1024
 # every file of one probe group is present; ``is_file`` probes require a
 # regular file, ``exists`` probes match any path type.
 _COMPONENTS: dict[str, tuple[str, str, list[list[tuple[str, Callable[[Path], bool]]]]]] = {
-    "markers": ("mini", "L1_marker", [[("markers.fasta", Path.exists)]]),
-    "L2_ani": (
+    "markers": ("mini", "D1_marker", [[("markers.fasta", Path.exists)]]),
+    "D2_ani": (
         "panel",
-        "L2_ani",
+        "D2_ani",
         [[("panel.sketch/sketches.db", Path.exists)], [("panel.sketch", Path.is_file)]],
     ),
-    "L3_mash": ("mash", "L3_mash", [[("mash.msh", Path.exists)], [("payload.bin", Path.exists)]]),
-    "L4_sourmash": (
+    "D3_mash": ("mash", "D3_mash", [[("mash.msh", Path.exists)], [("payload.bin", Path.exists)]]),
+    "D4_sourmash": (
         "sourmash",
-        "L4_sourmash",
+        "D4_sourmash",
         [[("gtdb-reps-k31.zip", Path.exists), ("lineages.csv", Path.exists)]],
     ),
 }
@@ -101,15 +101,15 @@ def _component_ready(component: str) -> bool:
 
 
 def _check_panel() -> bool:
-    return _component_ready("L2_ani")
+    return _component_ready("D2_ani")
 
 
 def _check_mash() -> bool:
-    return _component_ready("L3_mash")
+    return _component_ready("D3_mash")
 
 
 def _check_sourmash() -> bool:
-    return _component_ready("L4_sourmash")
+    return _component_ready("D4_sourmash")
 
 
 def db_status() -> dict[str, dict[str, Any]]:
@@ -129,11 +129,11 @@ def db_setup(tier: str = "panel", source: str = "") -> dict[str, str]:
 
     results: dict[str, str] = {}
     if tier in ("panel", "all"):
-        results["L2_ani"] = _setup_component("L2_ani", _install_panel, source)
+        results["D2_ani"] = _setup_component("D2_ani", _install_panel, source)
     if tier in ("mash", "all"):
-        results["L3_mash"] = _setup_component("L3_mash", _download_mash_zenodo, source)
+        results["D3_mash"] = _setup_component("D3_mash", _download_mash_zenodo, source)
     if tier == "sourmash":
-        results["L4_sourmash"] = _setup_component("L4_sourmash", _download_sourmash_farm, source)
+        results["D4_sourmash"] = _setup_component("D4_sourmash", _download_sourmash_farm, source)
     if not results:
         results["info"] = "mini tier ships with repo"
     return results

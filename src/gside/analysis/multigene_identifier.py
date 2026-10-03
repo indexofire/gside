@@ -16,8 +16,8 @@ import yaml
 
 from gside.config import SPECIES_DB_DIR
 
-_MARKERS_FASTA = SPECIES_DB_DIR / "L1_marker" / "markers.fasta"
-_MARKER_RULES = SPECIES_DB_DIR / "L1_marker" / "marker_rules.yaml"
+_MARKERS_FASTA = SPECIES_DB_DIR / "D1_marker" / "markers.fasta"
+_MARKER_RULES = SPECIES_DB_DIR / "D1_marker" / "marker_rules.yaml"
 
 _MIN_IDENTITY = 85.0
 _MIN_COVERAGE = 60.0
@@ -79,7 +79,7 @@ def _blast_contigs(contigs_fasta: str) -> list[dict[str, Any]]:
         resolver=which,
     )
 
-    db = str(SPECIES_DB_DIR / "L1_marker" / "markers_blastdb")
+    db = str(SPECIES_DB_DIR / "D1_marker" / "markers_blastdb")
     backend = BlastBackend(binary=blastn)
     engine_hits = backend.find(
         query=Path(contigs_fasta),

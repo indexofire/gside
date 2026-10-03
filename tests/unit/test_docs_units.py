@@ -47,7 +47,7 @@ class TestDatabaseDocs:
 
     def test_marker_paths(self):
         en = _read("reference/marker-rules.md")
-        assert "data/db/L1_marker/marker_rules.yaml" in en
+        assert "data/db/D1_marker/marker_rules.yaml" in en
 
 
 class TestCoverageFloorConsistency:

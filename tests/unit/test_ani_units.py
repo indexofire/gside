@@ -48,7 +48,7 @@ class TestTaxaMap:
 
 class TestDbVersion:
     def _db_with_sibling_manifests(self, tmp_path):
-        db_dir = tmp_path / "L2_ani"
+        db_dir = tmp_path / "D2_ani"
         db_dir.mkdir()
         manifests = tmp_path / "manifests"
         manifests.mkdir()
@@ -56,17 +56,17 @@ class TestDbVersion:
 
     def test_missing_manifest_is_unknown(self, tmp_path):
         db_dir, _ = self._db_with_sibling_manifests(tmp_path)
-        assert _db_version(db_dir, "L2_ani") == "unknown"
+        assert _db_version(db_dir, "D2_ani") == "unknown"
 
     def test_bad_json_is_unknown(self, tmp_path):
         db_dir, manifests = self._db_with_sibling_manifests(tmp_path)
-        (manifests / "L2_ani.json").write_text("{not json")
-        assert _db_version(db_dir, "L2_ani") == "unknown"
+        (manifests / "D2_ani.json").write_text("{not json")
+        assert _db_version(db_dir, "D2_ani") == "unknown"
 
     def test_checksum_truncated(self, tmp_path):
         db_dir, manifests = self._db_with_sibling_manifests(tmp_path)
-        (manifests / "L2_ani.json").write_text('{"checksum": "abcdef123456"}')
-        assert _db_version(db_dir, "L2_ani") == "abcdef12"
+        (manifests / "D2_ani.json").write_text('{"checksum": "abcdef123456"}')
+        assert _db_version(db_dir, "D2_ani") == "abcdef12"
 
 
 class TestHelpers:
@@ -82,7 +82,7 @@ class TestHelpers:
         assert _mash_species("GCF_X") == "GCF_X"
 
     def test_to_dict_shape(self):
-        d = AniIdResult(method="panel", database={"name": "L2_ani"}, result={"a": 1}).to_dict()
+        d = AniIdResult(method="panel", database={"name": "D2_ani"}, result={"a": 1}).to_dict()
         assert d["analysis_type"] == "species_identification"
         assert d["result"] == {"a": 1}
 
