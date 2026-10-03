@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import tarfile
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -73,44 +74,53 @@ _DOWNLOAD_TIMEOUT = 3600
 _CHUNK = 1024 * 1024
 
 
-def db_status() -> dict[str, dict[str, Any]]:
-    return {
-        "markers": {
-            "ready": (SPECIES_DB_DIR / "L1_marker" / "markers.fasta").exists(),
-            "path": str(SPECIES_DB_DIR / "L1_marker"),
-            "tier": "mini",
-        },
-        "L2_ani": {
-            "ready": _check_panel(),
-            "path": str(SPECIES_DB_DIR / "L2_ani"),
-            "tier": "panel",
-        },
-        "L3_mash": {
-            "ready": _check_mash(),
-            "path": str(SPECIES_DB_DIR / "L3_mash"),
-            "tier": "mash",
-        },
-        "L4_sourmash": {
-            "ready": _check_sourmash(),
-            "path": str(SPECIES_DB_DIR / "L4_sourmash"),
-            "tier": "sourmash",
-        },
-    }
+# Database components in `db status` order — key: (tier, directory under
+# SPECIES_DB_DIR, readiness probes relative to the directory). Ready when
+# every file of one probe group is present; ``is_file`` probes require a
+# regular file, ``exists`` probes match any path type.
+_COMPONENTS: dict[str, tuple[str, str, list[list[tuple[str, Callable[[Path], bool]]]]]] = {
+    "markers": ("mini", "L1_marker", [[("markers.fasta", Path.exists)]]),
+    "L2_ani": (
+        "panel",
+        "L2_ani",
+        [[("panel.sketch/sketches.db", Path.exists)], [("panel.sketch", Path.is_file)]],
+    ),
+    "L3_mash": ("mash", "L3_mash", [[("mash.msh", Path.exists)], [("payload.bin", Path.exists)]]),
+    "L4_sourmash": (
+        "sourmash",
+        "L4_sourmash",
+        [[("gtdb-reps-k31.zip", Path.exists), ("lineages.csv", Path.exists)]],
+    ),
+}
 
 
-def _check_sourmash() -> bool:
-    s = SPECIES_DB_DIR / "L4_sourmash"
-    return (s / "gtdb-reps-k31.zip").exists() and (s / "lineages.csv").exists()
+def _component_ready(component: str) -> bool:
+    _, dir_name, groups = _COMPONENTS[component]
+    base = SPECIES_DB_DIR / dir_name
+    return any(all(pred(base / rel) for rel, pred in group) for group in groups)
 
 
 def _check_panel() -> bool:
-    p = SPECIES_DB_DIR / "L2_ani"
-    return (p / "panel.sketch" / "sketches.db").exists() or (p / "panel.sketch").is_file()
+    return _component_ready("L2_ani")
 
 
 def _check_mash() -> bool:
-    m = SPECIES_DB_DIR / "L3_mash"
-    return (m / "mash.msh").exists() or (m / "payload.bin").exists()
+    return _component_ready("L3_mash")
+
+
+def _check_sourmash() -> bool:
+    return _component_ready("L4_sourmash")
+
+
+def db_status() -> dict[str, dict[str, Any]]:
+    return {
+        component: {
+            "ready": _component_ready(component),
+            "path": str(SPECIES_DB_DIR / dir_name),
+            "tier": tier,
+        }
+        for component, (tier, dir_name, _probes) in _COMPONENTS.items()
+    }
 
 
 def db_setup(tier: str = "panel", source: str = "") -> dict[str, str]:
@@ -119,71 +129,56 @@ def db_setup(tier: str = "panel", source: str = "") -> dict[str, str]:
 
     results: dict[str, str] = {}
     if tier in ("panel", "all"):
-        results["L2_ani"] = _setup_panel(source)
+        results["L2_ani"] = _setup_component("L2_ani", _install_panel, source)
     if tier in ("mash", "all"):
-        results["L3_mash"] = _setup_mash(source)
-    if tier in ("sourmash",):
-        results["L4_sourmash"] = _setup_sourmash(source)
+        results["L3_mash"] = _setup_component("L3_mash", _download_mash_zenodo, source)
+    if tier == "sourmash":
+        results["L4_sourmash"] = _setup_component("L4_sourmash", _download_sourmash_farm, source)
     if not results:
         results["info"] = "mini tier ships with repo"
     return results
 
 
-def _setup_panel(source: str = "") -> str:
-    if _check_panel():
+def _setup_component(component: str, install: Callable[[Path], str], source: str = "") -> str:
+    if _component_ready(component):
         return "already ready"
 
+    dir_name = _COMPONENTS[component][1]
     if source:
-        return _copy_from_source(source, "L2_ani")
+        return _copy_from_source(source, dir_name)
 
-    dst = SPECIES_DB_DIR / "L2_ani"
+    dst = SPECIES_DB_DIR / dir_name
     dst.mkdir(parents=True, exist_ok=True)
+    return install(dst)
 
+
+def _install_panel(dst: Path) -> str:
+    """Panel install chain: pre-built GitHub Release sketch, else manifest build."""
     result = _try_download_panel_release(dst)
-    if result:
-        return result
-
-    return _build_panel_from_manifest(dst)
-
-
-def _setup_mash(source: str = "") -> str:
-    if _check_mash():
-        return "already ready"
-
-    if source:
-        return _copy_from_source(source, "L3_mash")
-
-    dst = SPECIES_DB_DIR / "L3_mash"
-    dst.mkdir(parents=True, exist_ok=True)
-
-    return _download_mash_zenodo(dst)
-
-
-def _setup_sourmash(source: str = "") -> str:
-    if _check_sourmash():
-        return "already ready"
-
-    if source:
-        return _copy_from_source(source, "L4_sourmash")
-
-    dst = SPECIES_DB_DIR / "L4_sourmash"
-    dst.mkdir(parents=True, exist_ok=True)
-
-    return _download_sourmash_farm(dst)
+    return result if result else _build_panel_from_manifest(dst)
 
 
 def _download_sourmash_farm(dst: Path) -> str:
-    # No checksum published upstream; integrity comes from the gather run itself.
+    # No checksum published upstream for the sig zip; the lineages csv is pinned.
     try:
         print("  downloading sourmash GTDB sketch (~3.9GB)...")
-        _download_file(SOURMASH_SIG_URL, dst / "gtdb-rs226-reps.k31.sig.zip")
+        sig_zip = dst / "gtdb-rs226-reps.k31.sig.zip"
+        lineages_csv = dst / "gtdb-rs226-reps.lineages.csv"
+        _download_file(SOURMASH_SIG_URL, sig_zip)
         print("  downloading GTDB lineages...")
-        _download_file(SOURMASH_LINEAGES_URL, dst / "gtdb-rs226-reps.lineages.csv")
+        _download_file(SOURMASH_LINEAGES_URL, lineages_csv)
     except Exception as e:
         return f"ERROR: farm download failed: {e}"
+    for artifact, expected in (
+        (sig_zip, SOURMASH_SIG_SHA256),
+        (lineages_csv, SOURMASH_LINEAGES_SHA256),
+    ):
+        if not _verify_sha256(artifact, expected):
+            artifact.unlink(missing_ok=True)
+            return f"ERROR: SHA256 mismatch for {artifact.name}"
     try:
-        (dst / "gtdb-rs226-reps.k31.sig.zip").rename(dst / "gtdb-reps-k31.zip")
-        (dst / "gtdb-rs226-reps.lineages.csv").rename(dst / "lineages.csv")
+        sig_zip.rename(dst / "gtdb-reps-k31.zip")
+        lineages_csv.rename(dst / "lineages.csv")
     except OSError as e:
         return f"ERROR: {e}"
     if _check_sourmash():
