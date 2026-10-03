@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import types
 
+import pytest
+
 import gside.analysis.taxonomic_validator as tv
 from gside.analysis.taxonomic_validator import (
     TaxonomyResult,
@@ -13,6 +15,9 @@ from gside.analysis.taxonomic_validator import (
     _run_gtdbtk,
     validate_genome,
 )
+from gside.config import which as _which
+
+_HAS_BLASTN = _which("blastn") is not None
 
 
 def _result(**kw):
@@ -99,6 +104,7 @@ class TestInterpretation:
         )
 
 
+@pytest.mark.skipif(not _HAS_BLASTN, reason="blastn not available")
 class TestValidateSimple:
     def test_simple_with_real_blastn(self, tmp_path):
         from gside.analysis.multigene_identifier import _MARKERS_FASTA
