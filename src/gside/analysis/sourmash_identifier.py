@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -45,14 +46,20 @@ def _gather_and_tax(contigs: str | Path, db_dir: Path) -> list[dict[str, Any]]:
         raise RuntimeError(
             f"sourmash GTDB database not found in {db_dir} (run: gside db setup --tier sourmash)"
         )
-    sig = db_dir / "query.sig"
-    gather_csv = db_dir / "gather.csv"
-    _run(["sourmash", "sketch", "dna", "-p", "k=31,scaled=1000", str(contigs), "-o", str(sig)])
-    try:
-        _run(["sourmash", "gather", str(sig), str(db_zip), "-o", str(gather_csv)])
-    except RuntimeError:
-        return []
-    rows = list(csv.DictReader(gather_csv.read_text().splitlines())) if gather_csv.is_file() else []
+    with tempfile.TemporaryDirectory(prefix="gside-sourmash-") as tmp:
+        work = Path(tmp)
+        sig = work / "query.sig"
+        gather_csv = work / "gather.csv"
+        _run(["sourmash", "sketch", "dna", "-p", "k=31,scaled=1000", str(contigs), "-o", str(sig)])
+        try:
+            _run(["sourmash", "gather", str(sig), str(db_zip), "-o", str(gather_csv)])
+        except RuntimeError:
+            return []
+        rows = (
+            list(csv.DictReader(gather_csv.read_text().splitlines()))
+            if gather_csv.is_file()
+            else []
+        )
     lineage_map = _lineage_map(lineages)
     out: list[dict[str, Any]] = []
     for row in rows:
