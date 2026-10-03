@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import io
 import json
 import subprocess
 from dataclasses import dataclass, field
@@ -40,22 +39,21 @@ def _run(cmd: list[str]) -> str:
 
 
 def _gather_and_tax(contigs: str | Path, db_dir: Path) -> list[dict[str, Any]]:
+    db_zip = db_dir / "gtdb-reps-k31.zip"
+    lineages = db_dir / "lineages.csv"
+    if not db_zip.exists() or not lineages.exists():
+        raise RuntimeError(
+            f"sourmash GTDB database not found in {db_dir} (run: gside db setup --tier sourmash)"
+        )
     sig = db_dir / "query.sig"
+    gather_csv = db_dir / "gather.csv"
     _run(["sourmash", "sketch", "dna", "-p", "k=31,scaled=1000", str(contigs), "-o", str(sig)])
-    gather_csv = _run(
-        [
-            "sourmash",
-            "gather",
-            str(sig),
-            str(db_dir / "gtdb-reps-k31.zip"),
-            "--csv",
-            "-",
-            "-o",
-            str(db_dir / "gather.csv"),
-        ]
-    )
-    rows = list(csv.DictReader(io.StringIO(gather_csv))) if gather_csv.strip() else []
-    lineage_map = _lineage_map(db_dir / "lineages.csv")
+    try:
+        _run(["sourmash", "gather", str(sig), str(db_zip), "-o", str(gather_csv)])
+    except RuntimeError:
+        return []
+    rows = list(csv.DictReader(gather_csv.read_text().splitlines())) if gather_csv.is_file() else []
+    lineage_map = _lineage_map(lineages)
     out: list[dict[str, Any]] = []
     for row in rows:
         name = row.get("name", "")
@@ -79,7 +77,7 @@ def _lineage_map(path: Path) -> dict[str, str]:
 
 
 def _db_version(db_dir: Path) -> str:
-    manifest = db_dir.parent / "manifests" / "sourmash_gtdb.json"
+    manifest = db_dir.parent / "manifests" / "L4_sourmash.json"
     if manifest.is_file():
         try:
             checksum = json.loads(manifest.read_text()).get("checksum", "")
@@ -90,9 +88,9 @@ def _db_version(db_dir: Path) -> str:
 
 
 def identify_by_sourmash(contigs: str | Path, db_dir: str | Path | None = None) -> SourmashIdResult:
-    base = Path(db_dir) if db_dir else SPECIES_DB_DIR / "sourmash_gtdb"
+    base = Path(db_dir) if db_dir else SPECIES_DB_DIR / "L4_sourmash"
     partition = _gather_and_tax(contigs, base)
-    database = {"name": "sourmash_gtdb", "version": _db_version(base)}
+    database = {"name": "L4_sourmash", "version": _db_version(base)}
 
     best_fuw = max((p["f_unique_weighted"] for p in partition), default=0.0)
     flags: list[str] = []

@@ -6,7 +6,7 @@
 
 - Linux x86_64
 - [pixi](https://pixi.sh)（管理生信 CLI 工具）
-- Python ≥ 3.11
+- Python ≥ 3.12
 
 ## 安装步骤
 
@@ -35,7 +35,7 @@ pip install -e .
 
 ```bash
 gside --version
-gside db status     # markers_v2 应为 ✅
+gside db status     # markers 应为 ✅
 ```
 
 ## 数据库

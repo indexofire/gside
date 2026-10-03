@@ -12,9 +12,9 @@ from gside.config import SPECIES_DB_DIR
 from gside.engine.backends.skani import AniHit
 
 _DB_BY_MODE = {
-    "panel": "refseq_panel",
-    "skani_gtdb": "skani_gtdb",
-    "mash_refseq": "mash_refseq",
+    "panel": "L2_ani",
+    "skani_gtdb": "L2_skani_gtdb",
+    "mash_refseq": "L3_mash",
 }
 
 _ANI_HIGH = 95.0

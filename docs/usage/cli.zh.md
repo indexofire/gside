@@ -65,7 +65,7 @@ gside species contigs.fna --mode panel --db-dir /path/to/dbs
 
 | 选项 | 默认 | 说明 |
 |---|---|---|
-| `--tier` | `panel` | mini / panel / mash / all |
+| `--tier` | `panel` | mini / panel / mash / sourmash / all |
 | `--source` | 无 | 从本地已有数据目录复制 |
 
 ### 示例
@@ -74,6 +74,35 @@ gside species contigs.fna --mode panel --db-dir /path/to/dbs
 gside db status
 gside db setup --tier all
 gside db setup --tier panel --source /path/to/existing/db
+```
+
+## gside validate
+
+标记基因组装验证，可选叠加 CheckM2 + GTDB-Tk。
+
+### 用法
+
+```bash
+gside validate <contigs.fasta> [选项]
+```
+
+### 参数
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `contigs` | 位置参数 | — | 组装后的 contigs FASTA 文件 |
+| `--mode` | 选项 | `simple` | 验证深度：`simple`（标记基因）或 `standard`（叠加 CheckM2 + GTDB-Tk） |
+| `--output-dir` | 选项 | 自动 | `validation.json` 输出目录 |
+
+`standard` 模式优雅降级：缺 CheckM2/GTDB-Tk 数据库或二进制时只告警并返回
+部分结果，不崩溃。通过 `CHECKM2DB` / `GTDBTK_DATA_PATH`（或 `GTDBDB`）
+环境变量配置。
+
+### 示例
+
+```bash
+gside validate contigs.fna --mode simple
+gside validate contigs.fna --mode standard --output-dir ./taxonomy
 ```
 
 ## gside --version

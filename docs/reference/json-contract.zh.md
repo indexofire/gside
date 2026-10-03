@@ -55,7 +55,7 @@
     "panel": {
       "method": "panel",
       "database": {
-        "name": "refseq_panel",
+        "name": "L2_ani",
         "version": "e5f6g7h8"
       },
       "result": {

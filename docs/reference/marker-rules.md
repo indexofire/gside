@@ -6,7 +6,7 @@ adding new species requires only a rule entry, no code changes.
 ## File Location
 
 ```
-data/reference/species/marker_rules.yaml
+data/db/L1_marker/marker_rules.yaml
 ```
 
 ## Rule Structure
@@ -37,7 +37,7 @@ Examples: `Campylobacter_jejuni`, `V_parahaemolyticus`.
 ### genes
 
 Candidate marker gene names (lowercase). These genes must exist in
-`markers_v2.fasta`.
+`markers.fasta`.
 
 ### min_hits
 
@@ -114,8 +114,8 @@ Rule-level `min_identity` can override the global value (but not below 85).
 ```
 
 Then:
-1. Append corresponding gene sequences to `markers_v2.fasta`
-   (format: `>markers_v2~~~mpb64~~~ACCESSION description [species] role=primary`)
+1. Append corresponding gene sequences to `markers.fasta`
+   (format: `>markers~~~mpb64~~~ACCESSION description [species] role=primary`)
 2. Rebuild BLAST database:
-   `makeblastdb -in markers_v2.fasta -dbtype nucl -out markers_v2_blastdb`
+   `makeblastdb -in markers.fasta -dbtype nucl -out markers_blastdb`
 3. Run `gside species test.fna --mode marker` to verify

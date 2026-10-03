@@ -6,7 +6,7 @@ From zero to species identification in 5 to 15 minutes (including databases).
 
 - Linux x86_64
 - [pixi](https://pixi.sh) (manages bioinformatics CLI tools)
-- Python ≥ 3.11
+- Python ≥ 3.12
 
 ## Installation
 
@@ -35,7 +35,7 @@ pip install -e .
 
 ```bash
 gside --version
-gside db status     # markers_v2 should be ✅
+gside db status     # markers should be ✅
 ```
 
 ## Databases

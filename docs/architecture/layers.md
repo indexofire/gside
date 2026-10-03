@@ -42,16 +42,15 @@ gside/
 │       ├── multigene_identifier.py   L1 target gene combination
 │       ├── ani_identifier.py         L2 ANI (panel/mash_refseq)
 │       ├── sourmash_identifier.py    L2 sourmash gather
-│       ├── taxonomic_validator.py    L3 GTDB-Tk (present in the source
-│       │                             tree but not yet wired into the CLI)
+│       ├── taxonomic_validator.py    L3 GTDB-Tk (wired via gside validate)
 │       └── species_canon.py          Species name canonicalization
 │                                   (present but not yet wired into the CLI)
 ├── data/
-│   ├── reference/species/  marker_rules.yaml + markers_v2.fasta
-│   ├── panel_manifest/     panel_accessions.tsv + metadata.tsv
-│   └── db/                 Large databases (gitignored)
-│       ├── refseq_panel/   skani sketch (291 genomes)
-│       └── mash_refseq/    mash sketch (RefSeq)
+│   └── db/                 Per-scheme directories (one folder per method)
+│       ├── L1_marker/      marker rules + fasta + BLAST db (tracked in git)
+│       ├── L2_ani/         skani sketch + genomes (gitignored) + manifests/ (tracked recipe)
+│       ├── L3_mash/        mash sketch (gitignored)
+│       └── L4_sourmash/    GTDB reps k=31 + lineages (via db setup)
 └── tests/
 ```
 

@@ -16,45 +16,51 @@ from __future__ import annotations
 
 import gzip
 import hashlib
-import json
 import shutil
 import subprocess
-import sys
 import tarfile
 import urllib.request
 from pathlib import Path
 from typing import Any
 
-from .config import DATA_DIR, SPECIES_DB_DIR, which
+from .config import SPECIES_DB_DIR, which
 
-_MANIFEST_DIR = DATA_DIR / "panel_manifest"
+_MANIFEST_DIR = SPECIES_DB_DIR / "L2_ani" / "manifests"
 
 PANEL_RELEASE_URL = (
     "https://github.com/indexofire/gside/releases/download/db-v0.1/panel.sketch.tar.gz"
 )
 MASH_ZENODO_URL = "https://zenodo.org/records/22664519/files/RefSeqSketches_237.msh.gz"
 MASH_MD5 = "dee53b23af3ab120333f9eb1b95ae60f"
+SOURMASH_FARM_BASE = "https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs226"
+SOURMASH_SIG_URL = f"{SOURMASH_FARM_BASE}/gtdb-rs226-reps.k31.sig.zip"
+SOURMASH_LINEAGES_URL = f"{SOURMASH_FARM_BASE}/gtdb-rs226-reps.lineages.csv"
 
 _TIERS: dict[str, dict[str, Any]] = {
     "mini": {
         "description": "Marker rules + sequences (bundled)",
         "size": "~1MB",
-        "items": ["markers_v2"],
+        "items": ["markers"],
     },
     "panel": {
         "description": "Curated reference panel for ANI (skani)",
         "size": "~130MB sketch / ~1GB genomes",
-        "items": ["refseq_panel"],
+        "items": ["L2_ani"],
     },
     "mash": {
         "description": "RefSeq MinHash sketch",
         "size": "~179MB",
-        "items": ["mash_refseq"],
+        "items": ["L3_mash"],
+    },
+    "sourmash": {
+        "description": "GTDB gather database (sourmash, sketch k=31)",
+        "size": "~3.9GB",
+        "items": ["L4_sourmash"],
     },
     "all": {
         "description": "panel + mash",
         "size": "~310MB sketches",
-        "items": ["refseq_panel", "mash_refseq"],
+        "items": ["L2_ani", "L3_mash"],
     },
 }
 
@@ -64,33 +70,41 @@ _CHUNK = 1024 * 1024
 
 def db_status() -> dict[str, dict[str, Any]]:
     return {
-        "markers_v2": {
-            "ready": (DATA_DIR / "reference/species/markers_v2.fasta").exists(),
-            "path": str(DATA_DIR / "reference/species"),
+        "markers": {
+            "ready": (SPECIES_DB_DIR / "L1_marker" / "markers.fasta").exists(),
+            "path": str(SPECIES_DB_DIR / "L1_marker"),
             "tier": "mini",
         },
-        "refseq_panel": {
+        "L2_ani": {
             "ready": _check_panel(),
-            "path": str(SPECIES_DB_DIR / "refseq_panel"),
+            "path": str(SPECIES_DB_DIR / "L2_ani"),
             "tier": "panel",
         },
-        "mash_refseq": {
+        "L3_mash": {
             "ready": _check_mash(),
-            "path": str(SPECIES_DB_DIR / "mash_refseq"),
+            "path": str(SPECIES_DB_DIR / "L3_mash"),
             "tier": "mash",
+        },
+        "L4_sourmash": {
+            "ready": _check_sourmash(),
+            "path": str(SPECIES_DB_DIR / "L4_sourmash"),
+            "tier": "sourmash",
         },
     }
 
 
+def _check_sourmash() -> bool:
+    s = SPECIES_DB_DIR / "L4_sourmash"
+    return (s / "gtdb-reps-k31.zip").exists() and (s / "lineages.csv").exists()
+
+
 def _check_panel() -> bool:
-    p = SPECIES_DB_DIR / "refseq_panel"
-    return (p / "panel.sketch" / "sketches.db").exists() or (
-        p / "panel.sketch"
-    ).is_file()
+    p = SPECIES_DB_DIR / "L2_ani"
+    return (p / "panel.sketch" / "sketches.db").exists() or (p / "panel.sketch").is_file()
 
 
 def _check_mash() -> bool:
-    m = SPECIES_DB_DIR / "mash_refseq"
+    m = SPECIES_DB_DIR / "L3_mash"
     return (m / "mash.msh").exists() or (m / "payload.bin").exists()
 
 
@@ -100,9 +114,11 @@ def db_setup(tier: str = "panel", source: str = "") -> dict[str, str]:
 
     results: dict[str, str] = {}
     if tier in ("panel", "all"):
-        results["refseq_panel"] = _setup_panel(source)
+        results["L2_ani"] = _setup_panel(source)
     if tier in ("mash", "all"):
-        results["mash_refseq"] = _setup_mash(source)
+        results["L3_mash"] = _setup_mash(source)
+    if tier in ("sourmash",):
+        results["L4_sourmash"] = _setup_sourmash(source)
     if not results:
         results["info"] = "mini tier ships with repo"
     return results
@@ -113,9 +129,9 @@ def _setup_panel(source: str = "") -> str:
         return "already ready"
 
     if source:
-        return _copy_from_source(source, "refseq_panel")
+        return _copy_from_source(source, "L2_ani")
 
-    dst = SPECIES_DB_DIR / "refseq_panel"
+    dst = SPECIES_DB_DIR / "L2_ani"
     dst.mkdir(parents=True, exist_ok=True)
 
     result = _try_download_panel_release(dst)
@@ -130,12 +146,44 @@ def _setup_mash(source: str = "") -> str:
         return "already ready"
 
     if source:
-        return _copy_from_source(source, "mash_refseq")
+        return _copy_from_source(source, "L3_mash")
 
-    dst = SPECIES_DB_DIR / "mash_refseq"
+    dst = SPECIES_DB_DIR / "L3_mash"
     dst.mkdir(parents=True, exist_ok=True)
 
     return _download_mash_zenodo(dst)
+
+
+def _setup_sourmash(source: str = "") -> str:
+    if _check_sourmash():
+        return "already ready"
+
+    if source:
+        return _copy_from_source(source, "L4_sourmash")
+
+    dst = SPECIES_DB_DIR / "L4_sourmash"
+    dst.mkdir(parents=True, exist_ok=True)
+
+    return _download_sourmash_farm(dst)
+
+
+def _download_sourmash_farm(dst: Path) -> str:
+    # No checksum published upstream; integrity comes from the gather run itself.
+    try:
+        print("  downloading sourmash GTDB sketch (~3.9GB)...")
+        _download_file(SOURMASH_SIG_URL, dst / "gtdb-rs226-reps.k31.sig.zip")
+        print("  downloading GTDB lineages...")
+        _download_file(SOURMASH_LINEAGES_URL, dst / "gtdb-rs226-reps.lineages.csv")
+    except Exception as e:
+        return f"ERROR: farm download failed: {e}"
+    try:
+        (dst / "gtdb-rs226-reps.k31.sig.zip").rename(dst / "gtdb-reps-k31.zip")
+        (dst / "gtdb-rs226-reps.lineages.csv").rename(dst / "lineages.csv")
+    except OSError as e:
+        return f"ERROR: {e}"
+    if _check_sourmash():
+        return "downloaded from farm.cse.ucdavis.edu (GTDB rs226 reps, renamed in place)"
+    return "ERROR: download incomplete, expected gtdb-reps-k31.zip + lineages.csv"
 
 
 def _copy_from_source(source: str, name: str) -> str:
@@ -152,10 +200,10 @@ def _copy_from_source(source: str, name: str) -> str:
 
 def _try_download_panel_release(dst: Path) -> str | None:
     try:
-        print(f"  downloading panel sketch from GitHub Release...")
+        print("  downloading panel sketch from GitHub Release...")
         archive = dst / "panel.sketch.tar.gz"
         _download_file(PANEL_RELEASE_URL, archive)
-        print(f"  extracting...")
+        print("  extracting...")
         with tarfile.open(archive, "r:gz") as tf:
             tf.extractall(dst)
         archive.unlink(missing_ok=True)
@@ -169,7 +217,7 @@ def _try_download_panel_release(dst: Path) -> str | None:
 
 def _download_mash_zenodo(dst: Path) -> str:
     try:
-        print(f"  downloading mash sketch from Zenodo (~179MB)...")
+        print("  downloading mash sketch from Zenodo (~179MB)...")
         gz_path = dst / "mash.msh.gz"
         _download_file(MASH_ZENODO_URL, gz_path)
 
@@ -178,7 +226,7 @@ def _download_mash_zenodo(dst: Path) -> str:
             gz_path.unlink(missing_ok=True)
             return f"ERROR: MD5 mismatch (got {md5}, expected {MASH_MD5})"
 
-        print(f"  verifying MD5 ✓, decompressing...")
+        print("  verifying MD5 ✓, decompressing...")
         with gzip.open(gz_path, "rb") as fin, open(dst / "mash.msh", "wb") as fout:
             shutil.copyfileobj(fin, fout)
         gz_path.unlink(missing_ok=True)
@@ -219,9 +267,21 @@ def _build_panel_from_manifest(dst: Path) -> str:
         acc_file = dst / "_accessions.txt"
         acc_file.write_text("\n".join(to_download))
         result = subprocess.run(
-            [datasets_bin, "download", "genome", "accession", "-f", str(acc_file),
-             "--include", "genome", "--filename", str(dst / "_genomes.zip")],
-            capture_output=True, text=True, timeout=_DOWNLOAD_TIMEOUT,
+            [
+                datasets_bin,
+                "download",
+                "genome",
+                "accession",
+                "-f",
+                str(acc_file),
+                "--include",
+                "genome",
+                "--filename",
+                str(dst / "_genomes.zip"),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=_DOWNLOAD_TIMEOUT,
         )
         acc_file.unlink(missing_ok=True)
         if result.returncode != 0:
@@ -231,7 +291,8 @@ def _build_panel_from_manifest(dst: Path) -> str:
         if zip_path.exists():
             subprocess.run(
                 ["unzip", "-oq", str(zip_path), "-d", str(dst / "_dl")],
-                capture_output=True, timeout=300,
+                capture_output=True,
+                timeout=300,
             )
             for fna in (dst / "_dl").rglob("*_genomic.fna"):
                 shutil.copy2(fna, genomes_dir / fna.name)
@@ -248,7 +309,9 @@ def _build_panel_from_manifest(dst: Path) -> str:
         shutil.rmtree(sketch_dir)
     result = subprocess.run(
         [skani_bin, "sketch", *[str(f) for f in fnas], "-o", str(sketch_dir)],
-        capture_output=True, text=True, timeout=_DOWNLOAD_TIMEOUT,
+        capture_output=True,
+        text=True,
+        timeout=_DOWNLOAD_TIMEOUT,
     )
     if result.returncode != 0:
         return f"ERROR: skani sketch failed: {result.stderr[:200]}"
@@ -259,8 +322,6 @@ def _build_panel_from_manifest(dst: Path) -> str:
 
 
 def _download_file(url: str, dst: Path) -> None:
-    import urllib.error
-
     req = urllib.request.Request(url, headers={"User-Agent": "gside-setup"})
     with urllib.request.urlopen(req, timeout=_DOWNLOAD_TIMEOUT) as resp:
         total = int(resp.headers.get("Content-Length", 0))
@@ -284,10 +345,7 @@ def run_db_command(args: list[str]) -> int:
         return 0
 
     sub = args[0]
-    if sub == "status":
-        _print_status()
-        return 0
-    elif sub == "setup":
+    if sub == "setup":
         tier = "panel"
         source = ""
         i = 1

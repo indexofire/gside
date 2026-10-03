@@ -6,13 +6,32 @@ gside reference databases are managed via the `gside db` subcommand with tiered 
 
 | Tier | Contents | Size | Purpose |
 |------|----------|------|---------|
-| **mini** | marker_rules.yaml + markers_v2.fasta + BLAST db | ~1MB | Target gene identification (L1) |
-| **panel** | refseq_panel (291 genomes, skani sketch) | ~130MB | ANI identification (L2) |
-| **mash** | mash_refseq (RefSeq MinHash sketch) | ~179MB | Distance identification (L2) |
-| **all** | panel + mash | ~310MB | Full capability |
+| **mini** | marker_rules.yaml + markers.fasta + BLAST db | ~1MB | Target gene identification (L1) |
+| **panel** | L2_ani (291 genomes, skani sketch) | ~130MB | ANI identification (L2) |
+| **mash** | L3_mash (RefSeq MinHash sketch) | ~179MB | Distance identification (L2) |
+| **sourmash** | L4_sourmash (GTDB reps k=31 + lineages) | ~3.9GB | Gather classification (sourmash) |
+| **all** | panel + mash | ~310MB | Full capability (excludes sourmash) |
 
-The `sourmash` mode uses a separate GTDB database (`sourmash_gtdb`) that is
-not covered by the tiers above.
+### Directory naming
+
+`data/db/` directories are named per identification layer:
+
+| Old name | New name | Method |
+|----------|----------|--------|
+| `refseq_panel` | `L2_ani` | panel (skani ANI) |
+| `mash_refseq` | `L3_mash` | mash_refseq (MinHash) |
+| `sourmash_gtdb` | `L4_sourmash` | sourmash (GTDB gather) |
+
+Migrate an existing checkout with:
+
+```bash
+mv data/db/refseq_panel data/db/L2_ani
+mv data/db/mash_refseq data/db/L3_mash
+mkdir -p data/db/L4_sourmash
+```
+
+Note: the prebuilt GitHub Release archive still contains the inner
+`panel.sketch/` directory unchanged, so download-and-extract works as before.
 
 ## Commands
 
@@ -25,9 +44,10 @@ gside db status
 ```
 gside database status
 ───────────────────────────────────────────────
-  ✅ markers_v2       tier=mini   path=data/reference/species
-  ✅ refseq_panel     tier=panel  path=data/db/refseq_panel
-  ✅ mash_refseq      tier=mash   path=data/db/mash_refseq
+  ✅ markers          tier=mini   path=data/db/L1_marker
+  ✅ L2_ani        tier=panel  path=data/db/L2_ani
+  ✅ L3_mash         tier=mash   path=data/db/L3_mash
+  ✅ L4_sourmash     tier=sourmash path=data/db/L4_sourmash
 
   Run 'gside db setup --tier <tier>' to provision
 ```
@@ -37,7 +57,8 @@ gside database status
 ```bash
 gside db setup --tier panel          # Panel only (ANI), the default tier
 gside db setup --tier mash           # MinHash only
-gside db setup --tier all            # Everything
+gside db setup --tier sourmash       # GTDB gather db (~3.9GB)
+gside db setup --tier all            # panel + mash (excludes sourmash)
 ```
 
 With no `--tier` given, setup defaults to `panel`. Panel tries a pre-built
@@ -73,7 +94,7 @@ Default paths can be overridden via environment variables:
 
 ## Custom Marker Rules
 
-Edit `data/reference/species/marker_rules.yaml`:
+Edit `data/db/L1_marker/marker_rules.yaml`:
 
 ```yaml
 - species: Mycobacterium_tuberculosis
@@ -88,8 +109,8 @@ Edit `data/reference/species/marker_rules.yaml`:
 Then rebuild the BLAST database:
 
 ```bash
-cd data/reference/species
-makeblastdb -in markers_v2.fasta -dbtype nucl -out markers_v2_blastdb
+cd data/db/L1_marker
+makeblastdb -in markers.fasta -dbtype nucl -out markers_blastdb
 ```
 
 No code changes required — rules are data.

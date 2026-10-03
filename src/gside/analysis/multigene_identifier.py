@@ -1,4 +1,4 @@
-"""Multi-gene species identifier using the expanded markers_v2 BLAST database.
+"""Multi-gene species identifier using the expanded markers BLAST database.
 
 Replaces the single-gene species_identifier for routine use. Reads
 marker_rules.yaml for gene combination logic and scoring.
@@ -13,10 +13,10 @@ from typing import Any
 
 import yaml
 
-from gside.config import REF_DIR
+from gside.config import SPECIES_DB_DIR
 
-_MARKERS_V2_FASTA = REF_DIR / "species" / "markers_v2.fasta"
-_MARKER_RULES = REF_DIR / "species" / "marker_rules.yaml"
+_MARKERS_FASTA = SPECIES_DB_DIR / "L1_marker" / "markers.fasta"
+_MARKER_RULES = SPECIES_DB_DIR / "L1_marker" / "marker_rules.yaml"
 
 _MIN_IDENTITY = 85.0
 _MIN_COVERAGE = 60.0
@@ -55,7 +55,7 @@ class MultiGeneResult:
 
 def _db_version() -> str:
     try:
-        return hashlib.sha256(_MARKERS_V2_FASTA.read_bytes()).hexdigest()[:8]
+        return hashlib.sha256(_MARKERS_FASTA.read_bytes()).hexdigest()[:8]
     except OSError:
         return "unknown"
 
@@ -86,7 +86,7 @@ def _blast_contigs(contigs_fasta: str) -> list[dict[str, Any]]:
     if not blastn:
         blastn = "blastn"
 
-    db = str(REF_DIR / "species" / "markers_v2_blastdb")
+    db = str(SPECIES_DB_DIR / "L1_marker" / "markers_blastdb")
     result = subprocess.run(
         [
             blastn,
@@ -153,7 +153,7 @@ def identify_multigene(contigs_fasta: str) -> MultiGeneResult:
     priority_species = set()
     for rule in rules:
         if rule.get("priority_over"):
-            for target in rule["priority_over"]:
+            for _target in rule["priority_over"]:
                 priority_species.add(rule["species"])
 
     best_species = "Unknown"
@@ -169,9 +169,12 @@ def identify_multigene(contigs_fasta: str) -> MultiGeneResult:
 
         matched = []
         for gene in genes:
-            if gene in significant and significant[gene]["identity"] >= min_id:
-                if gene not in exclude:
-                    matched.append(gene)
+            if (
+                gene in significant
+                and significant[gene]["identity"] >= min_id
+                and gene not in exclude
+            ):
+                matched.append(gene)
 
         excluded_present = [g for g in exclude if g in significant]
 

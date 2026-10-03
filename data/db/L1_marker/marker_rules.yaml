@@ -6,7 +6,7 @@ rules:
   min_identity: 90
 - species: V_parahaemolyticus
   genes:
-  - toxr
+  - tlh
   min_hits: 1
   min_identity: 90
 - species: Listeria_monocytogenes

@@ -6,7 +6,7 @@
 ## 文件位置
 
 ```
-data/reference/species/marker_rules.yaml
+data/db/L1_marker/marker_rules.yaml
 ```
 
 ## 规则结构
@@ -35,7 +35,7 @@ rules:
 
 ### genes
 
-候选标记基因名列表（小写）。这些基因必须存在于 `markers_v2.fasta` 中。
+候选标记基因名列表（小写）。这些基因必须存在于 `markers.fasta` 中。
 
 ### min_hits
 
@@ -105,8 +105,8 @@ rules:
 
 然后：
 
-1. 将对应基因序列追加到 `markers_v2.fasta`，FASTA 头格式：
-   `>markers_v2~~~mpb64~~~ACC 描述 [物种] role=primary`
+1. 将对应基因序列追加到 `markers.fasta`，FASTA 头格式：
+   `>markers~~~mpb64~~~ACC 描述 [物种] role=primary`
 2. 重建 BLAST 库：
-   `makeblastdb -in markers_v2.fasta -dbtype nucl -out markers_v2_blastdb`
+   `makeblastdb -in markers.fasta -dbtype nucl -out markers_blastdb`
 3. 运行 `gside species test.fna --mode marker` 验证

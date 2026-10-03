@@ -64,7 +64,6 @@ class KmaBackend:
             str(self.threads),
             "-t_db",
             str(index_prefix),
-            "-res",
             "-1t1",
             "-cge",
             "-apm",
@@ -99,7 +98,7 @@ class KmaBackend:
             parts = line.split("\t")
             if len(parts) < len(header):
                 parts += [""] * (len(header) - len(parts))
-            row = dict(zip(header, parts))
+            row = dict(zip(header, parts, strict=False))
 
             template = row.get("Template", "")
             if not template:

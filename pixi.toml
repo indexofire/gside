@@ -8,21 +8,32 @@ version = "0.1.0"
 [tasks]
 docs = "mkdocs serve"
 docs-build = "mkdocs build --strict"
+check = "ruff check src/ tests/ && ruff format --check src/ tests/"
+fix = "ruff check --fix src/ tests/ && ruff format src/ tests/"
+typecheck = "pyright src/gside/"
+cov = "pytest tests/ -q --cov=src/gside --cov-report=term-missing --cov-fail-under=96"
 
 [dependencies]
-python = ">=3.11"
+python = ">=3.12,<3.13"
 blast = ">=2.16"
 skani = "0.3.*"
 mash = ">=2.3"
 mmseqs2 = ">=15"
+sourmash = ">=4.9"
 
 [pypi-dependencies]
 gside = { path = ".", editable = true }
+
+[feature.dev.dependencies]
+pyright = ">=1.1"
 
 [feature.dev.pypi-dependencies]
 mkdocs = ">=1.6"
 mkdocs-material = ">=9.0"
 mkdocs-static-i18n = ">=1.2"
+pytest = ">=8.0"
+pytest-cov = ">=5.0"
+ruff = ">=0.5"
 
 [environments]
 default = { features = [], solve-group = "default" }

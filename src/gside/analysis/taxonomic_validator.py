@@ -92,7 +92,7 @@ def _run_checkm2(contigs_path: str, output_dir: Path) -> tuple[float | None, flo
         return None, None
     header = lines[0].split("\t")
     data = lines[1].split("\t")
-    row = dict(zip(header, data))
+    row = dict(zip(header, data, strict=False))
 
     try:
         completeness = float(row.get("Completeness", 0))
@@ -154,7 +154,7 @@ def _run_gtdbtk(contigs_path: str, output_dir: Path) -> str:
         return ""
     header = lines[0].split("\t")
     data = lines[1].split("\t")
-    row = dict(zip(header, data))
+    row = dict(zip(header, data, strict=False))
     return row.get("classification", "")
 
 
@@ -176,7 +176,7 @@ def validate_genome(
         output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    from ..analysis.species_identifier import identify
+    from gside.analysis.multigene_identifier import identify_multigene as identify
 
     marker_result = identify(contigs_path)
     result = TaxonomyResult(

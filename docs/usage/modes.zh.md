@@ -13,7 +13,7 @@ L1  marker 靶基因组合规则                    [layer=1]
 
 ### 原理
 
-对 contigs 执行一次 BLAST（vs markers_v2 库，81 条序列），将命中基因与
+对 contigs 执行一次 BLAST（vs markers 库，81 条序列），将命中基因与
 38 条组合规则匹配（数据驱动，`marker_rules.yaml`）。
 
 ### 判定阈值

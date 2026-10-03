@@ -5,7 +5,7 @@ and data sources used by gside are acknowledged below.
 
 ## NCBI GenBank / RefSeq Sequences
 
-The marker gene sequences in `data/reference/species/markers_v2.fasta` and the
+The marker gene sequences in `data/db/L1_marker/markers.fasta` and the
 reference genomes used to build the ANI panel are derived from NCBI GenBank
 and RefSeq databases.
 
@@ -17,7 +17,7 @@ NCBI data policies: https://www.ncbi.nlm.nih.gov/home/about/policies/
 
 ## RefSeq Mash Sketch (Zenodo)
 
-The `mash_refseq` database is downloaded at runtime from the community-maintained
+The `L3_mash` database (RefSeq mash sketch, `data/db/L3_mash/`) is downloaded at runtime from the community-maintained
 Zenodo repository (not bundled in this repository).
 
 - Source: https://zenodo.org/records/22664519

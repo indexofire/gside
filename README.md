@@ -59,19 +59,19 @@ gside --version
 
 数据分层：
 
-- mini：随仓库分发，含 marker_rules.yaml（38 条规则）、markers_v2.fasta（81 序列）
+- mini：随仓库分发，含 marker_rules.yaml（38 条规则）、markers.fasta（81 序列）
   与预建 BLAST 库，开箱即用
 - panel：skani 精选面板 sketch，约 130MB
 - mash：RefSeq MinHash sketch，约 179MB
 
 ## 自定义规则
 
-编辑 `data/reference/species/marker_rules.yaml`，字段为 `species` / `genes` /
+编辑 `data/db/L1_marker/marker_rules.yaml`，字段为 `species` / `genes` /
 `min_hits` / `min_identity` / `exclude_genes`。修改 fasta 后重建 BLAST 库即生效，
 无需改代码：
 
 ```bash
-makeblastdb -in markers_v2.fasta -dbtype nucl -out markers_v2_blastdb
+makeblastdb -in markers.fasta -dbtype nucl -out markers_blastdb
 ```
 
 ## 输出

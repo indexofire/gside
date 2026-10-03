@@ -14,7 +14,7 @@ L1  marker target gene combination rules                          [authority=1]
 
 ### Principle
 
-Performs a single BLAST scan of contigs against the markers_v2 database
+Performs a single BLAST scan of contigs against the markers database
 (81 sequences), then matches detected genes against 38 combination rules
 (data-driven, `marker_rules.yaml`).
 

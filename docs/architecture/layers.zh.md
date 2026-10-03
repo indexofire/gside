@@ -34,19 +34,20 @@ gside/
 │       ├── multigene_identifier.py   L1 靶基因组合
 │       ├── ani_identifier.py         L2 ANI（panel/mash）
 │       ├── sourmash_identifier.py    L2 sourmash gather
-│       ├── taxonomic_validator.py    L3 GTDB-Tk（未接入 CLI）
+│       ├── taxonomic_validator.py    L3 GTDB-Tk（已通过 gside validate 接入）
 │       └── species_canon.py          物种名规范化（未接入 CLI）
 ├── data/
-│   ├── reference/species/  marker_rules.yaml + markers_v2.fasta
-│   ├── panel_manifest/     panel_accessions.tsv + metadata.tsv
-│   └── db/                 大型数据库（gitignored）
-│       ├── refseq_panel/   skani sketch（291 基因组）
-│       └── mash_refseq/    mash sketch（RefSeq）
+│   └── db/                 按方案分目录（一法一文件夹）
+│       ├── L1_marker/      标记规则 + fasta + BLAST 库（git 跟踪）
+│       ├── L2_ani/         skani sketch + 基因组（gitignored）+ manifests/（跟踪的配方）
+│       ├── L3_mash/        mash sketch（gitignored）
+│       └── L4_sourmash/    GTDB reps k=31 + lineages（db setup 安装）
 └── tests/
 ```
 
-注：`taxonomic_validator.py` 与 `species_canon.py` 尚未接入 CLI，
-当前命令行仅提供 marker / panel / mash_refseq / sourmash / all 五种模式。
+注：`taxonomic_validator.py` 已通过 `gside validate` 接入（simple 模式开箱即用，
+standard 模式需 CheckM2/GTDB-Tk 环境）；`species_canon.py` 仍未接入 CLI。
+当前 `species` 命令提供 marker / panel / mash_refseq / sourmash / all 五种模式。
 
 ## 设计原则
 

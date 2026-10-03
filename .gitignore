@@ -2,9 +2,11 @@
 .pixi/*
 !.pixi/config.toml
 # Large reference databases (not in git — use `gside db setup`)
-data/db/refseq_panel/
-data/db/mash_refseq/
-data/db/sourmash/
+# NOTE: data/db/L2_ani/manifests/ (panel build recipe) stays git-tracked
+# despite the dir-level ignore below; use `git add -f` for new recipe files.
+data/db/L2_ani/
+data/db/L3_mash/
+data/db/L4_sourmash/
 site/
 
 # Python
@@ -25,4 +27,3 @@ coverage.xml
 # OS
 .DS_Store
 Thumbs.db
-!data/panel_manifest/

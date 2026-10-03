@@ -6,10 +6,31 @@ gside 的参考数据库通过 `gside db` 子命令管理，支持分层数据�
 
 | Tier | 包含 | 大小 | 用途 |
 |---|---|---|---|
-| **mini** | marker_rules.yaml + markers_v2.fasta + 预建 BLAST 库 | ~1MB | 靶基因组合鉴定（L1），随仓库分发 |
-| **panel** | refseq_panel（291 基因组 skani sketch） | ~130MB | ANI 鉴定（L2） |
-| **mash** | mash_refseq（RefSeq MinHash sketch） | ~179MB | 距离鉴定（L2） |
-| **all** | panel + mash | ~310MB | 全层次能力 |
+| **mini** | marker_rules.yaml + markers.fasta + 预建 BLAST 库 | ~1MB | 靶基因组合鉴定（L1），随仓库分发 |
+| **panel** | L2_ani（291 基因组 skani sketch） | ~130MB | ANI 鉴定（L2） |
+| **mash** | L3_mash（RefSeq MinHash sketch） | ~179MB | 距离鉴定（L2） |
+| **sourmash** | L4_sourmash（GTDB reps k=31 + lineages） | ~3.9GB | gather 分类（sourmash） |
+| **all** | panel + mash | ~310MB | 全层次能力（不含 sourmash） |
+
+### 目录命名
+
+`data/db/` 下目录按鉴定层次命名：
+
+| 旧名 | 新名 | 对应方法 |
+|---|---|---|
+| `refseq_panel` | `L2_ani` | panel（skani ANI） |
+| `mash_refseq` | `L3_mash` | mash_refseq（MinHash） |
+| `sourmash_gtdb` | `L4_sourmash` | sourmash（GTDB gather，需手动下载） |
+
+已有旧目录按如下迁移：
+
+```bash
+mv data/db/refseq_panel data/db/L2_ani
+mv data/db/mash_refseq data/db/L3_mash
+mkdir -p data/db/L4_sourmash
+```
+
+注意：GitHub Release 预建包内层 `panel.sketch/` 目录名不变，下载解压流程不受影响。
 
 ## 命令
 
@@ -22,9 +43,10 @@ gside db status
 ```
 gside database status
 ──────────────────────────────────────────
-  ✅ markers_v2       tier=mini   path=data/reference/species
-  ✅ refseq_panel     tier=panel  path=data/db/refseq_panel
-  ✅ mash_refseq      tier=mash   path=data/db/mash_refseq
+  ✅ markers          tier=mini   path=data/db/L1_marker
+  ✅ L2_ani        tier=panel  path=data/db/L2_ani
+  ✅ L3_mash         tier=mash   path=data/db/L3_mash
+  ✅ L4_sourmash     tier=sourmash path=data/db/L4_sourmash
 ```
 
 ### 安装/更新
@@ -32,7 +54,8 @@ gside database status
 ```bash
 gside db setup --tier panel          # 仅面板（ANI），默认
 gside db setup --tier mash           # 仅 MinHash
-gside db setup --tier all            # 全部
+gside db setup --tier sourmash       # GTDB gather 库（~3.9GB）
+gside db setup --tier all            # panel + mash（不含 sourmash）
 ```
 
 不带 `--tier` 时默认安装 `panel`。
@@ -55,7 +78,7 @@ gside db list
 
 ## 自定义标记规则
 
-编辑 `data/reference/species/marker_rules.yaml`：
+编辑 `data/db/L1_marker/marker_rules.yaml`：
 
 ```yaml
 - species: Mycobacterium_tuberculosis
@@ -70,8 +93,8 @@ gside db list
 然后重建 BLAST 库：
 
 ```bash
-cd data/reference/species
-makeblastdb -in markers_v2.fasta -dbtype nucl -out markers_v2_blastdb
+cd data/db/L1_marker
+makeblastdb -in markers.fasta -dbtype nucl -out markers_blastdb
 ```
 
 无需修改代码：规则即数据。

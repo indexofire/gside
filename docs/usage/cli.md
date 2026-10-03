@@ -71,7 +71,7 @@ Database management subcommand.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--tier` | `panel` | mini / panel / mash / all |
+| `--tier` | `panel` | mini / panel / mash / sourmash / all |
 | `--source` | — | Copy from an existing local database directory instead of downloading |
 
 ### Examples
@@ -80,6 +80,35 @@ Database management subcommand.
 gside db status
 gside db setup --tier all
 gside db setup --tier panel --source /path/to/existing/data/db
+```
+
+## gside validate
+
+Assembly validation with marker genes, optionally CheckM2 + GTDB-Tk.
+
+### Usage
+
+```bash
+gside validate <contigs.fasta> [options]
+```
+
+### Arguments
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `contigs` | positional | — | Assembled contigs FASTA file |
+| `--mode` | option | `simple` | Validation depth: `simple` (marker genes) or `standard` (adds CheckM2 + GTDB-Tk) |
+| `--output-dir` | option | auto | Directory for `validation.json` |
+
+`standard` mode degrades gracefully: missing CheckM2/GTDB-Tk databases or
+binaries produce warnings and partial results, never a crash. Configure via
+`CHECKM2DB` / `GTDBTK_DATA_PATH` (or `GTDBDB`) environment variables.
+
+### Examples
+
+```bash
+gside validate contigs.fna --mode simple
+gside validate contigs.fna --mode standard --output-dir ./taxonomy
 ```
 
 ## gside --version

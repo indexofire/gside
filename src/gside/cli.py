@@ -1,48 +1,265 @@
-"""gside — Genome Species IDentification Engine.
-
-Multi-layer species identification from contigs:
-  marker       multigene combination rules (blastn against markers_v2)
-  panel        ANI against the curated reference panel (skani)
-  mash_refseq  MinHash distance against RefSeq sketch (mash)
-  sourmash     sourmash GTDB gather
-  all          run available methods and arbitrate (ANI layer > marker layer)
-
-Output: single JSON verdict per method (GOM-compatible contract).
-"""
+"""Command-line interface for gside."""
 
 from __future__ import annotations
 
-import argparse
 import json
+import logging
 import sys
 from typing import Any
 
-from .db import run_db_command
+import click
+
+from gside import __version__
+
+HELP_SETTINGS = {"help_option_names": ["-h", "--help"]}
+
+MODES = ["marker", "panel", "mash_refseq", "sourmash", "all"]
+TIERS = ["mini", "panel", "mash", "sourmash", "all"]
+
+logger = logging.getLogger(__name__)
 
 
-def _run_species(args: argparse.Namespace) -> int:
-    contigs = args.contigs
+def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
+    """Configure root logging. Call once from the CLI entry point."""
+    if verbose and quiet:
+        raise ValueError("verbose and quiet cannot be enabled together")
+    level = logging.DEBUG if verbose else logging.ERROR if quiet else logging.WARNING
+    logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
+
+
+@click.group(
+    context_settings=HELP_SETTINGS,
+    invoke_without_command=True,
+)
+@click.version_option(__version__, "--version", "-V")
+@click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
+@click.option("--quiet", "-q", is_flag=True, help="Suppress non-error logging.")
+@click.pass_context
+def main(ctx: click.Context, verbose: bool, quiet: bool) -> None:
+    """gside — Genome Species IDentification Engine.
+
+    Multi-layer species identification from contigs. Prints a single
+    JSON verdict per run to stdout.
+    """
+    if verbose and quiet:
+        raise click.UsageError("--verbose and --quiet cannot be used together")
+    setup_logging(verbose=verbose, quiet=quiet)
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
+
+
+@main.command("species", context_settings=HELP_SETTINGS)
+@click.argument("contigs", nargs=-1, required=True, type=click.Path(dir_okay=False))
+@click.option(
+    "--mode",
+    type=click.Choice(MODES),
+    default="marker",
+    show_default=True,
+    help="Identification method (all runs every method, then arbitrates).",
+)
+@click.option(
+    "--db-dir",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Database root (default: $GSIDE_DB_DIR or data/db).",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["json", "tsv", "md"]),
+    default="json",
+    show_default=True,
+    help="Output format (tsv/md render one row per input file).",
+)
+def species_cmd(
+    contigs: tuple[str, ...], mode: str, db_dir: str | None, output_format: str
+) -> None:
+    """Identify species from assembled contigs FASTA (accepts multiple files)."""
+    sys.exit(_run_species(list(contigs), mode, db_dir, output_format))
+
+
+@click.group(
+    "db",
+    context_settings=HELP_SETTINGS,
+    invoke_without_command=True,
+)
+@click.pass_context
+def db_group(ctx: click.Context) -> None:
+    """Manage reference databases (status/setup/list)."""
+    if ctx.invoked_subcommand is None:
+        from .db import run_db_command
+
+        sys.exit(run_db_command(["status"]))
+
+
+@db_group.command("status", context_settings=HELP_SETTINGS)
+def db_status_cmd() -> None:
+    """Show database readiness status."""
+    from .db import run_db_command
+
+    sys.exit(run_db_command(["status"]))
+
+
+@db_group.command("setup", context_settings=HELP_SETTINGS)
+@click.option(
+    "--tier",
+    type=click.Choice(TIERS),
+    default="panel",
+    show_default=True,
+    help="Database tier to install.",
+)
+@click.option(
+    "--source",
+    default="",
+    help="Copy from an existing local database directory.",
+)
+def db_setup_cmd(tier: str, source: str) -> None:
+    """Install or update databases."""
+    from .db import run_db_command
+
+    args = ["setup", tier]
+    if source:
+        args += ["--source", source]
+    sys.exit(run_db_command(args))
+
+
+@db_group.command("list", context_settings=HELP_SETTINGS)
+def db_list_cmd() -> None:
+    """List available database tiers."""
+    from .db import run_db_command
+
+    sys.exit(run_db_command(["list"]))
+
+
+@main.command("validate", context_settings=HELP_SETTINGS)
+@click.argument("contigs", type=click.Path(dir_okay=False))
+@click.option(
+    "--mode",
+    type=click.Choice(["simple", "standard"]),
+    default="simple",
+    show_default=True,
+    help="Validation depth (standard adds CheckM2 + GTDB-Tk).",
+)
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Directory for validation.json (default: <contigs-dir>/../taxonomy).",
+)
+def validate_cmd(contigs: str, mode: str, output_dir: str | None) -> None:
+    """Validate an assembly with marker genes, optionally CheckM2/GTDB-Tk."""
+    import json
+
+    from .analysis.taxonomic_validator import validate_genome
+
+    result = validate_genome(contigs, mode=mode, output_dir=output_dir)
+    print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+
+
+# Register commands
+main.add_command(species_cmd, name="species")
+main.add_command(db_group, name="db")
+main.add_command(validate_cmd, name="validate")
+
+
+def _run_species(
+    contigs_list: list[str], mode: str, db_dir: str | None, output_format: str = "json"
+) -> int:
+    payloads = [_identify_one(contigs, mode, db_dir) for contigs in contigs_list]
+    if output_format == "json":
+        if len(payloads) == 1:
+            print(json.dumps(payloads[0], ensure_ascii=False, indent=2))
+        else:
+            print(json.dumps(payloads, ensure_ascii=False, indent=2))
+    else:
+        print(_render_table(payloads, markdown=(output_format == "md")))
+    return 0
+
+
+TABLE_COLUMNS = [
+    "contigs",
+    "verdict_species",
+    "verdict_confidence",
+    "verdict_basis",
+    "marker_species",
+    "marker_confidence",
+    "marker_rule",
+    "panel_species",
+    "panel_confidence",
+    "mash_refseq_species",
+    "mash_refseq_confidence",
+    "sourmash_species",
+    "sourmash_confidence",
+    "errors",
+]
+
+
+def _method_cell(methods: dict[str, Any], mode: str, key: str) -> str:
+    payload = methods.get(mode, {})
+    res = payload.get("result", payload)
+    value = res.get(key, "")
+    return "" if value is None else str(value)
+
+
+def _render_table(payloads: list[dict[str, Any]], markdown: bool) -> str:
+    rows: list[list[str]] = []
+    for payload in payloads:
+        methods = payload.get("methods", {})
+        verdict = payload.get("verdict", {})
+        errors = "; ".join(f"{m}: {p.get('error', '')}" for m, p in methods.items() if "error" in p)
+        rows.append(
+            [
+                payload.get("contigs", ""),
+                verdict.get("species", ""),
+                verdict.get("confidence", ""),
+                ",".join(verdict.get("basis", [])),
+                _method_cell(methods, "marker", "species"),
+                _method_cell(methods, "marker", "confidence"),
+                methods.get("marker", {}).get("matched_rule", ""),
+                _method_cell(methods, "panel", "species"),
+                _method_cell(methods, "panel", "confidence"),
+                _method_cell(methods, "mash_refseq", "species"),
+                _method_cell(methods, "mash_refseq", "confidence"),
+                _method_cell(methods, "sourmash", "species"),
+                _method_cell(methods, "sourmash", "confidence"),
+                errors,
+            ]
+        )
+    clean = [[c.replace("|", "/").replace("\n", " ") for c in row] for row in rows]
+    if not markdown:
+        return "\n".join(["\t".join(TABLE_COLUMNS)] + ["\t".join(row) for row in clean])
+    lines = [
+        "| " + " | ".join(TABLE_COLUMNS) + " |",
+        "|" + "|".join(["---"] * len(TABLE_COLUMNS)) + "|",
+    ]
+    lines += ["| " + " | ".join(row) + " |" for row in clean]
+    return "\n".join(lines)
+
+
+def _identify_one(contigs: str, mode: str, db_dir: str | None) -> dict[str, Any]:
     results: dict[str, Any] = {}
 
-    modes = ["marker", "panel", "mash_refseq", "sourmash"] if args.mode == "all" else [args.mode]
-    for mode in modes:
+    modes = ["marker", "panel", "mash_refseq", "sourmash"] if mode == "all" else [mode]
+    for m in modes:
         try:
-            if mode == "marker":
+            if m == "marker":
                 from gside.analysis.multigene_identifier import identify_multigene
 
-                results[mode] = identify_multigene(contigs).to_dict()
-            elif mode in ("panel", "mash_refseq"):
+                results[m] = identify_multigene(contigs).to_dict()
+            elif m in ("panel", "mash_refseq"):
                 from gside.analysis.ani_identifier import identify_by_ani
 
-                results[mode] = identify_by_ani(contigs, mode=mode, db_dir=args.db_dir).to_dict()
-            elif mode == "sourmash":
-                from gside.analysis.sourmash_identifier import identify_by_sourmash as identify_sourmash
+                results[m] = identify_by_ani(contigs, mode=m, db_dir=db_dir).to_dict()
+            elif m == "sourmash":
+                from gside.analysis.sourmash_identifier import (
+                    identify_by_sourmash as identify_sourmash,
+                )
 
-                results[mode] = identify_sourmash(contigs, db_dir=args.db_dir).to_dict()
+                results[m] = identify_sourmash(contigs, db_dir=db_dir).to_dict()
         except Exception as e:  # noqa: BLE001 — CLI 边界：单法失败不终止其他方法
-            results[mode] = {"method": mode, "error": str(e)[:300]}
+            results[m] = {"method": m, "error": str(e)[:300]}
 
-    if args.mode == "all" and len(results) > 1:
+    if mode == "all" and len(results) > 1:
         verdict = _arbitrate(results)
     else:
         first = next(iter(results.values()), {})
@@ -55,13 +272,12 @@ def _run_species(args: argparse.Namespace) -> int:
     payload = {
         "analysis_type": "species_identification",
         "tool": "gside",
-        "version": _version(),
+        "version": __version__,
         "contigs": contigs,
         "methods": results,
         "verdict": verdict,
     }
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
-    return 0
+    return payload
 
 
 def _arbitrate(results: dict[str, Any]) -> dict[str, Any]:
@@ -82,49 +298,5 @@ def _arbitrate(results: dict[str, Any]) -> dict[str, Any]:
     return {"species": best[1], "confidence": best[2], "basis": [best[3]]}
 
 
-def _version() -> str:
-    try:
-        from importlib.metadata import version
-
-        return version("gside")
-    except Exception:  # noqa: BLE001
-        return "0.1.0.dev"
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        prog="gside", description="Genome Species IDentification Engine"
-    )
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    p_species = sub.add_parser("species", help="Identify species from contigs")
-    p_species.add_argument("contigs", help="Assembled contigs FASTA")
-    p_species.add_argument(
-        "--mode",
-        choices=["marker", "panel", "mash_refseq", "sourmash", "all"],
-        default="marker",
-    )
-    p_species.add_argument(
-        "--db-dir", default=None, help="Database root (default: $GSIDE_DB_DIR or data/db)"
-    )
-    p_species.set_defaults(func=_run_species)
-
-    p_db = sub.add_parser("db", help="Manage reference databases (status/setup/list)")
-    p_db.add_argument("subcommand", nargs="?", default="status", help="status|setup|list")
-    p_db.add_argument("--tier", default="panel", help="mini|panel|mash|all")
-    p_db.add_argument("--source", default="", help="Copy from existing bacmap data/db path")
-    p_db.set_defaults(func=lambda a: run_db_command(
-        [a.subcommand] if a.subcommand != "setup" else ["setup", a.tier, "--source", a.source]
-        if a.source else ["setup", a.tier]
-    ))
-
-    parser.add_argument("--version", action="store_true")
-    args = parser.parse_args(argv)
-    if args.version:
-        print(f"gside {_version()}")
-        return 0
-    return args.func(args)
-
-
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
