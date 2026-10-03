@@ -252,6 +252,7 @@ class TestSourmashTier:
             Path(dst).write_bytes(b"x")
 
         monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
         msg = db_setup("sourmash")["L4_sourmash"]
         assert msg.startswith("downloaded from farm.cse.ucdavis.edu")
         assert (root / "L4_sourmash" / "gtdb-reps-k31.zip").is_file()
@@ -320,12 +321,14 @@ class TestSetupSourcePaths:
 class TestSourmashRenameErrors:
     def test_rename_failure(self, root, monkeypatch):
         def fake_download(url, dst):
-            if "sig.zip" in url:
-                Path(dst).write_bytes(b"x")
+            Path(dst).write_bytes(b"x")
 
         monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
         dst = root / "L4_sourmash"
         dst.mkdir(parents=True)
+        # Pre-existing directory at the rename target makes os.rename fail.
+        (dst / "lineages.csv").mkdir()
         msg = db_setup("sourmash")["L4_sourmash"]
         assert msg.startswith("ERROR:")
 
@@ -334,5 +337,193 @@ class TestSourmashRenameErrors:
             Path(dst).write_bytes(b"x")
 
         monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
         monkeypatch.setattr(db, "_check_sourmash", lambda: False)
         assert db_setup("sourmash")["L4_sourmash"].startswith("ERROR: download incomplete")
+
+
+class TestPinnedChecksumConstants:
+    def test_constants(self):
+        assert db.PANEL_SHA256 == ""
+        assert db.SOURMASH_SIG_SHA256 == ""
+        assert db.SOURMASH_LINEAGES_SHA256 == (
+            "98bceab27a50f08b2f777ca7bdfb57c88aabe5ce1fa54cfb103dd0ad51b67624"
+        )
+
+
+class TestVerifySha256:
+    def test_matching_digest_passes(self, tmp_path):
+        artifact = tmp_path / "artifact.bin"
+        artifact.write_bytes(b"payload")
+        expected = hashlib.sha256(b"payload").hexdigest()
+        assert db._verify_sha256(artifact, expected) is True
+
+    def test_multichunk_streaming_matches(self, tmp_path):
+        payload = bytes(range(256)) * 12288
+        artifact = tmp_path / "big.bin"
+        artifact.write_bytes(payload)
+        expected = hashlib.sha256(payload).hexdigest()
+        assert db._verify_sha256(artifact, expected) is True
+
+    def test_wrong_digest_fails(self, tmp_path):
+        artifact = tmp_path / "artifact.bin"
+        artifact.write_bytes(b"payload")
+        assert db._verify_sha256(artifact, "0" * 64) is False
+
+    def test_empty_expected_warns_and_passes(self, tmp_path, capsys):
+        artifact = tmp_path / "artifact.bin"
+        artifact.write_bytes(b"payload")
+        assert db._verify_sha256(artifact, "") is True
+        out = capsys.readouterr().out
+        assert "WARNING: no pinned checksum for artifact.bin" in out
+        assert "skipping integrity verification" in out
+
+    def test_missing_file_fails_closed(self, tmp_path):
+        assert db._verify_sha256(tmp_path / "missing.bin", "0" * 64) is False
+
+
+class TestTarExtractionSafety:
+    def test_traversal_member_rejected(self, root, monkeypatch):
+        dst = root / "L2_ani"
+        dst.mkdir(parents=True)
+
+        def fake_download(url, d):
+            _write_tar(Path(d), ["panel.sketch/sketches.db", "../evil.txt"])
+
+        monkeypatch.setattr(db, "_download_file", fake_download)
+        msg = _try_download_panel_release(dst)
+        assert isinstance(msg, str) and msg.startswith("ERROR:")
+        assert not (root / "evil.txt").exists()
+
+    def test_absolute_path_member_rejected(self, root, monkeypatch):
+        dst = root / "L2_ani"
+        dst.mkdir(parents=True)
+
+        def fake_download(url, d):
+            _write_tar(Path(d), ["panel.sketch/sketches.db", "/../evil-abs.txt"])
+
+        monkeypatch.setattr(db, "_download_file", fake_download)
+        msg = _try_download_panel_release(dst)
+        assert isinstance(msg, str) and msg.startswith("ERROR:")
+        assert not (root / "evil-abs.txt").exists()
+
+    def test_benign_nested_tar_still_extracts(self, root, monkeypatch):
+        dst = root / "L2_ani"
+        dst.mkdir(parents=True)
+
+        def fake_download(url, d):
+            _write_tar(Path(d), ["panel.sketch/sketches.db", "panel.sketch/nested/deep/file.txt"])
+
+        monkeypatch.setattr(db, "_download_file", fake_download)
+        msg = _try_download_panel_release(dst)
+        assert msg == "downloaded from GitHub Release (pre-built sketch)"
+        assert (dst / "panel.sketch" / "sketches.db").is_file()
+        assert (dst / "panel.sketch" / "nested" / "deep" / "file.txt").is_file()
+
+
+def _tar_bytes(names: list[str]) -> bytes:
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+        for name in names:
+            info = tarfile.TarInfo(name)
+            info.size = 1
+            tf.addfile(info, io.BytesIO(b"x"))
+    return buf.getvalue()
+
+
+class TestPanelChecksumVerification:
+    def test_pinned_match_extracts(self, root, monkeypatch):
+        dst = root / "L2_ani"
+        dst.mkdir(parents=True)
+        archive_bytes = _tar_bytes(["panel.sketch/sketches.db"])
+
+        def fake_download(url, d):
+            Path(d).write_bytes(archive_bytes)
+
+        monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "PANEL_SHA256", hashlib.sha256(archive_bytes).hexdigest())
+        msg = _try_download_panel_release(dst)
+        assert msg == "downloaded from GitHub Release (pre-built sketch)"
+        assert (dst / "panel.sketch" / "sketches.db").is_file()
+
+    def test_pinned_mismatch_fails_closed(self, root, monkeypatch):
+        dst = root / "L2_ani"
+        dst.mkdir(parents=True)
+
+        def fake_download(url, d):
+            _write_tar(Path(d), ["panel.sketch/sketches.db"])
+
+        monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "PANEL_SHA256", "f" * 64)
+        msg = _try_download_panel_release(dst)
+        assert msg is not None and msg.startswith("ERROR: SHA256 mismatch")
+        assert not (dst / "panel.sketch.tar.gz").exists()
+        assert not (dst / "panel.sketch").exists()
+
+    def test_unpinned_warns_and_continues(self, root, monkeypatch, capsys):
+        dst = root / "L2_ani"
+        dst.mkdir(parents=True)
+
+        def fake_download(url, d):
+            _write_tar(Path(d), ["panel.sketch/sketches.db"])
+
+        monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "PANEL_SHA256", "")
+        msg = _try_download_panel_release(dst)
+        assert msg == "downloaded from GitHub Release (pre-built sketch)"
+        assert "WARNING: no pinned checksum for panel.sketch.tar.gz" in capsys.readouterr().out
+
+
+class TestSourmashChecksumVerification:
+    def test_lineages_mismatch_fails_closed(self, root, monkeypatch):
+        def fake_download(url, d):
+            Path(d).write_bytes(b"x")
+
+        monkeypatch.setattr(db, "_download_file", fake_download)
+        dst = root / "L4_sourmash"
+        dst.mkdir(parents=True)
+        msg = db._download_sourmash_farm(dst)
+        assert msg.startswith("ERROR: SHA256 mismatch for gtdb-rs226-reps.lineages.csv")
+        assert not (dst / "gtdb-rs226-reps.lineages.csv").exists()
+        assert not (dst / "lineages.csv").exists()
+        assert not (dst / "gtdb-reps-k31.zip").exists()
+
+    def test_sig_unpinned_warns_and_lineages_verified(self, root, monkeypatch, capsys):
+        def fake_download(url, d):
+            Path(d).write_bytes(b"x")
+
+        monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
+        dst = root / "L4_sourmash"
+        dst.mkdir(parents=True)
+        msg = db._download_sourmash_farm(dst)
+        assert msg.startswith("downloaded from farm.cse.ucdavis.edu")
+        out = capsys.readouterr().out
+        assert "WARNING: no pinned checksum for gtdb-rs226-reps.k31.sig.zip" in out
+        assert "WARNING: no pinned checksum for gtdb-rs226-reps.lineages.csv" not in out
+
+
+class TestMashStreamingMd5:
+    def test_multichunk_hash_without_whole_file_read(self, root, monkeypatch):
+        dst = root / "L3_mash"
+        dst.mkdir(parents=True)
+        payload = b"a" * (2 * 1024 * 1024 + 123)
+        buf = io.BytesIO()
+        with gzip.open(buf, "wb") as fh:
+            fh.write(payload)
+        gz_bytes = buf.getvalue()
+
+        def fake_download(url, d):
+            Path(d).write_bytes(gz_bytes)
+
+        def no_read_bytes(self):
+            raise AssertionError("whole-file read_bytes; MD5 must stream in chunks")
+
+        monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "MASH_MD5", hashlib.md5(gz_bytes).hexdigest())
+        monkeypatch.setattr(Path, "read_bytes", no_read_bytes)
+        msg = _download_mash_zenodo(dst)
+        monkeypatch.undo()
+        assert msg == "downloaded from Zenodo (community sketch)"
+        assert (dst / "mash.msh").read_bytes() == payload
+        assert not (dst / "mash.msh.gz").exists()

@@ -32,6 +32,11 @@ PANEL_RELEASE_URL = (
 )
 MASH_ZENODO_URL = "https://zenodo.org/records/22664519/files/RefSeqSketches_237.msh.gz"
 MASH_MD5 = "dee53b23af3ab120333f9eb1b95ae60f"
+# Pinned SHA256 digests (hex) of downloaded artifacts. An empty string means
+# no checksum is pinned yet; _verify_sha256 prints a warning and skips.
+PANEL_SHA256 = ""
+SOURMASH_SIG_SHA256 = ""
+SOURMASH_LINEAGES_SHA256 = "98bceab27a50f08b2f777ca7bdfb57c88aabe5ce1fa54cfb103dd0ad51b67624"
 SOURMASH_FARM_BASE = "https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs226"
 SOURMASH_SIG_URL = f"{SOURMASH_FARM_BASE}/gtdb-rs226-reps.k31.sig.zip"
 SOURMASH_LINEAGES_URL = f"{SOURMASH_FARM_BASE}/gtdb-rs226-reps.lineages.csv"
@@ -203,9 +208,16 @@ def _try_download_panel_release(dst: Path) -> str | None:
         print("  downloading panel sketch from GitHub Release...")
         archive = dst / "panel.sketch.tar.gz"
         _download_file(PANEL_RELEASE_URL, archive)
+        if not _verify_sha256(archive, PANEL_SHA256):
+            archive.unlink(missing_ok=True)
+            return f"ERROR: SHA256 mismatch for {archive.name}"
         print("  extracting...")
-        with tarfile.open(archive, "r:gz") as tf:
-            tf.extractall(dst)
+        try:
+            with tarfile.open(archive, "r:gz") as tf:
+                tf.extractall(dst, filter="data")
+        except tarfile.TarError as e:
+            archive.unlink(missing_ok=True)
+            return f"ERROR: unsafe or corrupt archive: {e}"
         archive.unlink(missing_ok=True)
         if _check_panel():
             return "downloaded from GitHub Release (pre-built sketch)"
@@ -221,10 +233,13 @@ def _download_mash_zenodo(dst: Path) -> str:
         gz_path = dst / "mash.msh.gz"
         _download_file(MASH_ZENODO_URL, gz_path)
 
-        md5 = hashlib.md5(gz_path.read_bytes()).hexdigest()
-        if md5 != MASH_MD5:
+        md5 = hashlib.md5()
+        with gz_path.open("rb") as f:
+            while chunk := f.read(_CHUNK):
+                md5.update(chunk)
+        if md5.hexdigest() != MASH_MD5:
             gz_path.unlink(missing_ok=True)
-            return f"ERROR: MD5 mismatch (got {md5}, expected {MASH_MD5})"
+            return f"ERROR: MD5 mismatch (got {md5.hexdigest()}, expected {MASH_MD5})"
 
         print("  verifying MD5 ✓, decompressing...")
         with gzip.open(gz_path, "rb") as fin, open(dst / "mash.msh", "wb") as fout:
@@ -337,6 +352,21 @@ def _download_file(url: str, dst: Path) -> None:
                     pct = downloaded * 100 // total
                     print(f"\r  {pct:3d}% ({downloaded // _CHUNK}MB)", end="", flush=True)
         print()
+
+
+def _verify_sha256(path: Path, expected: str) -> bool:
+    """Streaming SHA256 check; empty ``expected`` warns and skips verification."""
+    if not expected:
+        print(f"  WARNING: no pinned checksum for {path.name}; skipping integrity verification")
+        return True
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as f:
+            while chunk := f.read(_CHUNK):
+                digest.update(chunk)
+    except OSError:
+        return False
+    return digest.hexdigest() == expected.lower()
 
 
 def run_db_command(args: list[str]) -> int:
