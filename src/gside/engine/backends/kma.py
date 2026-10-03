@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from ...utils import parse_db_header
-from .._env import which
+from .._env import require_bin, run_checked, which
 from ..hits import Hit
 
 
@@ -21,10 +21,9 @@ class KmaBackend:
         self._bin = self._find_binary()
 
     def _find_binary(self) -> str:
-        binary = which("kma")
-        if not binary:
-            raise RuntimeError("kma not found in PATH. Install: pixi install")
-        return binary
+        return require_bin(
+            "kma", hint="kma not found in PATH. Install: pixi install", resolver=which
+        )
 
     def make_index(self, templates_fasta: Path, index_prefix: Path) -> Path:
         cmd = [
@@ -76,9 +75,7 @@ class KmaBackend:
         else:
             cmd.extend(["-i", str(reads_r1)])
 
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if proc.returncode != 0:
-            raise RuntimeError(f"KMA failed (exit {proc.returncode}): {proc.stderr.strip()[:500]}")
+        run_checked(cmd, timeout=600, name="KMA failed")
 
         return self._parse_res(out_prefix, min_coverage, min_identity)
 

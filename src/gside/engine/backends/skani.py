@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from .._env import which
+from .._env import require_bin, run_checked, which
 
 
 @dataclass(frozen=True)
@@ -16,13 +15,14 @@ class AniHit:
 
 
 def _find_bin() -> str:
-    found = which("skani")
-    if not found:
-        raise RuntimeError(
+    return require_bin(
+        "skani",
+        hint=(
             "skani not found in PATH. Install: pixi add 'skani=0.3.*' (locked to "
             "match the official pre-sketched GTDB database format)"
-        )
-    return found
+        ),
+        resolver=which,
+    )
 
 
 class SkaniBackend:
@@ -32,14 +32,13 @@ class SkaniBackend:
         self._bin = _find_bin()
 
     def search(self, query: Path, db: Path) -> list[AniHit]:
-        result = subprocess.run(
+        result = run_checked(
             [self._bin, "search", str(query), "-d", str(db)],
-            capture_output=True,
-            text=True,
             timeout=600,
+            name="skani search failed",
+            exit_in_msg=False,
+            truncate=None,
         )
-        if result.returncode != 0:
-            raise RuntimeError(f"skani search failed: {result.stderr.strip()}")
 
         lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
         if not lines:

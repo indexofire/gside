@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from .._env import which
+from .._env import require_bin, run_checked, which
 from ..hits import Hit
 
 _PARAM_MAP = {
@@ -26,10 +26,7 @@ class MinimapBackend:
         self._bin = self._find_binary()
 
     def _find_binary(self) -> str:
-        binary = which("minimap2")
-        if not binary:
-            raise RuntimeError("minimap2 not found in PATH")
-        return binary
+        return require_bin("minimap2", hint="minimap2 not found in PATH", resolver=which)
 
     def make_index(self, fasta: Path, index_path: Path) -> None:
         cmd = [self._bin, "-d", str(index_path), str(fasta)]
@@ -70,16 +67,7 @@ class MinimapBackend:
             else:
                 cmd.extend([f"-{mapped}", str(value)])
 
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=600,
-        )
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"minimap2 failed (exit {proc.returncode}): {proc.stderr.strip()[:500]}"
-            )
+        proc = run_checked(cmd, timeout=600, name="minimap2 failed")
 
         hits: list[Hit] = []
         for line in proc.stdout.splitlines():
