@@ -114,11 +114,13 @@ def identify_multigene(contigs_fasta: str) -> MultiGeneResult:
         if gene not in best_hits or hit["identity"] > best_hits[gene]["identity"]:
             best_hits[gene] = hit
 
-    significant = {
-        gene: hit
-        for gene, hit in best_hits.items()
-        if hit["identity"] >= _MIN_IDENTITY and hit["coverage"] >= _MIN_COVERAGE
-    }
+    significant: dict[str, dict[str, Any]] = {}
+    for hit in raw_hits:
+        if hit["identity"] < _MIN_IDENTITY or hit["coverage"] < _MIN_COVERAGE:
+            continue
+        gene = hit["gene"]
+        if gene not in significant or hit["identity"] > significant[gene]["identity"]:
+            significant[gene] = hit
 
     result = MultiGeneResult(database_version=_db_version())
     result.all_hits = list(best_hits.values())
@@ -171,6 +173,12 @@ def identify_multigene(contigs_fasta: str) -> MultiGeneResult:
             {"gene": g, "identity": h["identity"], "coverage": h["coverage"]}
             for g, h in sorted(significant.items(), key=lambda x: -x[1]["identity"])
         ]
+
+    if best_species.startswith("Vibrio_cholerae"):
+        if "ctxa" in significant:
+            result.notes.append("ctxA detected - toxigenic Vibrio cholerae strain.")
+        else:
+            result.notes.append("ctxA not detected - non-toxigenic by this marker assay.")
 
     if not significant and raw_hits:
         near = [h for h in raw_hits if h["identity"] >= 75 and h["coverage"] >= 20]

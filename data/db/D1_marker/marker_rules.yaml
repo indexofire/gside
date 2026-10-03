@@ -17,8 +17,19 @@ rules:
 - species: Vibrio_cholerae
   genes:
   - ompw
-  - ctxa
   min_hits: 1
+  min_identity: 90
+- species: Vibrio_cholerae_O1
+  genes:
+  - ompw
+  - wben
+  min_hits: 2
+  min_identity: 90
+- species: Vibrio_cholerae_O139
+  genes:
+  - ompw
+  - wbfr
+  min_hits: 2
   min_identity: 90
 - species: Vibrio_vulnificus
   genes:

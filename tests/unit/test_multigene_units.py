@@ -165,3 +165,77 @@ class TestMainOutput:
         monkeypatch.setattr("sys.argv", ["prog", str(q)])
         mg.main()
         assert "Species: Salmonella (high)" in capsys.readouterr().out
+
+
+class TestCholeraeSerogroupRules:
+    @staticmethod
+    def _hit(gene: str, identity: float = 99.0) -> dict[str, object]:
+        return {
+            "gene": gene,
+            "identity": identity,
+            "coverage": 100.0,
+            "ref_len": 900,
+            "seqid": f"markers~~~{gene}~~~x",
+        }
+
+    def test_o1_rule_outranks_species_and_flags_toxigenic(self, monkeypatch):
+        monkeypatch.setattr(
+            mg,
+            "_blast_contigs",
+            lambda contigs: [
+                self._hit("ompw", 95.0),
+                self._hit("wben", 99.5),
+                self._hit("ctxa", 99.0),
+            ],
+        )
+        result = mg.identify_multigene("q.fna")
+        assert result.species == "Vibrio_cholerae_O1"
+        assert result.confidence == "high"
+        assert any("toxigenic" in note for note in result.notes)
+
+    def test_species_call_without_ctxa_notes_nontoxigenic(self, monkeypatch):
+        monkeypatch.setattr(
+            mg,
+            "_blast_contigs",
+            lambda contigs: [self._hit("ompw", 95.0)],
+        )
+        result = mg.identify_multigene("q.fna")
+        assert result.species == "Vibrio_cholerae"
+        assert any("ctxA not detected" in note for note in result.notes)
+
+    def test_o139_rule_outranks_species(self, monkeypatch):
+        monkeypatch.setattr(
+            mg,
+            "_blast_contigs",
+            lambda contigs: [self._hit("ompw", 95.0), self._hit("wbfr", 98.0)],
+        )
+        result = mg.identify_multigene("q.fna")
+        assert result.species == "Vibrio_cholerae_O139"
+
+
+class TestBestHitSelection:
+    def test_short_fragment_does_not_displace_full_length_hit(self, monkeypatch):
+        monkeypatch.setattr(
+            mg,
+            "_blast_contigs",
+            lambda contigs: [
+                {
+                    "gene": "ctxa",
+                    "identity": 99.2,
+                    "coverage": 12.5,
+                    "ref_len": 2020,
+                    "seqid": "markers~~~ctxa~~~x",
+                },
+                {
+                    "gene": "ctxa",
+                    "identity": 99.0,
+                    "coverage": 100.0,
+                    "ref_len": 2020,
+                    "seqid": "markers~~~ctxa~~~x",
+                },
+            ],
+        )
+        result = mg.identify_multigene("q.fna")
+        detected = {m["gene"]: m for m in result.detected_markers}
+        assert "ctxa" in detected
+        assert detected["ctxa"]["identity"] == 99.0
