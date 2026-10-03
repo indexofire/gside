@@ -43,12 +43,5 @@ source = ["gside"]
 fail_under = 96
 skip_covered = true
 
-[tool.pyright]
-# Quarantined: broken import, see AGENTS.md rule 9 + gotchas.
-# Exclusion lifts when it is fixed or removed — not a lint waiver.
-exclude = [
-    "src/gside/engine/backends/kma.py",
-]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
