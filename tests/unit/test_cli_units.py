@@ -70,6 +70,12 @@ class TestRenderTable:
         out = _render_table([self._payload_row()], markdown=True).splitlines()
         assert out[1].count("---") == len(TABLE_COLUMNS)
 
+    def test_tab_and_cr_in_cells_do_not_add_columns(self):
+        evil = _payload(contigs="a\tb\rc.fna")
+        row = _render_table([evil], markdown=False).splitlines()[1].split("\t")
+        assert len(row) == len(TABLE_COLUMNS)
+        assert "\r" not in row[0]
+
     def test_empty_methods(self):
         payload = {"contigs": "x.fna", "methods": {}, "verdict": {}}
         row = _render_table([payload], markdown=False).splitlines()[1].split("\t")

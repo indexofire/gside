@@ -225,7 +225,10 @@ def _render_table(payloads: list[dict[str, Any]], markdown: bool) -> str:
                 errors,
             ]
         )
-    clean = [[c.replace("|", "/").replace("\n", " ") for c in row] for row in rows]
+    def _clean(cell: str) -> str:
+        return cell.replace("|", "/").replace("\n", " ").replace("\t", " ").replace("\r", " ")
+
+    clean = [[_clean(c) for c in row] for row in rows]
     if not markdown:
         return "\n".join(["\t".join(TABLE_COLUMNS)] + ["\t".join(row) for row in clean])
     lines = [
