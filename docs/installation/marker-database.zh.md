@@ -1,19 +1,26 @@
 # 标记基因数据库
 
 标记基因数据库（`data/db/D1_marker/`，随仓库分发的 **mini** 层）驱动默认的
-`--mode marker` 鉴定：`blastn` 将查询 contigs 比对到 81 条精选参考序列，
-再由 38 条物种规则把命中转化为判定。该库随仓库分发——无需 `db setup`——
+`--mode marker` 鉴定：`blastn` 将查询 contigs 比对到 83 条精选参考序列，
+再由 40 条物种规则把命中转化为判定。该库随仓库分发——无需 `db setup`——
 其指纹（`database.version`，即 `markers.fasta` 的 SHA-256 前缀）会写入每条
 marker 结果。
 
 ## marker 鉴定流程
 
 1. `blastn` 将 contigs 比对到预建的 `markers_blastdb`（evalue 1e-10，词长 11）。
-2. 命中需通过全局阈值：identity >= 85% 且 coverage >= 60%。
-3. 每个基因取最佳命中进入物种规则：规则内基因命中数达到 `min_hits` 且
-   identity 不低于 `min_identity` 时规则触发。
+2. 命中需通过全局阈值：identity >= 85% 且 coverage >= 60%；逐基因最佳命中
+   在**通过阈值的命中中**选取，短小的高一致性片段不会挤掉全长匹配。
+3. 每个基因的最佳命中进入物种规则：规则内基因命中数达到 `min_hits` 且
+   identity 不低于 `min_identity` 时规则触发；命中数最多的规则获胜。
 4. 命中基因平均 identity >= 90% 判 **high** 置信度，否则 **medium**；
    临界命中的 marker 结果会建议进行 ANI 复核。
+
+分层规则有意利用"命中数胜出"的仲裁：*霍乱弧菌* 仅以 `ompW` 定义（种级），
+O1/O139 规则额外要求血清群基因（`wbeN`/`wbfR`），因此血清群判定必然压过种级
+判定。产毒性单独报告：作出霍乱弧菌判定后，`ctxA` 命中会附加"产毒株"提示
+（无命中则附加"ctxA not detected"提示）——毒素基因不参与物种定义，因为
+非 O1 血清群与 *V. mimicus* 也可能携带 `ctxA`。
 
 规则文件格式见[标记规则](../reference/marker-rules.zh.md)，marker 与 ANI 方法的仲裁关系见
 [鉴定模式](../usage/modes.zh.md)。
@@ -22,12 +29,12 @@ marker 结果。
 
 | 角色 | 含义 | 数量 |
 |---|---|---|
-| `primary` | 物种定义标记；规则的 `genes` 主要取自此类 | 46 |
-| `confirm` | 佐证证据，随判定一并报告 | 22 |
-| `typing` | 分型 / 血清型背景信息，不定义物种 | 3 |
-| `virulence` | 毒素 / 毒力因子，作为发现项报告 | 10 |
+| `primary` | Species-defining marker; a rule's `genes` draw from these | 46 |
+| `confirm` | Corroborating evidence reported alongside the verdict | 22 |
+| `typing` | Sub-typing / serogroup context, not species-defining | 5 |
+| `virulence` | Toxin / virulence factors, reported as findings | 10 |
 
-## 基因清单（81 条序列）
+## 基因清单（83 条序列）
 
 | 基因 | 角色 | 参考文献 |
 |---|---|---|
@@ -45,7 +52,6 @@ marker 结果。
 | `toxr` | primary | NC_004603.1 toxR regulatory protein [Vibrio parahaemolyticus] |
 | `tlh` | confirm | M36437.1 thermolabile hemolysin tlh [Vibrio parahaemolyticus] |
 | `tdh` | virulence | M10069.1 thermostable direct hemolysin [Vibrio parahaemolyticus] |
-| `ompw` | primary | AF055890.1 outer membrane protein W [Vibrio cholerae] |
 | `ctxa` | virulence | X00171.1 cholera enterotoxin A subunit [Vibrio cholerae] |
 | `vvha` | primary | M34462.1 hemolysin vvhA [Vibrio vulnificus] |
 | `hly` | primary | M24199.1 listeriolysin O hly [Listeria monocytogenes] |
@@ -112,49 +118,54 @@ marker 结果。
 | `hipo` | primary | GCF_000009085.1 hipo [Campylobacter jejuni] |
 | `mapa` | primary | GCF_000009085.1 mapa [Campylobacter jejuni] |
 | `speb` | primary | GCF_000006785.1 speb [Streptococcus pyogenes] |
+| `ompw` | primary | X51948.1 outer membrane protein W [Vibrio cholerae] |
+| `wben` | typing | X59554.1:12384-14861 O-antigen biosynthesis wbeN (rfbN) [Vibrio cholerae O1] |
+| `wbfr` | typing | KY660230.1 O-antigen biosynthesis wbfR [Vibrio cholerae O139] |
 
-## 物种覆盖（38 条规则）
+## 物种覆盖（40 条规则）
 
 | 物种 | 规则基因 | 最少命中 | 最低 identity |
 |---|---|---|---|
-| *Salmonella* | `inva` | 1 | 90% |
-| *V parahaemolyticus* | `tlh` | 1 | 90% |
-| *Listeria monocytogenes* | `hly` | 1 | 90% |
-| *Vibrio cholerae* | `ompw, ctxa` | 1 | 90% |
-| *Vibrio vulnificus* | `vvha` | 1 | 90% |
-| *Staphylococcus aureus* | `nuc` | 1 | 90% |
-| *Klebsiella pneumoniae* | `khe` | 1 | 90% |
-| *Acinetobacter baumannii* | `oxa51` | 1 | 90% |
-| *Pseudomonas aeruginosa* | `ecfx` | 1 | 90% |
-| *Enterococcus faecalis* | `ddl-ef` | 1 | 90% |
-| *Enterococcus faecium* | `ddl-efm` | 1 | 90% |
-| *Streptococcus pneumoniae* | `lyta` | 1 | 90% |
-| *Streptococcus pyogenes* | `speb` | 1 | 90% |
-| *Streptococcus agalactiae* | `cfb` | 1 | 90% |
-| *Neisseria meningitidis* | `ctra` | 1 | 90% |
-| *Neisseria gonorrhoeae* | `pora` | 1 | 90% |
-| *Clostridioides difficile* | `tcda, tcdb` | 1 | 90% |
-| *Cronobacter sakazakii* | `rpob-cs` | 1 | 90% (*excludes* `speb`) |
-| *Legionella pneumophila* | `mip` | 1 | 90% |
-| *Mycoplasma pneumoniae* | `p1` | 1 | 90% |
-| *Helicobacter pylori* | `urea, urec` | 1 | 90% |
-| *Bordetella pertussis* | `is481, ptxs1` | 1 | 90% |
-| *Corynebacterium diphtheriae* | `tox` | 1 | 90% |
-| *Haemophilus influenzae* | `hpd` | 1 | 90% |
-| *Streptococcus suis* | `gdh` | 1 | 90% |
-| *Burkholderia pseudomallei* | `tts1, bimabp` | 1 | 90% |
-| *Leptospira interrogans* | `lipl32` | 1 | 90% |
-| *Treponema pallidum* | `tpp47` | 1 | 90% |
-| *Bacillus anthracis* | `paga, capb` | 2 | 90% |
-| *Yersinia pestis* | `caf1, pla` | 2 | 90% |
-| *Yersinia enterocolitica* | `ail, yada` | 1 | 90% |
-| *Aeromonas hydrophila* | `aera, ahh1` | 1 | 90% |
-| *Clostridium botulinum* | `bontA, bontB, bontE` | 1 | 90% |
-| *Clostridium perfringens* | `cpa` | 1 | 90% |
-| *DEC* | `uida, lacy, gada` | 2 | 95% |
-| *Shigella EIEC* | `ipah` | 1 | 95% |
-| *Campylobacter jejuni* | `mapa, hipo, cadf` | 2 | 90% |
-| *Campylobacter coli* | `ceue` | 1 | 90% (*excludes* `mapa, hipo, cadf`) |
+| *Salmonella* | `inva` | 1 | 90%
+| *V parahaemolyticus* | `tlh` | 1 | 90%
+| *Listeria monocytogenes* | `hly` | 1 | 90%
+| *Vibrio cholerae* | `ompw` | 1 | 90%
+| *Vibrio cholerae O1* | `ompw, wben` | 2 | 90%
+| *Vibrio cholerae O139* | `ompw, wbfr` | 2 | 90%
+| *Vibrio vulnificus* | `vvha` | 1 | 90%
+| *Staphylococcus aureus* | `nuc` | 1 | 90%
+| *Klebsiella pneumoniae* | `khe` | 1 | 90%
+| *Acinetobacter baumannii* | `oxa51` | 1 | 90%
+| *Pseudomonas aeruginosa* | `ecfx` | 1 | 90%
+| *Enterococcus faecalis* | `ddl-ef` | 1 | 90%
+| *Enterococcus faecium* | `ddl-efm` | 1 | 90%
+| *Streptococcus pneumoniae* | `lyta` | 1 | 90%
+| *Streptococcus pyogenes* | `speb` | 1 | 90%
+| *Streptococcus agalactiae* | `cfb` | 1 | 90%
+| *Neisseria meningitidis* | `ctra` | 1 | 90%
+| *Neisseria gonorrhoeae* | `pora` | 1 | 90%
+| *Clostridioides difficile* | `tcda, tcdb` | 1 | 90%
+| *Cronobacter sakazakii* | `rpob-cs` | 1 | 90% (*excludes* `speb`)
+| *Legionella pneumophila* | `mip` | 1 | 90%
+| *Mycoplasma pneumoniae* | `p1` | 1 | 90%
+| *Helicobacter pylori* | `urea, urec` | 1 | 90%
+| *Bordetella pertussis* | `is481, ptxs1` | 1 | 90%
+| *Corynebacterium diphtheriae* | `tox` | 1 | 90%
+| *Haemophilus influenzae* | `hpd` | 1 | 90%
+| *Streptococcus suis* | `gdh` | 1 | 90%
+| *Burkholderia pseudomallei* | `tts1, bimabp` | 1 | 90%
+| *Leptospira interrogans* | `lipl32` | 1 | 90%
+| *Treponema pallidum* | `tpp47` | 1 | 90%
+| *Bacillus anthracis* | `paga, capb` | 2 | 90%
+| *Yersinia pestis* | `caf1, pla` | 2 | 90%
+| *Yersinia enterocolitica* | `ail, yada` | 1 | 90%
+| *Aeromonas hydrophila* | `aera, ahh1` | 1 | 90%
+| *Clostridium botulinum* | `bontA, bontB, bontE` | 1 | 90%
+| *Clostridium perfringens* | `cpa` | 1 | 90%
+| *DEC* | `uida, lacy, gada` | 2 | 95%
+| *Shigella EIEC* | `ipah` | 1 | 95%
+| *Campylobacter jejuni* | `mapa, hipo, cadf` | 2 | 90%
+| *Campylobacter coli* | `ceue` | 1 | 90% (*excludes* `mapa, hipo, cadf`)
 
 ## 自定义
 

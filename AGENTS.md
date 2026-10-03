@@ -96,7 +96,7 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-10-03): 330 tests, total coverage **97%** — all modules 100%
+Baseline (2026-10-03): 335 tests, total coverage **97%** — all modules 100%
 except: ani 93%, multigene 98%, taxonomic 93% (quarantined), cli 99%,
 db 92%, kma 94%, kmer 99%, read_mapper 99%. Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
 raise it every time coverage climbs.

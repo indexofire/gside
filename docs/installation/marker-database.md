@@ -2,7 +2,7 @@
 
 The marker database (`data/db/D1_marker/`, the bundled **mini** tier) powers the
 default `--mode marker` identification: `blastn` maps query contigs against
-81 curated reference sequences, and 38 species rules turn the hits into a
+83 curated reference sequences, and 40 species rules turn the hits into a
 verdict. It ships with the repository — no `db setup` needed — and its
 fingerprint (`database.version`, a SHA-256 prefix of `markers.fasta`) is
 reported in every marker result.
@@ -11,11 +11,22 @@ reported in every marker result.
 
 1. `blastn` aligns contigs against the pre-built `markers_blastdb`
    (evalue 1e-10, word size 11).
-2. Hits pass the global thresholds: identity >= 85% and coverage >= 60%.
+2. Hits pass the global thresholds: identity >= 85% and coverage >= 60%; the
+   best hit per gene is selected **among passing hits**, so a short
+   high-identity fragment cannot displace a full-length match.
 3. The best hit per gene feeds the species rules: a rule fires when enough of
-   its genes (`min_hits`) match at `min_identity` or better.
+   its genes (`min_hits`) match at `min_identity` or better; the rule with the
+   most matched genes wins.
 4. Mean identity of matched genes >= 90% reports **high** confidence,
    otherwise **medium**; near-threshold marker calls suggest an ANI recheck.
+
+Layered rules use the win-by-count arbitration deliberately: *V. cholerae*
+keys on `ompW` alone (species), while the O1/O139 rules additionally require
+their serogroup gene (`wbeN`/`wbfR`), so a serogroup call always outscores the
+species call. Toxigenicity is reported separately: when a *V. cholerae* call
+is made, a `ctxA` hit adds a "toxigenic strain" note (absence adds a
+"ctxA not detected" note) — the toxin gene never defines the species, because
+non-O1 serogroups and *V. mimicus* can also carry `ctxA`.
 
 See [Marker Rules](../reference/marker-rules.md) for the rule-file format and
 [Identification Modes](../usage/modes.md) for how marker results arbitrate
@@ -27,10 +38,10 @@ against ANI methods.
 |---|---|---|
 | `primary` | Species-defining marker; a rule's `genes` draw from these | 46 |
 | `confirm` | Corroborating evidence reported alongside the verdict | 22 |
-| `typing` | Sub-typing / serovar context, not species-defining | 3 |
+| `typing` | Sub-typing / serogroup context, not species-defining | 5 |
 | `virulence` | Toxin / virulence factors, reported as findings | 10 |
 
-## Gene inventory (81 sequences)
+## Gene inventory (83 sequences)
 
 | Gene | Role | Reference |
 |---|---|---|
@@ -48,7 +59,6 @@ against ANI methods.
 | `toxr` | primary | NC_004603.1 toxR regulatory protein [Vibrio parahaemolyticus] |
 | `tlh` | confirm | M36437.1 thermolabile hemolysin tlh [Vibrio parahaemolyticus] |
 | `tdh` | virulence | M10069.1 thermostable direct hemolysin [Vibrio parahaemolyticus] |
-| `ompw` | primary | AF055890.1 outer membrane protein W [Vibrio cholerae] |
 | `ctxa` | virulence | X00171.1 cholera enterotoxin A subunit [Vibrio cholerae] |
 | `vvha` | primary | M34462.1 hemolysin vvhA [Vibrio vulnificus] |
 | `hly` | primary | M24199.1 listeriolysin O hly [Listeria monocytogenes] |
@@ -115,49 +125,54 @@ against ANI methods.
 | `hipo` | primary | GCF_000009085.1 hipo [Campylobacter jejuni] |
 | `mapa` | primary | GCF_000009085.1 mapa [Campylobacter jejuni] |
 | `speb` | primary | GCF_000006785.1 speb [Streptococcus pyogenes] |
+| `ompw` | primary | X51948.1 outer membrane protein W [Vibrio cholerae] |
+| `wben` | typing | X59554.1:12384-14861 O-antigen biosynthesis wbeN (rfbN) [Vibrio cholerae O1] |
+| `wbfr` | typing | KY660230.1 O-antigen biosynthesis wbfR [Vibrio cholerae O139] |
 
-## Species coverage (38 rules)
+## Species coverage (40 rules)
 
 | Species | Rule genes | min hits | min identity |
 |---|---|---|---|
-| *Salmonella* | `inva` | 1 | 90% |
-| *V parahaemolyticus* | `tlh` | 1 | 90% |
-| *Listeria monocytogenes* | `hly` | 1 | 90% |
-| *Vibrio cholerae* | `ompw, ctxa` | 1 | 90% |
-| *Vibrio vulnificus* | `vvha` | 1 | 90% |
-| *Staphylococcus aureus* | `nuc` | 1 | 90% |
-| *Klebsiella pneumoniae* | `khe` | 1 | 90% |
-| *Acinetobacter baumannii* | `oxa51` | 1 | 90% |
-| *Pseudomonas aeruginosa* | `ecfx` | 1 | 90% |
-| *Enterococcus faecalis* | `ddl-ef` | 1 | 90% |
-| *Enterococcus faecium* | `ddl-efm` | 1 | 90% |
-| *Streptococcus pneumoniae* | `lyta` | 1 | 90% |
-| *Streptococcus pyogenes* | `speb` | 1 | 90% |
-| *Streptococcus agalactiae* | `cfb` | 1 | 90% |
-| *Neisseria meningitidis* | `ctra` | 1 | 90% |
-| *Neisseria gonorrhoeae* | `pora` | 1 | 90% |
-| *Clostridioides difficile* | `tcda, tcdb` | 1 | 90% |
-| *Cronobacter sakazakii* | `rpob-cs` | 1 | 90% (*excludes* `speb`) |
-| *Legionella pneumophila* | `mip` | 1 | 90% |
-| *Mycoplasma pneumoniae* | `p1` | 1 | 90% |
-| *Helicobacter pylori* | `urea, urec` | 1 | 90% |
-| *Bordetella pertussis* | `is481, ptxs1` | 1 | 90% |
-| *Corynebacterium diphtheriae* | `tox` | 1 | 90% |
-| *Haemophilus influenzae* | `hpd` | 1 | 90% |
-| *Streptococcus suis* | `gdh` | 1 | 90% |
-| *Burkholderia pseudomallei* | `tts1, bimabp` | 1 | 90% |
-| *Leptospira interrogans* | `lipl32` | 1 | 90% |
-| *Treponema pallidum* | `tpp47` | 1 | 90% |
-| *Bacillus anthracis* | `paga, capb` | 2 | 90% |
-| *Yersinia pestis* | `caf1, pla` | 2 | 90% |
-| *Yersinia enterocolitica* | `ail, yada` | 1 | 90% |
-| *Aeromonas hydrophila* | `aera, ahh1` | 1 | 90% |
-| *Clostridium botulinum* | `bontA, bontB, bontE` | 1 | 90% |
-| *Clostridium perfringens* | `cpa` | 1 | 90% |
-| *DEC* | `uida, lacy, gada` | 2 | 95% |
-| *Shigella EIEC* | `ipah` | 1 | 95% |
-| *Campylobacter jejuni* | `mapa, hipo, cadf` | 2 | 90% |
-| *Campylobacter coli* | `ceue` | 1 | 90% (*excludes* `mapa, hipo, cadf`) |
+| *Salmonella* | `inva` | 1 | 90%
+| *V parahaemolyticus* | `tlh` | 1 | 90%
+| *Listeria monocytogenes* | `hly` | 1 | 90%
+| *Vibrio cholerae* | `ompw` | 1 | 90%
+| *Vibrio cholerae O1* | `ompw, wben` | 2 | 90%
+| *Vibrio cholerae O139* | `ompw, wbfr` | 2 | 90%
+| *Vibrio vulnificus* | `vvha` | 1 | 90%
+| *Staphylococcus aureus* | `nuc` | 1 | 90%
+| *Klebsiella pneumoniae* | `khe` | 1 | 90%
+| *Acinetobacter baumannii* | `oxa51` | 1 | 90%
+| *Pseudomonas aeruginosa* | `ecfx` | 1 | 90%
+| *Enterococcus faecalis* | `ddl-ef` | 1 | 90%
+| *Enterococcus faecium* | `ddl-efm` | 1 | 90%
+| *Streptococcus pneumoniae* | `lyta` | 1 | 90%
+| *Streptococcus pyogenes* | `speb` | 1 | 90%
+| *Streptococcus agalactiae* | `cfb` | 1 | 90%
+| *Neisseria meningitidis* | `ctra` | 1 | 90%
+| *Neisseria gonorrhoeae* | `pora` | 1 | 90%
+| *Clostridioides difficile* | `tcda, tcdb` | 1 | 90%
+| *Cronobacter sakazakii* | `rpob-cs` | 1 | 90% (*excludes* `speb`)
+| *Legionella pneumophila* | `mip` | 1 | 90%
+| *Mycoplasma pneumoniae* | `p1` | 1 | 90%
+| *Helicobacter pylori* | `urea, urec` | 1 | 90%
+| *Bordetella pertussis* | `is481, ptxs1` | 1 | 90%
+| *Corynebacterium diphtheriae* | `tox` | 1 | 90%
+| *Haemophilus influenzae* | `hpd` | 1 | 90%
+| *Streptococcus suis* | `gdh` | 1 | 90%
+| *Burkholderia pseudomallei* | `tts1, bimabp` | 1 | 90%
+| *Leptospira interrogans* | `lipl32` | 1 | 90%
+| *Treponema pallidum* | `tpp47` | 1 | 90%
+| *Bacillus anthracis* | `paga, capb` | 2 | 90%
+| *Yersinia pestis* | `caf1, pla` | 2 | 90%
+| *Yersinia enterocolitica* | `ail, yada` | 1 | 90%
+| *Aeromonas hydrophila* | `aera, ahh1` | 1 | 90%
+| *Clostridium botulinum* | `bontA, bontB, bontE` | 1 | 90%
+| *Clostridium perfringens* | `cpa` | 1 | 90%
+| *DEC* | `uida, lacy, gada` | 2 | 95%
+| *Shigella EIEC* | `ipah` | 1 | 95%
+| *Campylobacter jejuni* | `mapa, hipo, cadf` | 2 | 90%
+| *Campylobacter coli* | `ceue` | 1 | 90% (*excludes* `mapa, hipo, cadf`)
 
 ## Customizing
 
