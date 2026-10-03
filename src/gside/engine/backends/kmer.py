@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .._env import which
+from .._env import require_bin, run_checked, which
 
 
 @dataclass
@@ -31,17 +31,23 @@ class MashBackend:
         results = backend.distance(Path('query.msh'), Path('ref.msh'))
     """
 
-    def __init__(self, kmer_size: int = 21, sketch_size: int = 1000, threads: int = 4) -> None:
+    def __init__(
+        self,
+        kmer_size: int = 21,
+        sketch_size: int = 1000,
+        threads: int = 4,
+        binary: str | None = None,
+    ) -> None:
         self.kmer_size = kmer_size
         self.sketch_size = sketch_size
         self.threads = threads
-        self._bin = self._find_binary()
+        # binary= (caller-resolved) skips discovery so callers keep their own error messages.
+        self._bin = binary if binary is not None else self._find_binary()
 
     def _find_binary(self) -> str:
-        binary = which("mash")
-        if not binary:
-            raise RuntimeError("mash not found. Install: conda install -c bioconda mash")
-        return binary
+        return require_bin(
+            "mash", hint="mash not found. Install: conda install -c bioconda mash", resolver=which
+        )
 
     def sketch(self, fasta: Path, output: Path, individual: bool = False) -> Path:
         """Create a MinHash sketch from FASTA file(s)."""
@@ -86,16 +92,7 @@ class MashBackend:
             if value is not None:
                 cmd.extend([f"-{key}", str(value)])
 
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"mash dist failed (exit {proc.returncode}): {proc.stderr.strip()[:500]}"
-            )
+        proc = run_checked(cmd, timeout=300, name="mash dist failed")
 
         results: list[KmerDistance] = []
         for line in proc.stdout.splitlines():
@@ -156,10 +153,9 @@ class SourmashBackend:
         self._bin = self._find_binary()
 
     def _find_binary(self) -> str:
-        binary = which("sourmash")
-        if not binary:
-            raise RuntimeError("sourmash not found. Install: pip install sourmash")
-        return binary
+        return require_bin(
+            "sourmash", hint="sourmash not found. Install: pip install sourmash", resolver=which
+        )
 
     def sketch(self, fasta: Path, output: Path, name: str = "") -> Path:
         """Create a sourmash signature from FASTA."""
@@ -198,16 +194,7 @@ class SourmashBackend:
             "--csv",
         ]
 
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"sourmash search failed (exit {proc.returncode}): {proc.stderr.strip()[:500]}"
-            )
+        proc = run_checked(cmd, timeout=300, name="sourmash search failed")
 
         results: list[KmerDistance] = []
         lines = proc.stdout.strip().splitlines()

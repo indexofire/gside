@@ -47,6 +47,17 @@ class TestFindBin:
 _MASH_LINE = "refA\tquery1\t0.02\t0.0\t80/1000"
 
 
+class TestExplicitBinary:
+    def test_mash_binary_bypasses_discovery(self, nobin, monkeypatch):
+        seen = {}
+        monkeypatch.setattr(
+            subprocess, "run", lambda cmd, **kw: seen.update(cmd=cmd) or _completed("")
+        )
+        backend = MashBackend(binary="/explicit/mash")
+        backend.distance(Path("q.msh"), Path("r.msh"))
+        assert seen["cmd"][0] == "/explicit/mash"
+
+
 class TestMashDistance:
     def test_parse_slash_hashes(self, fakebin, monkeypatch):
         monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed(_MASH_LINE))

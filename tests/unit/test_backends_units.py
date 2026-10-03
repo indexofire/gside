@@ -48,6 +48,17 @@ class TestFindBin:
             Mmseqs2Backend()
 
 
+class TestExplicitBinary:
+    def test_blast_binary_bypasses_discovery(self, nobin, monkeypatch):
+        seen = {}
+        monkeypatch.setattr(
+            subprocess, "run", lambda cmd, **kw: seen.update(cmd=cmd) or _completed("")
+        )
+        backend = BlastBackend(binary="/explicit/blastn")
+        backend.find(Path("q.fna"), "db")
+        assert seen["cmd"][0] == "/explicit/blastn"
+
+
 def _skani_table(header: str, rows: list[str]) -> str:
     return "\n".join([header] + rows)
 

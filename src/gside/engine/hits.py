@@ -22,6 +22,8 @@ class Hit:
     subject_end: int = 0
     strand: str = "+"
     alignment_length: int = 0
+    query_length: int = 0
+    subject_length: int = 0
     mismatches: int = 0
     mapq: int = 0
     backend: str = ""
@@ -45,6 +47,8 @@ class Hit:
             subject_id=f[1],
             identity=float(f[2]),
             alignment_length=aln_len,
+            query_length=qlen,
+            subject_length=slen,
             mismatches=int(f[4]),
             query_start=int(f[6]),
             query_end=int(f[7]),

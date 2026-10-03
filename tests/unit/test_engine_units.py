@@ -106,6 +106,10 @@ class TestHitBlast:
         h = Hit.from_blast_line(_blast_line(qlen="0", slen="0"))
         assert h.query_coverage == 0.0 and h.subject_coverage == 0.0
 
+    def test_lengths_populated(self):
+        h = Hit.from_blast_line(_blast_line())
+        assert h.query_length == 500 and h.subject_length == 450
+
     def test_to_dict_roundtrip(self):
         h = Hit.from_blast_line(_blast_line())
         assert h.to_dict()["query_id"] == "q1"

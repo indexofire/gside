@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from .._env import which
+from .._env import require_bin, run_checked, which
 from ..hits import Hit
 
 _BLAST_OUTFMT = (
@@ -27,16 +27,14 @@ _PARAM_MAP = {
 class BlastBackend:
     """BLAST+ backend supporting blastn, blastp, blastx, tblastn, tblastx."""
 
-    def __init__(self, tool: str = "blastn", threads: int = 4):
+    def __init__(self, tool: str = "blastn", threads: int = 4, binary: str | None = None):
         self.tool = tool
         self.threads = threads
-        self._bin = self._find_binary()
+        # binary= (caller-resolved) skips discovery so callers keep their own error messages.
+        self._bin = binary if binary is not None else self._find_binary()
 
     def _find_binary(self) -> str:
-        binary = which(self.tool)
-        if not binary:
-            raise RuntimeError(f"{self.tool} not found in PATH")
-        return binary
+        return require_bin(self.tool, hint=f"{self.tool} not found in PATH", resolver=which)
 
     def make_db(self, fasta_file: Path, db_path: Path, db_type: str = "nucl") -> None:
         makeblastdb = which("makeblastdb")
@@ -100,16 +98,7 @@ class BlastBackend:
             else:
                 cmd.extend([f"-{mapped}", str(value)])
 
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=600,
-        )
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"{self.tool} failed (exit {proc.returncode}): {proc.stderr.strip()[:500]}"
-            )
+        proc = run_checked(cmd, timeout=600, name=f"{self.tool} failed")
 
         hits: list[Hit] = []
         for line in proc.stdout.splitlines():
