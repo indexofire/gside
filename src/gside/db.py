@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import json
 import shutil
 import subprocess
 import tarfile
@@ -364,6 +365,46 @@ def _verify_sha256(path: Path, expected: str) -> bool:
     return digest.hexdigest() == expected.lower()
 
 
+def _check_format(fmt: str) -> None:
+    if fmt not in ("table", "tsv", "json"):
+        raise ValueError(f"unknown format {fmt!r}; expected 'table', 'tsv', or 'json'")
+
+
+def format_status(fmt: str) -> str:
+    """Render ``db status`` output as table (human), tsv, or json."""
+    _check_format(fmt)
+    status = db_status()
+    if fmt == "json":
+        return json.dumps(status, indent=2, ensure_ascii=False)
+    if fmt == "tsv":
+        lines = ["COMPONENT\tREADY\tTIER\tPATH"]
+        lines += [
+            f"{name}\t{'ready' if info['ready'] else 'missing'}\t{info['tier']}\t{info['path']}"
+            for name, info in status.items()
+        ]
+        return "\n".join(lines)
+    lines = ["gside database status", "─" * 55]
+    for name, info in status.items():
+        icon = "✅" if info["ready"] else "❌"
+        lines.append(f"  {icon} {name:16} tier={info['tier']:6} path={info['path']}")
+    lines += ["", "  Run 'gside db setup --tier <tier>' to provision"]
+    return "\n".join(lines)
+
+
+def format_tiers(fmt: str) -> str:
+    """Render ``db list`` output as table (human), tsv, or json."""
+    _check_format(fmt)
+    if fmt == "json":
+        return json.dumps(_TIERS, indent=2, ensure_ascii=False)
+    if fmt == "tsv":
+        lines = ["NAME\tSIZE\tDESCRIPTION"]
+        lines += [f"{name}\t{info['size']}\t{info['description']}" for name, info in _TIERS.items()]
+        return "\n".join(lines)
+    return "\n".join(
+        f"  {name:8} {info['size']:28} {info['description']}" for name, info in _TIERS.items()
+    )
+
+
 def run_db_command(args: list[str]) -> int:
     if not args or args[0] == "status":
         _print_status()
@@ -391,8 +432,7 @@ def run_db_command(args: list[str]) -> int:
                 has_error = True
         return 1 if has_error else 0
     elif sub == "list":
-        for name, info in _TIERS.items():
-            print(f"  {name:8} {info['size']:28} {info['description']}")
+        _print_tiers()
         return 0
     else:
         print(f"unknown subcommand: {sub} (status|setup|list)")
@@ -400,11 +440,8 @@ def run_db_command(args: list[str]) -> int:
 
 
 def _print_status() -> None:
-    status = db_status()
-    print("gside database status")
-    print("─" * 55)
-    for name, info in status.items():
-        icon = "✅" if info["ready"] else "❌"
-        print(f"  {icon} {name:16} tier={info['tier']:6} path={info['path']}")
-    print()
-    print("  Run 'gside db setup --tier <tier>' to provision")
+    print(format_status("table"))
+
+
+def _print_tiers() -> None:
+    print(format_tiers("table"))

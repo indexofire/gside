@@ -5,6 +5,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import io
+import json
 import tarfile
 from pathlib import Path
 
@@ -210,6 +211,51 @@ class TestBuildFromManifest:
             db, "which", lambda tool: "/bin/datasets" if tool == "datasets" else None
         )
         assert _build_panel_from_manifest(tmp_path / "dst").startswith("ERROR: skani not found")
+
+
+class TestFormatStatus:
+    def test_table_matches_print_status_bytes(self, root, capsys):
+        _touch(root / "D1_marker" / "markers.fasta")
+        run_db_command(["status"])
+        expected = capsys.readouterr().out
+        assert db.format_status("table") + "\n" == expected
+
+    def test_tsv_rows(self, root):
+        _touch(root / "D1_marker" / "markers.fasta")
+        text = db.format_status("tsv")
+        lines = text.splitlines()
+        assert lines[0] == "COMPONENT\tREADY\tTIER\tPATH"
+        assert lines[1].startswith("markers\tready\tmini\t")
+        assert lines[2].split("\t")[:3] == ["D2_ani", "missing", "panel"]
+        assert "✅" not in text
+        assert "Run 'gside" not in text
+
+    def test_json_roundtrip(self, root):
+        assert json.loads(db.format_status("json")) == db_status()
+
+    def test_unknown_format_raises(self):
+        with pytest.raises(ValueError, match="unknown format"):
+            db.format_status("wat")
+
+
+class TestFormatTiers:
+    def test_table_matches_run_db_command_bytes(self, capsys):
+        run_db_command(["list"])
+        expected = capsys.readouterr().out
+        assert db.format_tiers("table") + "\n" == expected
+
+    def test_tsv_rows(self):
+        lines = db.format_tiers("tsv").splitlines()
+        assert lines[0] == "NAME\tSIZE\tDESCRIPTION"
+        assert len(lines) == 1 + len(db._TIERS)
+        assert lines[1].split("\t")[:2] == ["mini", "~1MB"]
+
+    def test_json_roundtrip(self):
+        assert json.loads(db.format_tiers("json")) == db._TIERS
+
+    def test_unknown_format_raises(self):
+        with pytest.raises(ValueError, match="unknown format"):
+            db.format_tiers("wat")
 
 
 class TestRunDbCommand:

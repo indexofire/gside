@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import sys
+from pathlib import Path
 from typing import Any
 
 import click
@@ -30,17 +32,27 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
 @click.group(
     context_settings=HELP_SETTINGS,
     invoke_without_command=True,
+    no_args_is_help=True,
 )
-@click.version_option(__version__, "--version", "-V")
+@click.option("-V", "--version", is_flag=True, help="Show the version and exit.")
+@click.option(
+    "-J", "--json", "version_json", is_flag=True, help="With --version: emit version JSON."
+)
 @click.option("--verbose", "-v", is_flag=True, help="Enable debug logging.")
 @click.option("--quiet", "-q", is_flag=True, help="Suppress non-error logging.")
 @click.pass_context
-def main(ctx: click.Context, verbose: bool, quiet: bool) -> None:
+def main(ctx: click.Context, version: bool, version_json: bool, verbose: bool, quiet: bool) -> None:
     """gside — Genome Species IDentification Engine.
 
     Multi-layer species identification from contigs. Prints a single
     JSON verdict per run to stdout.
     """
+    if version:
+        if version_json:
+            print(json.dumps({"tool": "gside", "version": __version__}))
+        else:
+            print(f"gside, version {__version__}")
+        sys.exit(0)
     if verbose and quiet:
         raise click.UsageError("--verbose and --quiet cannot be used together")
     setup_logging(verbose=verbose, quiet=quiet)
@@ -51,6 +63,7 @@ def main(ctx: click.Context, verbose: bool, quiet: bool) -> None:
 @main.command("species", context_settings=HELP_SETTINGS)
 @click.argument("contigs", nargs=-1, required=True, type=click.Path(dir_okay=False))
 @click.option(
+    "-m",
     "--mode",
     type=click.Choice(MODES),
     default="marker",
@@ -58,12 +71,14 @@ def main(ctx: click.Context, verbose: bool, quiet: bool) -> None:
     help="Identification method (all runs every method, then arbitrates).",
 )
 @click.option(
+    "-D",
     "--db-dir",
     type=click.Path(file_okay=False),
     default=None,
     help="Database root (default: $GSIDE_DB_DIR or data/db).",
 )
 @click.option(
+    "-f",
     "--format",
     "output_format",
     type=click.Choice(["json", "tsv", "md"]),
@@ -71,11 +86,22 @@ def main(ctx: click.Context, verbose: bool, quiet: bool) -> None:
     show_default=True,
     help="Output format (tsv/md render one row per input file).",
 )
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False),
+    default=None,
+    help="Write the report to PATH instead of stdout (truncates; stdout then carries no data).",
+)
 def species_cmd(
-    contigs: tuple[str, ...], mode: str, db_dir: str | None, output_format: str
+    contigs: tuple[str, ...],
+    mode: str,
+    db_dir: str | None,
+    output_format: str,
+    output: str | None,
 ) -> None:
     """Identify species from assembled contigs FASTA (accepts multiple files)."""
-    sys.exit(_run_species(list(contigs), mode, db_dir, output_format))
+    sys.exit(_run_species(list(contigs), mode, db_dir, output_format, output))
 
 
 @click.group(
@@ -93,15 +119,25 @@ def db_group(ctx: click.Context) -> None:
 
 
 @db_group.command("status", context_settings=HELP_SETTINGS)
-def db_status_cmd() -> None:
+@click.option(
+    "-f",
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "tsv", "json"]),
+    default="table",
+    show_default=True,
+    help="Output format.",
+)
+def db_status_cmd(output_format: str) -> None:
     """Show database readiness status."""
-    from .db import run_db_command
+    from .db import format_status
 
-    sys.exit(run_db_command(["status"]))
+    print(format_status(output_format))
 
 
 @db_group.command("setup", context_settings=HELP_SETTINGS)
 @click.option(
+    "-t",
     "--tier",
     type=click.Choice(TIERS),
     default="panel",
@@ -109,26 +145,51 @@ def db_status_cmd() -> None:
     help="Database tier to install (all = panel + mash; sourmash is separate).",
 )
 @click.option(
+    "-s",
     "--source",
     default="",
     help="Copy from an existing local database directory.",
 )
-def db_setup_cmd(tier: str, source: str) -> None:
+@click.option(
+    "-f",
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    show_default=True,
+    help="Output format (json routes progress to stderr, result to stdout).",
+)
+def db_setup_cmd(tier: str, source: str, output_format: str) -> None:
     """Install or update databases."""
-    from .db import run_db_command
+    from .db import db_setup, run_db_command
 
-    args = ["setup", tier]
+    if output_format == "json":
+        with contextlib.redirect_stdout(sys.stderr):
+            results = db_setup(tier, source)
+        print(json.dumps(results, indent=2, ensure_ascii=False))
+        sys.exit(1 if any("ERROR" in str(msg) for msg in results.values()) else 0)
+
+    args = ["setup", "--tier", tier]
     if source:
         args += ["--source", source]
     sys.exit(run_db_command(args))
 
 
 @db_group.command("list", context_settings=HELP_SETTINGS)
-def db_list_cmd() -> None:
+@click.option(
+    "-f",
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "tsv", "json"]),
+    default="table",
+    show_default=True,
+    help="Output format.",
+)
+def db_list_cmd(output_format: str) -> None:
     """List available database tiers."""
-    from .db import run_db_command
+    from .db import format_tiers
 
-    sys.exit(run_db_command(["list"]))
+    print(format_tiers(output_format))
 
 
 @main.command("validate", context_settings=HELP_SETTINGS)
@@ -163,16 +224,23 @@ main.add_command(validate_cmd, name="validate")
 
 
 def _run_species(
-    contigs_list: list[str], mode: str, db_dir: str | None, output_format: str = "json"
+    contigs_list: list[str],
+    mode: str,
+    db_dir: str | None,
+    output_format: str = "json",
+    output: str | None = None,
 ) -> int:
     payloads = [_identify_one(contigs, mode, db_dir) for contigs in contigs_list]
     if output_format == "json":
-        if len(payloads) == 1:
-            print(json.dumps(payloads[0], ensure_ascii=False, indent=2))
-        else:
-            print(json.dumps(payloads, ensure_ascii=False, indent=2))
+        report: Any = payloads[0] if len(payloads) == 1 else payloads
+        text = json.dumps(report, ensure_ascii=False, indent=2)
     else:
-        print(_render_table(payloads, markdown=(output_format == "md")))
+        text = _render_table(payloads, markdown=(output_format == "md"))
+    if output is None:
+        print(text)
+    else:
+        Path(output).write_text(text + "\n", encoding="utf-8")
+        print(f"Results written to {output}", file=sys.stderr)
     return 0
 
 
