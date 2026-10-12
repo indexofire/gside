@@ -1,0 +1,64 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/gside
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Verify version consistency
+      run: |
+        PYPROJECT_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+        TAG_VERSION="${GITHUB_REF_NAME#v}"
+        echo "pyproject.toml: $PYPROJECT_VERSION"
+        echo "git tag: $TAG_VERSION"
+        if [ "$PYPROJECT_VERSION" != "$TAG_VERSION" ]; then
+          echo "ERROR: pyproject.toml ($PYPROJECT_VERSION) != git tag ($TAG_VERSION)"
+          exit 1
+        fi
+        echo "Versions match: $TAG_VERSION"
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+
+    - name: Build package
+      run: python -m build
+
+    - name: Check package
+      run: twine check dist/*
+
+    - name: Verify wheel version and bundled marker tier
+      run: |
+        python -c "
+        import zipfile, glob
+        whl = glob.glob('dist/*.whl')[0]
+        with zipfile.ZipFile(whl) as z:
+            names = z.namelist()
+            meta = next(n for n in names if n.endswith('METADATA'))
+            version = [l for l in z.read(meta).decode().splitlines() if l.startswith('Version:')][0].split(': ')[1]
+            assert version == '${GITHUB_REF_NAME#v}', f'wheel version {version} != tag'
+            for asset in ('marker_rules.yaml', 'markers.fasta', 'markers_blastdb.nhr'):
+                assert any(n.endswith(f'gside/data/db/D1_marker/{asset}') for n in names), f'{asset} missing from wheel'
+        print('wheel OK: version', version, '+ bundled marker tier')
+        "
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      # No API token needed when using trusted publishing
