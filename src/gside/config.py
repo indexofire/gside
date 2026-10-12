@@ -9,7 +9,13 @@ from pathlib import Path
 PACKAGE_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = PACKAGE_ROOT.parent.parent
 
-DATA_DIR = Path(os.environ.get("GSIDE_DATA_DIR", PROJECT_ROOT / "data"))
+
+def _default_data_dir(package_root: Path, project_root: Path) -> Path:
+    repo_data = project_root / "data"
+    return repo_data if repo_data.is_dir() else package_root / "data"
+
+
+DATA_DIR = Path(os.environ.get("GSIDE_DATA_DIR", _default_data_dir(PACKAGE_ROOT, PROJECT_ROOT)))
 SPECIES_DB_DIR = Path(os.environ.get("GSIDE_DB_DIR", DATA_DIR / "db"))
 
 

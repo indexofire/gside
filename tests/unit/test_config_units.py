@@ -2,7 +2,22 @@
 
 from __future__ import annotations
 
-from gside.config import _env_path
+from gside.config import _default_data_dir, _env_path
+
+
+class TestDataDirResolution:
+    def test_repo_checkout_with_data_dir_wins(self, tmp_path):
+        repo_root = tmp_path / "checkout"
+        (repo_root / "data").mkdir(parents=True)
+        pkg_root = tmp_path / "site-packages" / "gside"
+        pkg_root.mkdir(parents=True)
+        assert _default_data_dir(pkg_root, repo_root) == repo_root / "data"
+
+    def test_installed_package_falls_back_to_bundled_data(self, tmp_path):
+        repo_root = tmp_path / "lib"
+        repo_root.mkdir()
+        pkg_root = tmp_path / "lib" / "gside"
+        assert _default_data_dir(pkg_root, repo_root) == pkg_root / "data"
 
 
 class TestEnvPath:
