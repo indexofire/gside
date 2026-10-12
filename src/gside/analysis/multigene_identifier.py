@@ -167,12 +167,13 @@ def identify_multigene(contigs_fasta: str) -> MultiGeneResult:
                     best_conf = conf
                     best_score = score
                     best_rule = rule_str
-            elif best_species not in priority_species:
-                if score > best_score or (score == best_score and conf == "high"):
-                    best_species = rule["species"]
-                    best_conf = conf
-                    best_score = score
-                    best_rule = rule_str
+            elif best_species not in priority_species and (
+                score > best_score or (score == best_score and conf == "high")
+            ):
+                best_species = rule["species"]
+                best_conf = conf
+                best_score = score
+                best_rule = rule_str
 
     result.species = best_species
     result.confidence = best_conf
