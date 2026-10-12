@@ -365,20 +365,22 @@ class TestDbOutputFormats:
         import gside.db as dbmod
 
         monkeypatch.setattr(dbmod, "_TIERS", self._TIERS)
+        monkeypatch.setattr(dbmod, "db_status", lambda: self._STATUS)
         result = CliRunner().invoke(main, ["db", "list", "--format", "tsv"])
         assert result.exit_code == 0
         assert result.output.splitlines() == [
-            "NAME\tSIZE\tDESCRIPTION",
-            "mini\t~1MB\tMarker rules + sequences (bundled)",
+            "NAME\tREADY\tSIZE\tDESCRIPTION",
+            "mini\tready\t~1MB\tMarker rules + sequences (bundled)",
         ]
 
     def test_list_json(self, monkeypatch):
         import gside.db as dbmod
 
         monkeypatch.setattr(dbmod, "_TIERS", self._TIERS)
+        monkeypatch.setattr(dbmod, "db_status", lambda: self._STATUS)
         result = CliRunner().invoke(main, ["db", "list", "-f", "json"])
         assert result.exit_code == 0
-        assert json.loads(result.output) == self._TIERS
+        assert json.loads(result.output) == {"mini": {**self._TIERS["mini"], "ready": True}}
 
 
 class TestDbSetupShortFlags:

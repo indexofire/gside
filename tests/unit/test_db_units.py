@@ -244,14 +244,38 @@ class TestFormatTiers:
         expected = capsys.readouterr().out
         assert db.format_tiers("table") + "\n" == expected
 
+    def test_table_has_header_and_ready_column(self):
+        lines = db.format_tiers("table").splitlines()
+        assert lines[0].split() == ["NAME", "READY", "SIZE", "DESCRIPTION"]
+        assert len(lines) == 1 + len(db._TIERS)
+        ready_values = {ln.split()[1] for ln in lines[1:]}
+        assert ready_values <= {"ready", "missing"}
+
     def test_tsv_rows(self):
         lines = db.format_tiers("tsv").splitlines()
-        assert lines[0] == "NAME\tSIZE\tDESCRIPTION"
+        assert lines[0] == "NAME\tREADY\tSIZE\tDESCRIPTION"
         assert len(lines) == 1 + len(db._TIERS)
-        assert lines[1].split("\t")[:2] == ["mini", "~1MB"]
+        assert lines[1].split("\t")[:3] == ["mini", "ready", "~1MB"]
 
-    def test_json_roundtrip(self):
-        assert json.loads(db.format_tiers("json")) == db._TIERS
+    def test_tsv_ready_aggregates_tier_items(self, root):
+        _touch(root / "D2_ani" / "panel.sketch" / "sketches.db")
+        lines = db.format_tiers("tsv").splitlines()
+        by_name = {ln.split("\t")[0]: ln.split("\t")[1] for ln in lines[1:]}
+        assert by_name["panel"] == "ready"
+        assert by_name["all"] == "missing"
+        assert by_name["mash"] == "missing"
+
+    def test_json_roundtrip_with_ready(self):
+        data = json.loads(db.format_tiers("json"))
+        assert set(data) == set(db._TIERS)
+        assert data["mini"]["ready"] is True
+        assert isinstance(data["panel"]["ready"], bool)
+
+    def test_csv_quotes_commas(self):
+        lines = db.format_tiers("csv").splitlines()
+        assert lines[0] == "NAME,READY,SIZE,DESCRIPTION"
+        sourmash_row = next(ln for ln in lines[1:] if ln.startswith("sourmash,"))
+        assert '"GTDB gather database (sourmash, sketch k=31)"' in sourmash_row
 
     def test_unknown_format_raises(self):
         with pytest.raises(ValueError, match="unknown format"):

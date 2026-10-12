@@ -14,8 +14,10 @@ Tiers:
 
 from __future__ import annotations
 
+import csv
 import gzip
 import hashlib
+import io
 import json
 import shutil
 import subprocess
@@ -366,8 +368,8 @@ def _verify_sha256(path: Path, expected: str) -> bool:
 
 
 def _check_format(fmt: str) -> None:
-    if fmt not in ("table", "tsv", "json"):
-        raise ValueError(f"unknown format {fmt!r}; expected 'table', 'tsv', or 'json'")
+    if fmt not in ("table", "tsv", "csv", "json"):
+        raise ValueError(f"unknown format {fmt!r}; expected 'table', 'tsv', 'csv', or 'json'")
 
 
 def format_status(fmt: str) -> str:
@@ -392,17 +394,41 @@ def format_status(fmt: str) -> str:
 
 
 def format_tiers(fmt: str) -> str:
-    """Render ``db list`` output as table (human), tsv, or json."""
+    """Render ``db list`` output as table (human), tsv, csv, or json."""
     _check_format(fmt)
+    status = db_status()
+    rows = [
+        (
+            name,
+            "ready" if all(status[item]["ready"] for item in info["items"]) else "missing",
+            info["size"],
+            info["description"],
+        )
+        for name, info in _TIERS.items()
+    ]
     if fmt == "json":
-        return json.dumps(_TIERS, indent=2, ensure_ascii=False)
+        payload = {
+            name: {**info, "ready": ready == "ready"}
+            for (name, ready, _, _), (_, info) in zip(rows, _TIERS.items(), strict=True)
+        }
+        return json.dumps(payload, indent=2, ensure_ascii=False)
     if fmt == "tsv":
-        lines = ["NAME\tSIZE\tDESCRIPTION"]
-        lines += [f"{name}\t{info['size']}\t{info['description']}" for name, info in _TIERS.items()]
+        lines = ["NAME\tREADY\tSIZE\tDESCRIPTION"]
+        lines += ["\t".join(row) for row in rows]
         return "\n".join(lines)
-    return "\n".join(
-        f"  {name:8} {info['size']:28} {info['description']}" for name, info in _TIERS.items()
-    )
+    if fmt == "csv":
+        out = io.StringIO()
+        writer = csv.writer(out, lineterminator="\n")
+        writer.writerow(["NAME", "READY", "SIZE", "DESCRIPTION"])
+        writer.writerows(rows)
+        return out.getvalue().rstrip("\n")
+    return _table_with_header(rows)
+
+
+def _table_with_header(rows: list[tuple[str, str, str, str]]) -> str:
+    lines = [f"  {'NAME':8} {'READY':8} {'SIZE':28} DESCRIPTION"]
+    lines += [f"  {name:8} {ready:8} {size:28} {desc}" for name, ready, size, desc in rows]
+    return "\n".join(lines)
 
 
 def run_db_command(args: list[str]) -> int:
