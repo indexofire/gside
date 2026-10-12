@@ -15,8 +15,10 @@ gside species <contigs.fasta> [options]
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `contigs` | positional | — | Assembled contigs FASTA file |
-| `--mode` | option | `marker` | Identification mode (see below) |
-| `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
+| `-m`, `--mode` | option | `marker` | Identification mode (see below) |
+| `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
+| `-f`, `--format` | option | `json` | Output format: `json` / `tsv` / `md` |
+| `-o`, `--output PATH` | option | stdout | Write the report to PATH instead of stdout (truncates; stdout then carries no data, a notice goes to stderr) |
 
 ### Identification Modes
 
@@ -53,6 +55,9 @@ gside species contigs.fna --mode all
 
 # Specify database directory
 gside species contigs.fna --mode panel --db-dir /path/to/dbs
+
+# Write the report to a file (stdout stays empty; notice goes to stderr)
+gside species contigs.fna -m all -o report.json
 ```
 
 ## gside db
@@ -67,12 +72,17 @@ Database management subcommand.
 | `list` | List available tiers |
 | `setup` | Install/update databases |
 
+`status` and `list` accept `-f`/`--format [table|tsv|json]` (default `table`).
+`tsv` and `json` are machine-readable (e.g. `db status --format tsv` emits a
+`COMPONENT\tREADY\tTIER\tPATH` table with `ready`/`missing` booleans).
+
 ### setup Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--tier` | `panel` | mini / panel / mash / sourmash / all |
-| `--source` | — | Copy from an existing local database directory instead of downloading |
+| `-t`, `--tier` | `panel` | mini / panel / mash / sourmash / all |
+| `-s`, `--source` | — | Copy from an existing local database directory instead of downloading |
+| `-f`, `--format` | `text` | Output format: `text` / `json` (json routes progress to stderr and prints the result dict as a single JSON document on stdout; exit-code contract unchanged) |
 
 `all` installs **panel + mash only** (~310MB). The sourmash GTDB database
 (~3.9GB) is never part of `all`; provision it separately:
@@ -85,6 +95,7 @@ gside db setup --tier sourmash
 
 ```bash
 gside db status
+gside db status --format tsv    # machine-readable
 gside db setup --tier all
 gside db setup --tier sourmash   # not included in --tier all (~3.9GB)
 gside db setup --tier panel --source /path/to/existing/data/db
@@ -123,5 +134,8 @@ gside validate contigs.fna --mode standard --output-dir ./taxonomy
 
 ```bash
 gside --version
-# gside 0.1.0
+# gside, version 0.1.0
+
+gside --version --json     # or -V -J
+# {"tool": "gside", "version": "0.1.0"}
 ```

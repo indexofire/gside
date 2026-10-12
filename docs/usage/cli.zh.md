@@ -15,8 +15,10 @@ gside species <contigs.fasta> [选项]
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `contigs` | 位置参数 | 无 | 组装后的 contigs FASTA 文件 |
-| `--mode` | 选项 | `marker` | 鉴定模式（见下） |
-| `--db-dir` | 选项 | 自动 | 数据库根目录 |
+| `-m`，`--mode` | 选项 | `marker` | 鉴定模式（见下） |
+| `-D`，`--db-dir` | 选项 | 自动 | 数据库根目录 |
+| `-f`，`--format` | 选项 | `json` | 输出格式：`json` / `tsv` / `md` |
+| `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH 而非 stdout（截断写入；stdout 不再输出数据，提示信息走 stderr） |
 
 ### 鉴定模式
 
@@ -47,6 +49,9 @@ gside species contigs.fna --mode all
 
 # 指定数据库目录
 gside species contigs.fna --mode panel --db-dir /path/to/dbs
+
+# 报告写入文件（stdout 保持为空，提示信息走 stderr）
+gside species contigs.fna -m all -o report.json
 ```
 
 ## gside db
@@ -61,12 +66,17 @@ gside species contigs.fna --mode panel --db-dir /path/to/dbs
 | `list` | 列出可用 tier |
 | `setup` | 安装/更新数据库 |
 
+`status` 与 `list` 支持 `-f`/`--format [table|tsv|json]`（默认 `table`）。
+`tsv` 与 `json` 为机器可读格式（如 `db status --format tsv` 输出
+`COMPONENT\tREADY\tTIER\tPATH` 表，READY 列为 `ready`/`missing`）。
+
 ### setup 选项
 
 | 选项 | 默认 | 说明 |
 |---|---|---|
-| `--tier` | `panel` | mini / panel / mash / sourmash / all |
-| `--source` | 无 | 从本地已有数据目录复制 |
+| `-t`，`--tier` | `panel` | mini / panel / mash / sourmash / all |
+| `-s`，`--source` | 无 | 从本地已有数据目录复制 |
+| `-f`，`--format` | `text` | 输出格式：`text` / `json`（json 模式下进度信息走 stderr，结果字典以单个 JSON 文档输出到 stdout；退出码契约不变） |
 
 `all` **仅安装 panel + mash**（约 310MB）。sourmash GTDB 库（约 3.9GB）不含
 在 `all` 内，需单独安装：
@@ -79,6 +89,7 @@ gside db setup --tier sourmash
 
 ```bash
 gside db status
+gside db status --format tsv    # 机器可读
 gside db setup --tier all
 gside db setup --tier sourmash   # 不含在 --tier all 内（~3.9GB）
 gside db setup --tier panel --source /path/to/existing/db
@@ -117,5 +128,8 @@ gside validate contigs.fna --mode standard --output-dir ./taxonomy
 
 ```bash
 gside --version
-# gside 0.1.0
+# gside, version 0.1.0
+
+gside --version --json     # 或 -V -J
+# {"tool": "gside", "version": "0.1.0"}
 ```

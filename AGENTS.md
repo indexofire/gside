@@ -96,7 +96,7 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-10-03): 335 tests, total coverage **97%** — all modules 100%
+Baseline (2026-10-03): 365 tests, total coverage **97%** — all modules 100%
 except: ani 93%, multigene 98%, taxonomic 93% (quarantined), cli 99%,
 db 92%, kma 94%, kmer 99%, read_mapper 99%. Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
 raise it every time coverage climbs.
@@ -177,7 +177,9 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 - Prefer `pathlib.Path` over `os.path` for filesystem operations
 
 ### CLI Patterns
-- Click group style (mirrors gmlst): `HELP_SETTINGS` (`-h`/`--help`), `version_option`, global `-v`/`-q`, thin commands registered via `add_command`
+- Click group style (mirrors gmlst/gapit family): `HELP_SETTINGS` (`-h`/`--help`), bare invocation prints help and exits 2 (`no_args_is_help`), `-v`/`-q` mutually exclusive (UsageError), thin commands registered via `add_command`
+- Every option carries a short flag: species `-m/--mode -f/--format -D/--db-dir -o/--output`; db `-t/--tier -s/--source -f/--format`
+- Agent-friendly outputs: species defaults to JSON on stdout; `-o` writes the payload to a file (stdout stays empty, notice on stderr); `db status|list` accept `--format table|tsv|json`; `db setup` accepts `--format text|json` (json routes progress to stderr); `-V -J` prints version as JSON
 - Subcommands: `species` / `db` group (`status|setup|list`) / `validate` / `--version`; entry `gside.cli:main`
 - `--mode` choices are exactly `marker|panel|mash_refseq|sourmash|all` — do not invent modes
 - `--db-dir` overrides the database root for one invocation
