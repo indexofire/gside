@@ -2,9 +2,10 @@
 
 标记基因数据库（`data/db/D1_marker/`，随仓库分发的 **mini** 层）驱动默认的
 `--mode marker` 鉴定：`blastn` 将查询 contigs 比对到 83 条精选参考序列，
-再由 40 条物种规则把命中转化为判定。该库随仓库分发——无需 `db setup`——
-其指纹（`database.version`，即 `markers.fasta` 的 SHA-256 前缀）会写入每条
-marker 结果。
+再由 40 条物种规则把命中转化为判定。每条参考均锚定可核查的 NCBI/RefSeq
+ accession，并经 291 基因组面板 blast 验证（62 条验证为物种特异；其余 3 条
+零命中属移动元件基因在面板菌株中的合理缺失——pPCP1 质粒 pla、β-噬菌体 tox、
+O139 特异 wbfR）。
 
 ## marker 鉴定流程
 
@@ -39,79 +40,78 @@ O1/O139 规则额外要求血清群基因（`wbeN`/`wbfR`），因此血清群�
 | 基因 | 角色 | 参考文献 |
 |---|---|---|
 | `inva` | primary | M90846.1 invasion protein A [Salmonella enterica] |
-| `rpoD` | confirm | CP026417.1 RNA polymerase sigma 70 [Salmonella enterica] |
-| `iroB` | confirm | AF080424.1 iroB C-glycosyltransferase [Salmonella enterica] |
-| `safC` | typing | FM201984.1 Salmonella atypical fimbriae usher [Salmonella enterica] |
+| `rpoD` | confirm | M14427.1 rpoD operon region (dnaG-rpoD) [Salmonella enterica] |
+| `iroB` | confirm | PV799927.1 glycosyltransferase iroB [Salmonella enterica] |
 | `uida` | primary | NC_000913.3 beta-D-glucuronidase uidA [Escherichia coli] |
 | `lacy` | primary | NC_000913.3 lactose permease lacY [Escherichia coli] |
 | `gada` | confirm | NC_000913.3 glutamate decarboxylase alpha [Escherichia coli] |
 | `stx1` | virulence | AF125520.1 Shiga toxin 1 subunit A [Escherichia coli] |
-| `stx2` | virulence | AF125522.1 Shiga toxin 2 subunit A [Escherichia coli] |
-| `eae` | virulence | AF022231.1 intimin eae [Escherichia coli] |
+| `stx2` | virulence | PZ374831.1 Shiga toxin 2 subunit A (stx2A) [Escherichia coli] |
+| `eae` | virulence | PZ374841.1 intimin (eae) [Escherichia coli] |
 | `ipah` | primary | NC_004337.2 invasion plasmid antigen H ipaH [Shigella flexneri] |
 | `toxr` | primary | NC_004603.1 toxR regulatory protein [Vibrio parahaemolyticus] |
 | `tlh` | confirm | M36437.1 thermolabile hemolysin tlh [Vibrio parahaemolyticus] |
 | `tdh` | virulence | M10069.1 thermostable direct hemolysin [Vibrio parahaemolyticus] |
 | `ctxa` | virulence | X00171.1 cholera enterotoxin A subunit [Vibrio cholerae] |
-| `vvha` | primary | M34462.1 hemolysin vvhA [Vibrio vulnificus] |
+| `vvha` | primary | PQ308339.1 hemolysin vvhA [Vibrio vulnificus] |
 | `hly` | primary | M24199.1 listeriolysin O hly [Listeria monocytogenes] |
-| `prs` | confirm | AF261779.1 putrescine transport prs [Listeria monocytogenes] |
+| `prs` | confirm | LC700425.1 phosphoribosyl pyrophosphate synthetase prs [Listeria monocytogenes] |
 | `inlj` | confirm | AL592102.1 internalin J inlJ [Listeria monocytogenes] |
 | `nuc` | primary | V01281.1 thermonuclease nuc [Staphylococcus aureus] |
 | `fema` | confirm | X17688.1 methicillin resistance femA [Staphylococcus aureus] |
-| `khe` | primary | AF072244.1 hemolysin gene khe [Klebsiella pneumoniae] |
-| `gyrb-kpn` | confirm | AF318700.1 DNA gyrase subunit B [Klebsiella pneumoniae] |
-| `oxa51` | primary | AF300835.1 OXA-51-like carbapenemase [Acinetobacter baumannii] |
-| `rpob-aba` | confirm | X82164.1 RNA polymerase beta rpoB [Acinetobacter baumannii] |
+| `khe` | primary | PZ143400.1 hemolysin khe [Klebsiella pneumoniae] |
+| `gyrb-kpn` | confirm | PZ127011.1 DNA gyrase subunit B gyrB [Klebsiella pneumoniae] |
+| `oxa51` | primary | MZ351777.1 beta-lactamase blaOXA-51 [Acinetobacter baumannii] |
+| `rpob-aba` | confirm | QB079536.1 RNA polymerase beta rpoB [Acinetobacter baumannii] |
 | `ecfx` | primary | AE004091.2 sigma factor ECF ecfX [Pseudomonas aeruginosa] |
-| `gyrb-pae` | confirm | L05639.1 DNA gyrase subunit B [Pseudomonas aeruginosa] |
-| `ddl-ef` | primary | AF181880.1 D-ala-D-ala ligase ddl [Enterococcus faecalis] |
-| `ddl-efm` | primary | AF181882.1 D-ala-D-ala ligase ddl [Enterococcus faecium] |
-| `lyta` | primary | M81227.1 autolysin lytA [Streptococcus pneumoniae] |
+| `gyrb-pae` | confirm | PZ521782.1 DNA gyrase subunit B gyrB [Pseudomonas aeruginosa] |
+| `ddl-ef` | primary | QB064932.1 D-alanine-D-alanine ligase ddl [Enterococcus faecalis] |
+| `ddl-efm` | primary | PZ904265.1 D-alanine-D-alanine ligase ddl [Enterococcus faecium] |
+| `lyta` | primary | PP971805.1 autolysin lytA [Streptococcus pneumoniae] |
 | `psaa` | confirm | AF030366.1 manganese transport psaA [Streptococcus pneumoniae] |
-| `cfb` | primary | M33317.1 CAMP factor cfb [Streptococcus agalactiae] |
-| `ctra` | primary | M57681.1 capsule transport ctrA [Neisseria meningitidis] |
-| `sodc` | confirm | AF322864.1 superoxide dismutase C [Neisseria meningitidis] |
+| `cfb` | primary | PP475782.1 CAMP factor cfb [Streptococcus agalactiae] |
+| `ctra` | primary | AY336258.1 outer membrane protein ctrA [Neisseria meningitidis] |
+| `sodc` | confirm | PP471286.1 superoxide dismutase sodC [Neisseria meningitidis] |
 | `pora` | primary | M21289.1 porin protein A porA [Neisseria gonorrhoeae] |
 | `tcda` | primary | M30307.1 toxin A tcdA [Clostridioides difficile] |
-| `tcdb` | confirm | M19030.1 toxin B tcdB [Clostridioides difficile] |
-| `rpob-cs` | primary | AF064441.1 RNA polymerase beta rpoB [Cronobacter sakazakii] |
-| `aera` | primary | M64716.1 aerolysin aerA [Aeromonas hydrophila] |
-| `ahh1` | confirm | S57479.1 hemolysin ahh1 [Aeromonas hydrophila] |
+| `tcdb` | confirm | PQ863731.1 toxin B tcdB [Clostridioides difficile] |
+| `rpob-cs` | primary | MW380341.1 RNA polymerase beta rpoB [Cronobacter sakazakii] |
+| `aera` | primary | PQ871546.1 aerolysin aerA [Aeromonas hydrophila] |
+| `ahh1` | confirm | PZ301496.1 hemolysin ahh1 [Aeromonas hydrophila] |
 | `ail` | primary | M29945.1 attachment invasion locus ail [Yersinia enterocolitica] |
 | `yada` | confirm | X13881.1 Yersinia adhesin yadA [Yersinia enterocolitica] |
 | `nheb` | virulence | Z11886.1 non-hemolytic enterotoxin B nheB [Bacillus cereus] |
 | `ces` | virulence | AF110410.1 cereulide synthetase ces [Bacillus cereus] |
 | `cpe` | virulence | L43549.1 enterotoxin cpe [Clostridium perfringens] |
-| `mip` | primary | M32024.1 macrophage infectivity potentiator [Legionella pneumophila] |
-| `dota` | confirm | U91654.1 DotA type IV secretion [Legionella pneumophila] |
+| `mip` | primary | PX526202.1 macrophage infectivity potentiator mip [Legionella pneumophila] |
+| `dota` | confirm | MW092166.1 dotA [Legionella pneumophila] |
 | `cards` | confirm | AF390408.1 CARDS toxin [Mycoplasma pneumoniae] |
 | `ompa-cp` | primary | Z31593.1 major outer membrane protein [Chlamydia pneumoniae] |
-| `ompa-cps` | primary | AY006345.1 major outer membrane protein [Chlamydia psittaci] |
+| `ompa-cps` | primary | PZ860298.1 major outer membrane protein ompA [Chlamydia psittaci] |
 | `urea` | primary | M60398.1 urease subunit alpha [Helicobacter pylori] |
 | `urec` | confirm | M60398.1 urease subunit gamma/ureC [Helicobacter pylori] |
 | `caga` | virulence | AB015416.1 cytotoxin-associated gene A [Helicobacter pylori] |
 | `ptxs1` | confirm | M13223.1 pertussis toxin S1 subunit [Bordetella pertussis] |
-| `tox` | primary | K01722.1 diphtheria toxin [Corynebacterium diphtheriae] |
+| `tox` | primary | KX703000.1 diphtheria toxin tox [Corynebacterium diphtheriae] |
 | `hpd` | primary | U32723.1 hemoglobin-binding protein D [Haemophilus influenzae] |
-| `gdh` | primary | AF363735.1 glutamate dehydrogenase gdh [Streptococcus suis] |
+| `gdh` | primary | MT542692.1 glutamate dehydrogenase gdh [Streptococcus suis] |
 | `bimabp` | primary | AF505187.1 bacterial actin motility BimA(Bp) [Burkholderia pseudomallei] |
 | `tts1` | confirm | AY089501.1 type III secretion system 1 [Burkholderia pseudomallei] |
-| `lipl32` | primary | AF037900.1 outer membrane protein LipL32 [Leptospira interrogans] |
-| `tpp47` | primary | M88726.1 47kDa membrane lipoprotein [Treponema pallidum] |
+| `lipl32` | primary | PZ599989.1 lipoprotein lipL32 [Leptospira interrogans] |
+| `tpp47` | primary | AE000520.1:622266-623570 47 kDa membrane lipoprotein tpp47 [Treponema pallidum] |
 | `gyrb-ps` | primary | AB015801.1 DNA gyrase subunit B [Plesiomonas shigelloides] |
-| `eacf` | primary | AB074997.1 E. albertii adherence factor [Escherichia albertii] |
-| `toxrf` | primary | AF449565.1 toxR transcriptional regulator [Vibrio fluvialis] |
+| `eacf` | primary | CP099906.1:3631386-3634232 intimin eae [Escherichia albertii] |
+| `toxrf` | primary | OR123876.1 transmembrane regulatory protein toxR [Vibrio fluvialis] |
 | `bontA` | primary | M30171.1 botulinum neurotoxin type A [Clostridium botulinum] |
 | `bontB` | typing | M81186.1 botulinum neurotoxin type B [Clostridium botulinum] |
 | `bontE` | typing | X62089.1 botulinum neurotoxin type E [Clostridium botulinum] |
 | `paga` | primary | M22504.1 protective antigen pagA [Bacillus anthracis] |
 | `capb` | confirm | M64091.1 capsule biosynthesis capB [Bacillus anthracis] |
 | `caf1` | primary | X13880.1 F1 capsule antigen caf1 [Yersinia pestis] |
-| `pla` | confirm | M77367.1 plasminogen activator pla [Yersinia pestis] |
-| `trh` | virulence | AB025286.1 TDH-related hemolysin trh [Vibrio parahaemolyticus] |
-| `p1` | primary | U00089.2 P1 adhesin protein [Mycoplasma pneumoniae] |
-| `is481` | primary | U15171.1 insertion sequence IS481 [Bordetella pertussis] |
+| `pla` | confirm | PX130171.1 plasminogen activator pla pPCP1 [Yersinia pestis] |
+| `trh` | virulence | AB663491.1 thermostable direct hemolysin-related trh [Vibrio parahaemolyticus] |
+| `p1` | primary | U00089.2:180858-185741 P1 adhesin operon mgpA [Mycoplasma pneumoniae] |
+| `is481` | primary | MK841515.1 insertion sequence IS481 transposase [Bordetella pertussis] |
 | `cadf` | primary | GCF_000009085.1 cadf [Campylobacter jejuni] |
 | `ceue` | primary | GCF_009730395.1 ceue [Campylobacter coli] |
 | `hipo` | primary | GCF_000009085.1 hipo [Campylobacter jejuni] |
@@ -121,6 +121,7 @@ O1/O139 规则额外要求血清群基因（`wbeN`/`wbfR`），因此血清群�
 | `wben` | typing | X59554.1:12384-14861 O-antigen biosynthesis wbeN (rfbN) [Vibrio cholerae O1] |
 | `wbfr` | typing | KY660230.1 O-antigen biosynthesis wbfR [Vibrio cholerae O139] |
 | `cpa` | primary | PV804807.1 phospholipase C alpha toxin (cpa/plc) [Clostridium perfringens] |
+| `safC` | typing | NC_003197.2:343560-346076 saf atypical fimbrial operon [Salmonella enterica] |
 
 ## 物种覆盖（40 条规则）
 
@@ -145,7 +146,7 @@ O1/O139 规则额外要求血清群基因（`wbeN`/`wbfR`），因此血清群�
 | *Neisseria meningitidis* | `ctra` | 1 | 90%
 | *Neisseria gonorrhoeae* | `pora` | 1 | 90%
 | *Clostridioides difficile* | `tcda, tcdb` | 1 | 90%
-| *Cronobacter sakazakii* | `rpob-cs` | 1 | 90% (*excludes* `speb`)
+| *Cronobacter sakazakii* | `rpob-cs` | 1 | 95% (*excludes* `speb`)
 | *Legionella pneumophila* | `mip` | 1 | 90%
 | *Mycoplasma pneumoniae* | `p1` | 1 | 90%
 | *Helicobacter pylori* | `urea, urec` | 1 | 90%

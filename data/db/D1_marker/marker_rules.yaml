@@ -101,7 +101,7 @@ rules:
   genes:
   - rpob-cs
   min_hits: 1
-  min_identity: 90
+  min_identity: 95
   exclude_genes: [speb]
   note: rpoB fragment cross-reacts with S.pyogenes/dysgalactiae rpoB
     (cross-reaction case study); speB present -> prefer Streptococcus.
