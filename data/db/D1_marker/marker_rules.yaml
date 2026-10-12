@@ -208,10 +208,14 @@ rules:
   - ipah
   min_hits: 1
   min_identity: 95
-  note: ipaH ≥95% alone → Shigella/EIEC. If uidA+lacY also ≥95%, report as DEC with
-    EIEC marker.
-  co_detect_note: When both DEC and Shigella_EIEC markers are positive, prefer DEC
-    (EIEC pathotype).
+  note: ipaH ≥95% alone → Shigella/EIEC. Only fires when no DEC rule matches (DEC
+    outscores on 2+ core genes).
+  co_detect_note: When both DEC and Shigella_EIEC markers are positive, DEC is
+    reported. Marker-level DEC/Shigella_EIEC discrimination is fundamentally
+    unsound — ECO core genes can hit 100% while carrying ipaH paralogs, and real
+    EIEC carries near-reference core genes (bacmap V10 root cause — identity
+    distributions overlap with no separable threshold). Resolution requires
+    pINV-specific markers (virA/icsB) in the DB or gapit serotyping.
 - species: Campylobacter_jejuni
   genes:
   - mapa

@@ -157,12 +157,22 @@ def identify_multigene(contigs_fasta: str) -> MultiGeneResult:
             score = len(matched)
             avg_id = sum(significant[g]["identity"] for g in matched) / len(matched)
             conf = "high" if avg_id >= _HIGH_CONF else "medium"
+            rule_str = f"{'+'.join(matched)} ({len(matched)}/{min_hits} required)"
 
-            if score > best_score or (score == best_score and conf == "high"):
-                best_species = rule["species"]
-                best_conf = conf
-                best_score = score
-                best_rule = f"{'+'.join(matched)} ({len(matched)}/{min_hits} required)"
+            is_priority = rule["species"] in priority_species
+            if is_priority:
+                # priority 物种：一旦命中即压制非 priority 物种（即使后者分数更高）
+                if best_species not in priority_species or score > best_score:
+                    best_species = rule["species"]
+                    best_conf = conf
+                    best_score = score
+                    best_rule = rule_str
+            elif best_species not in priority_species:
+                if score > best_score or (score == best_score and conf == "high"):
+                    best_species = rule["species"]
+                    best_conf = conf
+                    best_score = score
+                    best_rule = rule_str
 
     result.species = best_species
     result.confidence = best_conf
