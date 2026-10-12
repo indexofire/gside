@@ -82,7 +82,6 @@ O1/O139 规则额外要求血清群基因（`wbeN`/`wbfR`），因此血清群�
 | `yada` | confirm | X13881.1 Yersinia adhesin yadA [Yersinia enterocolitica] |
 | `nheb` | virulence | Z11886.1 non-hemolytic enterotoxin B nheB [Bacillus cereus] |
 | `ces` | virulence | AF110410.1 cereulide synthetase ces [Bacillus cereus] |
-| `cpa` | primary | M24905.1 alpha toxin cpa/plc [Clostridium perfringens] |
 | `cpe` | virulence | L43549.1 enterotoxin cpe [Clostridium perfringens] |
 | `mip` | primary | M32024.1 macrophage infectivity potentiator [Legionella pneumophila] |
 | `dota` | confirm | U91654.1 DotA type IV secretion [Legionella pneumophila] |
@@ -121,6 +120,7 @@ O1/O139 规则额外要求血清群基因（`wbeN`/`wbfR`），因此血清群�
 | `ompw` | primary | X51948.1 outer membrane protein W [Vibrio cholerae] |
 | `wben` | typing | X59554.1:12384-14861 O-antigen biosynthesis wbeN (rfbN) [Vibrio cholerae O1] |
 | `wbfr` | typing | KY660230.1 O-antigen biosynthesis wbfR [Vibrio cholerae O139] |
+| `cpa` | primary | PV804807.1 phospholipase C alpha toxin (cpa/plc) [Clostridium perfringens] |
 
 ## 物种覆盖（40 条规则）
 
