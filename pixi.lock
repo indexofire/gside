@@ -863,8 +863,8 @@ packages:
   timestamp: 1786118485753
 - pypi: ./
   name: gside
-  version: 0.1.0
-  sha256: 8d89963f875f03b47d6f682f80cc6c84b1c6240e4b05d2c79d28c054562fbf15
+  version: 0.1.1
+  sha256: 840d9a42d59468c9662755da6306a0671cc12346001196dfb26077518b31e95a
   requires_dist:
   - biopython>=1.83
   - click>=8.0
