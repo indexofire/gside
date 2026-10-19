@@ -11,7 +11,7 @@
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": {
@@ -48,7 +48,7 @@
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": { ... },

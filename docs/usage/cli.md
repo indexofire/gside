@@ -134,8 +134,8 @@ gside validate contigs.fna --mode standard --output-dir ./taxonomy
 
 ```bash
 gside --version
-# gside, version 0.1.1
+# gside, version 0.1.2
 
 gside --version --json     # or -V -J
-# {"tool": "gside", "version": "0.1.1"}
+# {"tool": "gside", "version": "0.1.2"}
 ```
