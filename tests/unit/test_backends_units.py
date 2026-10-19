@@ -32,6 +32,9 @@ def fakebin(monkeypatch):
     monkeypatch.setattr(skani_mod, "which", lambda tool: "/bin/skani")
     monkeypatch.setattr(blast_mod, "which", lambda tool: "/bin/blastn")
     monkeypatch.setattr(mmseqs_mod, "which", lambda tool: "/bin/mmseqs")
+    import gside.engine.backends.kmer as kmer_mod
+
+    monkeypatch.setattr(kmer_mod, "which", lambda tool: "/bin/mash")
 
 
 class TestFindBin:
