@@ -6,8 +6,9 @@ import contextlib
 import json
 import logging
 import sys
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 import click
 
@@ -91,7 +92,11 @@ def main(ctx: click.Context, version: bool, version_json: bool, verbose: bool, q
     "--output",
     type=click.Path(dir_okay=False),
     default=None,
-    help="Write the report to PATH instead of stdout (truncates; stdout then carries no data).",
+    help=(
+        "Write the report to PATH instead of stdout (truncates; tsv/md rows"
+        " stream to the file as each input completes; json is written once"
+        " at the end; stdout then carries no data)"
+    ),
 )
 def species_cmd(
     contigs: tuple[str, ...],
@@ -223,6 +228,26 @@ main.add_command(db_group, name="db")
 main.add_command(validate_cmd, name="validate")
 
 
+class _OutputFileWriter:
+    """Chunk sink behind ``species --output`` (gapit OutputFileWriter semantics):
+    opens truncating on the first chunk, and every chunk is flushed, so an
+    in-batch failure still persists the already-streamed prefix."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._handle: TextIO | None = None
+
+    def __call__(self, chunk: str) -> None:
+        handle = self._handle or self._path.open("w", encoding="utf-8", newline="\n")
+        self._handle = handle
+        handle.write(chunk)
+        handle.flush()
+
+    def close(self) -> None:
+        if self._handle is not None:
+            self._handle.close()
+
+
 def _run_species(
     contigs_list: list[str],
     mode: str,
@@ -230,17 +255,39 @@ def _run_species(
     output_format: str = "json",
     output: str | None = None,
 ) -> int:
-    payloads = [_identify_one(contigs, mode, db_dir) for contigs in contigs_list]
     if output_format == "json":
+        payloads = [_identify_one(contigs, mode, db_dir) for contigs in contigs_list]
         report: Any = payloads[0] if len(payloads) == 1 else payloads
-        text = json.dumps(report, ensure_ascii=False, indent=2)
-    else:
-        text = _render_table(payloads, markdown=(output_format == "md"))
+        text = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
+        if output is None:
+            print(text, end="")
+        else:
+            writer = _OutputFileWriter(Path(output))
+            writer(text)
+            writer.close()
+            print(f"Results written to {output}", file=sys.stderr)
+        return 0
+
+    markdown = output_format == "md"
+
+    def chunks() -> Iterator[str]:
+        yield _table_header(markdown) + "\n"
+        for contigs in contigs_list:
+            payload = _identify_one(contigs, mode, db_dir)
+            yield _render_row(payload, markdown) + "\n"
+
     if output is None:
-        print(text)
-    else:
-        Path(output).write_text(text + "\n", encoding="utf-8")
-        print(f"Results written to {output}", file=sys.stderr)
+        for chunk in chunks():
+            print(chunk, end="", flush=True)
+        return 0
+
+    writer = _OutputFileWriter(Path(output))
+    try:
+        for chunk in chunks():
+            writer(chunk)
+    finally:
+        writer.close()
+    print(f"Results written to {output}", file=sys.stderr)
     return 0
 
 
@@ -269,42 +316,43 @@ def _method_cell(methods: dict[str, Any], mode: str, key: str) -> str:
     return "" if value is None else str(value)
 
 
-def _render_table(payloads: list[dict[str, Any]], markdown: bool) -> str:
-    rows: list[list[str]] = []
-    for payload in payloads:
-        methods = payload.get("methods", {})
-        verdict = payload.get("verdict", {})
-        errors = "; ".join(f"{m}: {p.get('error', '')}" for m, p in methods.items() if "error" in p)
-        rows.append(
-            [
-                payload.get("contigs", ""),
-                verdict.get("species", ""),
-                verdict.get("confidence", ""),
-                ",".join(verdict.get("basis", [])),
-                _method_cell(methods, "marker", "species"),
-                _method_cell(methods, "marker", "confidence"),
-                methods.get("marker", {}).get("matched_rule", ""),
-                _method_cell(methods, "panel", "species"),
-                _method_cell(methods, "panel", "confidence"),
-                _method_cell(methods, "mash_refseq", "species"),
-                _method_cell(methods, "mash_refseq", "confidence"),
-                _method_cell(methods, "sourmash", "species"),
-                _method_cell(methods, "sourmash", "confidence"),
-                errors,
-            ]
-        )
+def _table_header(markdown: bool) -> str:
+    if not markdown:
+        return "\t".join(TABLE_COLUMNS)
+    return "| " + " | ".join(TABLE_COLUMNS) + " |\n|" + "|".join(["---"] * len(TABLE_COLUMNS)) + "|"
+
+
+def _render_row(payload: dict[str, Any], markdown: bool) -> str:
+    methods = payload.get("methods", {})
+    verdict = payload.get("verdict", {})
+    errors = "; ".join(f"{m}: {p.get('error', '')}" for m, p in methods.items() if "error" in p)
+    cells = [
+        payload.get("contigs", ""),
+        verdict.get("species", ""),
+        verdict.get("confidence", ""),
+        ",".join(verdict.get("basis", [])),
+        _method_cell(methods, "marker", "species"),
+        _method_cell(methods, "marker", "confidence"),
+        methods.get("marker", {}).get("matched_rule", ""),
+        _method_cell(methods, "panel", "species"),
+        _method_cell(methods, "panel", "confidence"),
+        _method_cell(methods, "mash_refseq", "species"),
+        _method_cell(methods, "mash_refseq", "confidence"),
+        _method_cell(methods, "sourmash", "species"),
+        _method_cell(methods, "sourmash", "confidence"),
+        errors,
+    ]
 
     def _clean(cell: str) -> str:
         return cell.replace("|", "/").replace("\n", " ").replace("\t", " ").replace("\r", " ")
 
-    clean = [[_clean(c) for c in row] for row in rows]
-    if not markdown:
-        return "\n".join(["\t".join(TABLE_COLUMNS)] + ["\t".join(row) for row in clean])
-    lines = [
-        "| " + " | ".join(TABLE_COLUMNS) + " |",
-        "|" + "|".join(["---"] * len(TABLE_COLUMNS)) + "|",
-    ]
-    lines += ["| " + " | ".join(row) + " |" for row in clean]
+    clean = [_clean(c) for c in cells]
+    return ("| " + " | ".join(clean) + " |") if markdown else "\t".join(clean)
+
+
+def _render_table(payloads: list[dict[str, Any]], markdown: bool) -> str:
+    lines = [_table_header(markdown)]
+    lines += [_render_row(payload, markdown) for payload in payloads]
     return "\n".join(lines)
 
 

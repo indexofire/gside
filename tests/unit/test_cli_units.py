@@ -483,3 +483,58 @@ class TestDbSetupJsonFormat:
         result = CliRunner().invoke(main, ["db", "setup", "-t", "panel", "-f", "json"])
         assert result.exit_code == 1
         assert json.loads(result.stdout) == {"D2_ani": "ERROR: boom"}
+
+
+class TestStreamingOutput:
+    def test_output_tsv_rows_appear_as_files_complete(self, monkeypatch, tmp_path):
+        seen_during_run = {}
+
+        def fake_identify(contigs, mode, db_dir):
+            if contigs == "b.fna":
+                seen_during_run["mid"] = (tmp_path / "out.tsv").read_text()
+            return _payload(contigs)
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        cli._run_species(["a.fna", "b.fna"], "marker", None, "tsv", str(tmp_path / "out.tsv"))
+        assert "a.fna" in seen_during_run["mid"].splitlines()[-1]
+        assert "\t".join(TABLE_COLUMNS) in seen_during_run["mid"]
+
+    def test_output_md_rows_stream(self, monkeypatch, tmp_path):
+        seen_during_run = {}
+
+        def fake_identify(contigs, mode, db_dir):
+            if contigs == "b.fna":
+                seen_during_run["mid"] = (tmp_path / "out.md").read_text()
+            return _payload(contigs)
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        cli._run_species(["a.fna", "b.fna"], "marker", None, "md", str(tmp_path / "out.md"))
+        assert "a.fna" in seen_during_run["mid"]
+        assert "---" in seen_during_run["mid"]
+
+    def test_stdout_rows_stream(self, monkeypatch, capsys):
+        seen = {}
+
+        def fake_identify(contigs, mode, db_dir):
+            if contigs == "b.fna":
+                seen["mid"] = capsys.readouterr().out
+            return _payload(contigs)
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        cli._run_species(["a.fna", "b.fna"], "marker", None, "tsv", None)
+        assert "a.fna" in seen["mid"]
+        assert "b.fna" not in seen["mid"]
+
+    def test_midbatch_failure_persists_prefix(self, monkeypatch, tmp_path):
+        def fake_identify(contigs, mode, db_dir):
+            if contigs == "b.fna":
+                raise RuntimeError("boom mid-batch")
+            return _payload(contigs)
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        with pytest.raises(RuntimeError):
+            cli._run_species(["a.fna", "b.fna"], "marker", None, "tsv", str(tmp_path / "out.tsv"))
+        persisted = (tmp_path / "out.tsv").read_text().splitlines()
+        assert persisted[0].startswith("contigs")
+        assert "a.fna" in persisted[1]
+        assert len(persisted) == 2
