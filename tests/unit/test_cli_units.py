@@ -551,7 +551,7 @@ class TestSpeciesParallelism:
         monkeypatch.setattr(cli, "_run_species", fake_run)
         result = CliRunner().invoke(main, ["species", "-j", "3", "-t", "8", "x.fna"])
         assert result.exit_code == 0
-        assert seen["args"][5:] == (3, 8)
+        assert seen["args"][5:] == (3, 8, False)
 
     def test_parallel_run_preserves_input_order(self, monkeypatch, tmp_path):
         import time
@@ -651,3 +651,33 @@ class TestSpeciesProgress:
         with species_progress(["a", "b", "c"], quiet=False) as (bar, tid):
             assert tid is not None
             bar.advance()
+
+
+class TestNoHeaderOption:
+    def test_no_header_flag_parses(self, monkeypatch):
+        seen = {}
+        monkeypatch.setattr(cli, "_run_species", lambda *a: seen.update(args=a) or 0)
+        result = CliRunner().invoke(main, ["species", "--no-header", "x.fna"])
+        assert result.exit_code == 0
+        assert seen["args"][7] is True
+
+    def test_tsv_no_header_omits_header_row(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        cli._run_species(["a.fna"], "marker", None, "tsv", None, no_header=True)
+        # stdout was consumed by capsys in _run_species; verify via file
+        cli._run_species(["a.fna"], "marker", None, "tsv", str(tmp_path / "o.tsv"), no_header=True)
+        lines = (tmp_path / "o.tsv").read_text().strip().splitlines()
+        assert not lines[0].startswith("contigs")
+        assert "a.fna" in lines[0]
+
+    def test_tsv_with_header_default(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        cli._run_species(["a.fna"], "marker", None, "tsv", str(tmp_path / "o.tsv"))
+        lines = (tmp_path / "o.tsv").read_text().strip().splitlines()
+        assert lines[0].split("\t")[0] == "contigs"
+
+    def test_md_no_header_still_has_header(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        cli._run_species(["a.fna"], "marker", None, "md", str(tmp_path / "o.md"), no_header=True)
+        lines = (tmp_path / "o.md").read_text().strip().splitlines()
+        assert lines[0].startswith("| contigs")

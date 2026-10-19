@@ -114,6 +114,13 @@ def main(ctx: click.Context, version: bool, version_json: bool, verbose: bool, q
     show_default=True,
     help="Threads per aligner invocation (blastn -num_threads / skani -t / mash -p).",
 )
+@click.option(
+    "-n",
+    "--no-header",
+    is_flag=True,
+    default=False,
+    help="Suppress the TSV header row (tsv only; md/json keep their structure).",
+)
 def species_cmd(
     contigs: tuple[str, ...],
     mode: str,
@@ -122,9 +129,12 @@ def species_cmd(
     output: str | None,
     jobs: int,
     threads: int,
+    no_header: bool,
 ) -> None:
     """Identify species from assembled contigs FASTA (accepts multiple files)."""
-    sys.exit(_run_species(list(contigs), mode, db_dir, output_format, output, jobs, threads))
+    sys.exit(
+        _run_species(list(contigs), mode, db_dir, output_format, output, jobs, threads, no_header)
+    )
 
 
 @click.group(
@@ -274,6 +284,7 @@ def _run_species(
     output: str | None = None,
     jobs: int = 1,
     threads: int = 4,
+    no_header: bool = False,
     quiet: bool = False,
 ) -> int:
     from gside.progress import species_progress
@@ -295,6 +306,7 @@ def _run_species(
                 len(contigs_list),
                 output_format,
                 output,
+                no_header,
             )
     with species_progress(contigs_list, quiet=quiet) as (bar, _tid):
         return _emit_species(
@@ -302,6 +314,7 @@ def _run_species(
             len(contigs_list),
             output_format,
             output,
+            no_header,
         )
 
 
@@ -316,6 +329,7 @@ def _emit_species(
     n_inputs: int,
     output_format: str,
     output: str | None,
+    no_header: bool = False,
 ) -> int:
     if output_format == "json":
         payloads = list(payload_source)
@@ -333,7 +347,8 @@ def _emit_species(
     markdown = output_format == "md"
 
     def chunks() -> Iterator[str]:
-        yield _table_header(markdown) + "\n"
+        if not (no_header and not markdown):
+            yield _table_header(markdown) + "\n"
         for payload in payload_source:
             yield _render_row(payload, markdown) + "\n"
 

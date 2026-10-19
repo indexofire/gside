@@ -18,6 +18,7 @@ gside species <contigs.fasta> [options]
 | `-m`, `--mode` | option | `marker` | Identification mode (see below) |
 | `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
 | `-f`, `--format` | option | `json` | Output format: `json` / `tsv` / `md` |
+| `-n`, `--no-header` | option | off | Suppress the TSV header row (tsv only; md/json keep their structure) |
 | `-j`, `--jobs N` | option | `1` | Number of input files to identify concurrently (output order is always input order) |
 | `-t`, `--threads N` | option | `4` | Threads per aligner invocation (blastn `-num_threads` / skani `-t` / mash `-p`) |
 | `-o`, `--output PATH` | option | stdout | Write the report to PATH instead of stdout (truncates; tsv/md rows stream to the file as each input completes, flushed per row — a mid-batch failure still persists the prefix; json is written once at the end; stdout then carries no data, a notice goes to stderr) |
