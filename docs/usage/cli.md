@@ -34,6 +34,8 @@ Five modes are available. `marker` is the default.
 | `sourmash` | sourmash GTDB gather | sourmash GTDB db |
 | `all` | Run all available methods + arbitrate | as needed |
 
+Progress bar: multi-file runs show an stderr progress bar (spinner, M/N, elapsed) when stderr is a TTY; suppressed under `--quiet`, single-file, or piped stderr.
+
 In `all` mode a failure in one method does not abort the run: the error is
 recorded in that method's JSON entry and the remaining methods continue.
 

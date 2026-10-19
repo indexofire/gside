@@ -274,17 +274,41 @@ def _run_species(
     output: str | None = None,
     jobs: int = 1,
     threads: int = 4,
+    quiet: bool = False,
 ) -> int:
+    from gside.progress import species_progress
+
     def identify(contigs: str) -> dict[str, Any]:
         return _identify_one(contigs, mode, db_dir, threads)
 
     if jobs > 1:
         from concurrent.futures import ThreadPoolExecutor
 
-        with ThreadPoolExecutor(max_workers=jobs) as pool:
-            payload_source = pool.map(identify, contigs_list)
-            return _emit_species(payload_source, len(contigs_list), output_format, output)
-    return _emit_species(map(identify, contigs_list), len(contigs_list), output_format, output)
+        with (
+            ThreadPoolExecutor(max_workers=jobs) as pool,
+            species_progress(
+                contigs_list, quiet=quiet, description=f"Identifying ({jobs} jobs)"
+            ) as (bar, _tid),
+        ):
+            return _emit_species(
+                _tracked(pool.map(identify, contigs_list), bar),
+                len(contigs_list),
+                output_format,
+                output,
+            )
+    with species_progress(contigs_list, quiet=quiet) as (bar, _tid):
+        return _emit_species(
+            _tracked(map(identify, contigs_list), bar),
+            len(contigs_list),
+            output_format,
+            output,
+        )
+
+
+def _tracked(source: Iterator[dict[str, Any]], bar: Any) -> Iterator[dict[str, Any]]:
+    for payload in source:
+        yield payload
+        bar.advance()
 
 
 def _emit_species(

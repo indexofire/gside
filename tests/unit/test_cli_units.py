@@ -611,3 +611,43 @@ class TestSpeciesParallelism:
         cli._identify_one("q.fna", "marker", None, threads=8)
         cli._identify_one("q.fna", "panel", None, threads=8)
         assert cap["mg"] == 8 and cap["ani"] == 8
+
+
+class TestSpeciesProgress:
+    def test_progress_bar_module_exists(self):
+        from gside.progress import IdleBatch, make_progress, species_progress
+
+        assert callable(make_progress)
+        assert callable(species_progress)
+        idle = IdleBatch()
+        idle.describe("x")
+        idle.advance()
+
+    def test_multi_file_not_quiet_not_tty_yields_idle(self, monkeypatch, tmp_path):
+        from gside.progress import STATUS_CONSOLE, species_progress
+
+        monkeypatch.setattr(type(STATUS_CONSOLE), "is_terminal", property(lambda self: False))
+        with species_progress(["a", "b"], quiet=False) as (bar, tid):
+            assert tid is None
+            assert bar.advance() is None
+
+    def test_quiet_yields_idle(self, monkeypatch):
+        from gside.progress import species_progress
+
+        with species_progress(["a", "b"], quiet=True) as (bar, tid):
+            assert tid is None
+            assert bar.describe("x") is None
+
+    def test_single_file_yields_idle(self, monkeypatch):
+        from gside.progress import species_progress
+
+        with species_progress(["a"], quiet=False) as (bar, tid):
+            assert tid is None
+
+    def test_multi_file_tty_yields_live(self, monkeypatch):
+        from gside.progress import STATUS_CONSOLE, species_progress
+
+        monkeypatch.setattr(type(STATUS_CONSOLE), "is_terminal", property(lambda self: True))
+        with species_progress(["a", "b", "c"], quiet=False) as (bar, tid):
+            assert tid is not None
+            bar.advance()
