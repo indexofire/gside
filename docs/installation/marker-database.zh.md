@@ -1,11 +1,11 @@
 # 标记基因数据库
 
 标记基因数据库（`data/db/D1_marker/`，随仓库分发的 **mini** 层）驱动默认的
-`--mode marker` 鉴定：`blastn` 将查询 contigs 比对到 83 条精选参考序列，
-再由 40 条物种规则把命中转化为判定。每条参考均锚定可核查的 NCBI/RefSeq
- accession，并经 291 基因组面板 blast 验证（62 条验证为物种特异；其余 3 条
-零命中属移动元件基因在面板菌株中的合理缺失——pPCP1 质粒 pla、β-噬菌体 tox、
-O139 特异 wbfR）。
+`--mode marker` 鉴定：`blastn` 将查询 contigs 比对到 81 条精选参考序列，
+再由 38 条物种规则把命中转化为判定。gside 是物种鉴定引擎：每条参考均
+锚定可核查的 NCBI/RefSeq accession，并经 291 基因组面板 blast 验证。
+种下分型是 gapit 的职责——霍乱弧菌 O1/O139 血清群库已移交该处
+（`gapit screen --db vc_serogroup`）。
 
 ## marker 鉴定流程
 
@@ -17,11 +17,9 @@ O139 特异 wbfR）。
 4. 命中基因平均 identity >= 90% 判 **high** 置信度，否则 **medium**；
    临界命中的 marker 结果会建议进行 ANI 复核。
 
-分层规则有意利用"命中数胜出"的仲裁：*霍乱弧菌* 仅以 `ompW` 定义（种级），
-O1/O139 规则额外要求血清群基因（`wbeN`/`wbfR`），因此血清群判定必然压过种级
-判定。产毒性单独报告：作出霍乱弧菌判定后，`ctxA` 命中会附加"产毒株"提示
-（无命中则附加"ctxA not detected"提示）——毒素基因不参与物种定义，因为
-非 O1 血清群与 *V. mimicus* 也可能携带 `ctxA`。
+产毒性仅作为上下文报告，绝不改变物种判定：作出霍乱弧菌判定后，`ctxA`
+命中会附加"产毒株"提示（无命中则附加"ctxA not detected"提示）——毒素基因
+不参与物种定义，因为非 O1 血清群与 *V. mimicus* 也可能携带 `ctxA`。
 
 规则文件格式见[标记规则](../reference/marker-rules.zh.md)，marker 与 ANI 方法的仲裁关系见
 [鉴定模式](../usage/modes.zh.md)。
@@ -32,10 +30,9 @@ O1/O139 规则额外要求血清群基因（`wbeN`/`wbfR`），因此血清群�
 |---|---|---|
 | `primary` | Species-defining marker; a rule's `genes` draw from these | 46 |
 | `confirm` | Corroborating evidence reported alongside the verdict | 22 |
-| `typing` | Sub-typing / serogroup context, not species-defining | 5 |
 | `virulence` | Toxin / virulence factors, reported as findings | 10 |
 
-## 基因清单（83 条序列）
+## 基因清单（81 条序列）
 
 | 基因 | 角色 | 参考文献 |
 |---|---|---|
@@ -118,12 +115,10 @@ O1/O139 规则额外要求血清群基因（`wbeN`/`wbfR`），因此血清群�
 | `mapa` | primary | GCF_000009085.1 mapa [Campylobacter jejuni] |
 | `speb` | primary | GCF_000006785.1 speb [Streptococcus pyogenes] |
 | `ompw` | primary | X51948.1 outer membrane protein W [Vibrio cholerae] |
-| `wben` | typing | X59554.1:12384-14861 O-antigen biosynthesis wbeN (rfbN) [Vibrio cholerae O1] |
-| `wbfr` | typing | KY660230.1 O-antigen biosynthesis wbfR [Vibrio cholerae O139] |
 | `cpa` | primary | PV804807.1 phospholipase C alpha toxin (cpa/plc) [Clostridium perfringens] |
 | `safC` | typing | NC_003197.2:343560-346076 saf atypical fimbrial operon [Salmonella enterica] |
 
-## 物种覆盖（40 条规则）
+## 物种覆盖（38 条规则）
 
 | 物种 | 规则基因 | 最少命中 | 最低 identity |
 |---|---|---|---|
@@ -131,8 +126,6 @@ O1/O139 规则额外要求血清群基因（`wbeN`/`wbfR`），因此血清群�
 | *V parahaemolyticus* | `tlh` | 1 | 90%
 | *Listeria monocytogenes* | `hly` | 1 | 90%
 | *Vibrio cholerae* | `ompw` | 1 | 90%
-| *Vibrio cholerae O1* | `ompw, wben` | 2 | 90%
-| *Vibrio cholerae O139* | `ompw, wbfr` | 2 | 90%
 | *Vibrio vulnificus* | `vvha` | 1 | 90%
 | *Staphylococcus aureus* | `nuc` | 1 | 90%
 | *Klebsiella pneumoniae* | `khe` | 1 | 90%

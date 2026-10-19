@@ -167,7 +167,7 @@ class TestMainOutput:
         assert "Species: Salmonella (high)" in capsys.readouterr().out
 
 
-class TestCholeraeSerogroupRules:
+class TestCholeraeToxigenicityNotes:
     @staticmethod
     def _hit(gene: str, identity: float = 99.0) -> dict[str, object]:
         return {
@@ -178,18 +178,17 @@ class TestCholeraeSerogroupRules:
             "seqid": f"markers~~~{gene}~~~x",
         }
 
-    def test_o1_rule_outranks_species_and_flags_toxigenic(self, monkeypatch):
+    def test_species_call_with_ctxa_flags_toxigenic(self, monkeypatch):
         monkeypatch.setattr(
             mg,
             "_blast_contigs",
             lambda contigs: [
                 self._hit("ompw", 95.0),
-                self._hit("wben", 99.5),
                 self._hit("ctxa", 99.0),
             ],
         )
         result = mg.identify_multigene("q.fna")
-        assert result.species == "Vibrio_cholerae_O1"
+        assert result.species == "Vibrio_cholerae"
         assert result.confidence == "high"
         assert any("toxigenic" in note for note in result.notes)
 
@@ -202,15 +201,6 @@ class TestCholeraeSerogroupRules:
         result = mg.identify_multigene("q.fna")
         assert result.species == "Vibrio_cholerae"
         assert any("ctxA not detected" in note for note in result.notes)
-
-    def test_o139_rule_outranks_species(self, monkeypatch):
-        monkeypatch.setattr(
-            mg,
-            "_blast_contigs",
-            lambda contigs: [self._hit("ompw", 95.0), self._hit("wbfr", 98.0)],
-        )
-        result = mg.identify_multigene("q.fna")
-        assert result.species == "Vibrio_cholerae_O139"
 
 
 class TestBestHitSelection:

@@ -2,11 +2,11 @@
 
 The marker database (`data/db/D1_marker/`, the bundled **mini** tier) powers the
 default `--mode marker` identification: `blastn` maps query contigs against
-83 curated reference sequences, and 40 species rules turn the hits into a
-verdict. Every reference is anchored to a verifiable NCBI/RefSeq accession and
-was validated by blast against the 291-genome panel (62 entries verified
-species-specific; the three remaining no-hits are mobile-element genes that
-panel strains legitimately lack - pPCP1 pla, corynephage tox, O139 wbfR).
+81 curated reference sequences, and 38 species rules turn the hits into a
+verdict. gside is a species-identification engine: every reference is anchored
+to a verifiable NCBI/RefSeq accession and was validated by blast against the
+291-genome panel. Sub-species typing is gapit's job — the V. cholerae
+O1/O139 serogroup database lives there (`gapit screen --db vc_serogroup`).
 
 ## How marker identification works
 
@@ -21,13 +21,10 @@ panel strains legitimately lack - pPCP1 pla, corynephage tox, O139 wbfR).
 4. Mean identity of matched genes >= 90% reports **high** confidence,
    otherwise **medium**; near-threshold marker calls suggest an ANI recheck.
 
-Layered rules use the win-by-count arbitration deliberately: *V. cholerae*
-keys on `ompW` alone (species), while the O1/O139 rules additionally require
-their serogroup gene (`wbeN`/`wbfR`), so a serogroup call always outscores the
-species call. Toxigenicity is reported separately: when a *V. cholerae* call
-is made, a `ctxA` hit adds a "toxigenic strain" note (absence adds a
-"ctxA not detected" note) - the toxin gene never defines the species, because
-non-O1 serogroups and *V. mimicus* can also carry `ctxA`.
+Toxigenicity is reported as context, never as the species call: when a
+*V. cholerae* verdict is made, a `ctxA` hit adds a "toxigenic strain" note
+(absence adds a "ctxA not detected" note) — the toxin gene never defines the
+species, because non-O1 serogroups and *V. mimicus* can also carry `ctxA`.
 
 See [Marker Rules](../reference/marker-rules.md) for the rule-file format and
 [Identification Modes](../usage/modes.md) for how marker results arbitrate
@@ -39,10 +36,9 @@ against ANI methods.
 |---|---|---|
 | `primary` | Species-defining marker; a rule's `genes` draw from these | 46 |
 | `confirm` | Corroborating evidence reported alongside the verdict | 22 |
-| `typing` | Sub-typing / serogroup context, not species-defining | 5 |
 | `virulence` | Toxin / virulence factors, reported as findings | 10 |
 
-## Gene inventory (83 sequences)
+## Gene inventory (81 sequences)
 
 | Gene | Role | Reference |
 |---|---|---|
@@ -125,12 +121,10 @@ against ANI methods.
 | `mapa` | primary | GCF_000009085.1 mapa [Campylobacter jejuni] |
 | `speb` | primary | GCF_000006785.1 speb [Streptococcus pyogenes] |
 | `ompw` | primary | X51948.1 outer membrane protein W [Vibrio cholerae] |
-| `wben` | typing | X59554.1:12384-14861 O-antigen biosynthesis wbeN (rfbN) [Vibrio cholerae O1] |
-| `wbfr` | typing | KY660230.1 O-antigen biosynthesis wbfR [Vibrio cholerae O139] |
 | `cpa` | primary | PV804807.1 phospholipase C alpha toxin (cpa/plc) [Clostridium perfringens] |
 | `safC` | typing | NC_003197.2:343560-346076 saf atypical fimbrial operon [Salmonella enterica] |
 
-## Species coverage (40 rules)
+## Species coverage (38 rules)
 
 | Species | Rule genes | min hits | min identity |
 |---|---|---|---|
@@ -138,8 +132,6 @@ against ANI methods.
 | *V parahaemolyticus* | `tlh` | 1 | 90%
 | *Listeria monocytogenes* | `hly` | 1 | 90%
 | *Vibrio cholerae* | `ompw` | 1 | 90%
-| *Vibrio cholerae O1* | `ompw, wben` | 2 | 90%
-| *Vibrio cholerae O139* | `ompw, wbfr` | 2 | 90%
 | *Vibrio vulnificus* | `vvha` | 1 | 90%
 | *Staphylococcus aureus* | `nuc` | 1 | 90%
 | *Klebsiella pneumoniae* | `khe` | 1 | 90%

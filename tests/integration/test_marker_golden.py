@@ -16,13 +16,14 @@ _HAS_BLASTN = _which("blastn") is not None
 @pytest.mark.skipif(not _HAS_BLASTN, reason="blastn not available")
 @pytest.mark.skipif(not _N16961.is_file(), reason="N16961 genome missing")
 class TestCholeraeN16961:
-    def test_o1_toxigenic_golden(self):
+    def test_species_call_with_toxigenicity_note(self):
         from gside.analysis.multigene_identifier import identify_multigene
 
         r = identify_multigene(str(_N16961))
-        assert r.species == "Vibrio_cholerae_O1"
+        assert r.species == "Vibrio_cholerae"
         assert r.confidence == "high"
         detected = {m["gene"] for m in r.detected_markers}
-        assert {"ompw", "wben", "ctxa"} <= detected
+        assert {"ompw", "ctxa"} <= detected
+        assert "wben" not in detected
         assert "wbfr" not in detected
         assert any("toxigenic" in note for note in r.notes)
