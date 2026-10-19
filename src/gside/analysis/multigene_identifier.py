@@ -68,7 +68,7 @@ def _load_rules() -> list[dict[str, Any]]:
     return list(data.get("rules", []))
 
 
-def _blast_contigs(contigs_fasta: str) -> list[dict[str, Any]]:
+def _blast_contigs(contigs_fasta: str, threads: int = 4) -> list[dict[str, Any]]:
     from gside.config import which
     from gside.engine._env import require_bin
     from gside.engine.backends.blast import BlastBackend
@@ -80,7 +80,7 @@ def _blast_contigs(contigs_fasta: str) -> list[dict[str, Any]]:
     )
 
     db = str(SPECIES_DB_DIR / "D1_marker" / "markers_blastdb")
-    backend = BlastBackend(binary=blastn)
+    backend = BlastBackend(binary=blastn, threads=threads)
     engine_hits = backend.find(
         query=Path(contigs_fasta),
         db_path=db,
@@ -104,8 +104,8 @@ def _blast_contigs(contigs_fasta: str) -> list[dict[str, Any]]:
     return hits
 
 
-def identify_multigene(contigs_fasta: str) -> MultiGeneResult:
-    raw_hits = _blast_contigs(contigs_fasta)
+def identify_multigene(contigs_fasta: str, threads: int = 4) -> MultiGeneResult:
+    raw_hits = _blast_contigs(contigs_fasta, threads)
     rules = _load_rules()
 
     best_hits: dict[str, dict[str, Any]] = {}

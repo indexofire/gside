@@ -80,7 +80,7 @@ class TestPriorityDeadCode:
         monkeypatch.setattr(
             mg,
             "_blast_contigs",
-            lambda contigs: [{"gene": "g1", "identity": 99.0, "coverage": 100.0}],
+            lambda contigs, threads=4: [{"gene": "g1", "identity": 99.0, "coverage": 100.0}],
         )
         from gside.analysis.multigene_identifier import identify_multigene
 
@@ -155,7 +155,7 @@ class TestMainOutput:
         monkeypatch.setattr(
             mg,
             "identify_multigene",
-            lambda c: mg.MultiGeneResult(species="Salmonella", confidence="high"),
+            lambda c, threads=4: mg.MultiGeneResult(species="Salmonella", confidence="high"),
         )
         q = tmp_path / "q.fna"
         q.write_text(">q\nACGT\n")
@@ -182,7 +182,7 @@ class TestCholeraeToxigenicityNotes:
         monkeypatch.setattr(
             mg,
             "_blast_contigs",
-            lambda contigs: [
+            lambda contigs, threads=4: [
                 self._hit("ompw", 95.0),
                 self._hit("ctxa", 99.0),
             ],
@@ -196,7 +196,7 @@ class TestCholeraeToxigenicityNotes:
         monkeypatch.setattr(
             mg,
             "_blast_contigs",
-            lambda contigs: [self._hit("ompw", 95.0)],
+            lambda contigs, threads=4: [self._hit("ompw", 95.0)],
         )
         result = mg.identify_multigene("q.fna")
         assert result.species == "Vibrio_cholerae"
@@ -208,7 +208,7 @@ class TestBestHitSelection:
         monkeypatch.setattr(
             mg,
             "_blast_contigs",
-            lambda contigs: [
+            lambda contigs, threads=4: [
                 {
                     "gene": "ctxa",
                     "identity": 99.2,

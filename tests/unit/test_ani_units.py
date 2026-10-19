@@ -93,53 +93,57 @@ def _skani_hit(ref="GCF_A", ani=99.0, af=0.9):
 
 class TestPanelThresholds:
     def test_high(self, monkeypatch, taxadb):
-        monkeypatch.setattr(ani, "_skani_search", lambda q, d: [_skani_hit(ani=99.0)])
+        monkeypatch.setattr(ani, "_skani_search", lambda q, d, threads=4: [_skani_hit(ani=99.0)])
         r = identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result
         assert (r["species"], r["confidence"]) == ("Escherichia coli K12", "high")
 
     def test_medium_band(self, monkeypatch, taxadb):
-        monkeypatch.setattr(ani, "_skani_search", lambda q, d: [_skani_hit(ani=94.0)])
+        monkeypatch.setattr(ani, "_skani_search", lambda q, d, threads=4: [_skani_hit(ani=94.0)])
         r = identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result
         assert r["confidence"] == "medium"
 
     def test_low_af_rejects(self, monkeypatch, taxadb):
-        monkeypatch.setattr(ani, "_skani_search", lambda q, d: [_skani_hit(ani=99.0, af=0.5)])
+        monkeypatch.setattr(
+            ani, "_skani_search", lambda q, d, threads=4: [_skani_hit(ani=99.0, af=0.5)]
+        )
         r = identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result
         assert (r["species"], r["confidence"]) == ("Unknown", "low")
 
     def test_below_medium(self, monkeypatch, taxadb):
-        monkeypatch.setattr(ani, "_skani_search", lambda q, d: [_skani_hit(ani=90.0)])
+        monkeypatch.setattr(ani, "_skani_search", lambda q, d, threads=4: [_skani_hit(ani=90.0)])
         assert identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result["species"] == "Unknown"
 
     def test_no_hits(self, monkeypatch, taxadb):
-        monkeypatch.setattr(ani, "_skani_search", lambda q, d: [])
+        monkeypatch.setattr(ani, "_skani_search", lambda q, d, threads=4: [])
         r = identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result
         assert r["species"] == "Unknown" and r["ani"] is None
 
     def test_unknown_ref_falls_back_to_id(self, monkeypatch, taxadb):
-        monkeypatch.setattr(ani, "_skani_search", lambda q, d: [_skani_hit(ref="GCF_ZZ")])
+        monkeypatch.setattr(
+            ani, "_skani_search", lambda q, d, threads=4: [_skani_hit(ref="GCF_ZZ")]
+        )
         r = identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result
         assert r["species"] == "GCF_ZZ"
 
 
 class TestMashThresholds:
     def test_high(self, monkeypatch, taxadb):
-        monkeypatch.setattr(ani, "_mash_dist", lambda q, m: [("GCF_A", 0.99)])
+        monkeypatch.setattr(ani, "_mash_dist", lambda q, m, threads=4: [("GCF_A", 0.99)])
         r = identify_by_ani("q.fna", mode="mash_refseq", db_dir=taxadb).result
         assert (r["species"], r["confidence"]) == ("Escherichia coli K12", "high")
 
     def test_medium_band(self, monkeypatch, taxadb):
-        monkeypatch.setattr(ani, "_mash_dist", lambda q, m: [("GCF_A", 0.95)])
+        monkeypatch.setattr(ani, "_mash_dist", lambda q, m, threads=4: [("GCF_A", 0.95)])
         r = identify_by_ani("q.fna", mode="mash_refseq", db_dir=taxadb).result
         assert r["confidence"] == "medium"
 
     def test_low(self, monkeypatch, taxadb):
-        monkeypatch.setattr(ani, "_mash_dist", lambda q, m: [("GCF_A", 0.5)])
+        monkeypatch.setattr(ani, "_mash_dist", lambda q, m, threads=4: [("GCF_A", 0.5)])
         r = identify_by_ani("q.fna", mode="mash_refseq", db_dir=taxadb).result
         assert r["confidence"] == "low"
 
     def test_empty(self, monkeypatch, taxadb):
-        monkeypatch.setattr(ani, "_mash_dist", lambda q, m: [])
+        monkeypatch.setattr(ani, "_mash_dist", lambda q, m, threads=4: [])
         r = identify_by_ani("q.fna", mode="mash_refseq", db_dir=taxadb).result
         assert r["species"] == "Unknown"
 

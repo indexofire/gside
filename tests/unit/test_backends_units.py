@@ -264,3 +264,38 @@ class TestMakeDbAndFlags:
         )
         hits = BlastBackend().find(Path("q.fna"), "db")
         assert len(hits) == 1
+
+
+class TestBackendThreads:
+    def test_skani_search_carries_t_flag(self, fakebin, monkeypatch):
+        from gside.engine.backends.skani import SkaniBackend
+
+        seen = {}
+        monkeypatch.setattr(
+            subprocess, "run", lambda cmd, **kw: seen.update(cmd=cmd) or _completed("\n")
+        )
+        SkaniBackend(threads=3).search(Path("q.fna"), Path("db"))
+        i = seen["cmd"].index("-t")
+        assert seen["cmd"][i + 1] == "3"
+
+    def test_mash_distance_default_threads_flag(self, fakebin, monkeypatch):
+        from gside.engine.backends.kmer import MashBackend
+
+        seen = {}
+        monkeypatch.setattr(
+            subprocess, "run", lambda cmd, **kw: seen.update(cmd=cmd) or _completed("")
+        )
+        MashBackend().distance(Path("q.msh"), Path("r.msh"))
+        i = seen["cmd"].index("-p")
+        assert seen["cmd"][i + 1] == "4"
+
+    def test_mash_explicit_p_kwarg_overrides_threads(self, fakebin, monkeypatch):
+        from gside.engine.backends.kmer import MashBackend
+
+        seen = {}
+        monkeypatch.setattr(
+            subprocess, "run", lambda cmd, **kw: seen.update(cmd=cmd) or _completed("")
+        )
+        MashBackend(threads=6).distance(Path("q.msh"), Path("r.msh"), p=500)
+        flags = [(f, seen["cmd"][i + 1]) for i, f in enumerate(seen["cmd"]) if f == "-p"]
+        assert flags == [("-p", "500")]

@@ -87,6 +87,8 @@ class MashBackend:
             str(query),
             str(reference),
         ]
+        if "p" not in kwargs:
+            cmd.extend(["-p", str(self.threads)])
 
         for key, value in kwargs.items():
             if value is not None:

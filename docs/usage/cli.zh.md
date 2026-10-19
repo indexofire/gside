@@ -18,6 +18,8 @@ gside species <contigs.fasta> [选项]
 | `-m`，`--mode` | 选项 | `marker` | 鉴定模式（见下） |
 | `-D`，`--db-dir` | 选项 | 自动 | 数据库根目录 |
 | `-f`，`--format` | 选项 | `json` | 输出格式：`json` / `tsv` / `md` |
+| `-j`，`--jobs N` | 选项 | `1` | 并发鉴定的输入文件数（输出顺序恒为输入顺序） |
+| `-t`，`--threads N` | 选项 | `4` | 每次比对调用的线程数（blastn `-num_threads` / skani `-t` / mash `-p`） |
 | `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH 而非 stdout（截断写入；tsv/md 逐输入流式落盘、逐行 flush——批次中途失败已写前缀仍保留；json 为单文档收尾一次写入；stdout 不再输出数据，提示信息走 stderr） |
 
 ### 鉴定模式

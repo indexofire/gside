@@ -98,15 +98,33 @@ def main(ctx: click.Context, version: bool, version_json: bool, verbose: bool, q
         " at the end; stdout then carries no data)"
     ),
 )
+@click.option(
+    "-j",
+    "--jobs",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help="Number of input files to identify concurrently (output order is always input order).",
+)
+@click.option(
+    "-t",
+    "--threads",
+    type=click.IntRange(min=1),
+    default=4,
+    show_default=True,
+    help="Threads per aligner invocation (blastn -num_threads / skani -t / mash -p).",
+)
 def species_cmd(
     contigs: tuple[str, ...],
     mode: str,
     db_dir: str | None,
     output_format: str,
     output: str | None,
+    jobs: int,
+    threads: int,
 ) -> None:
     """Identify species from assembled contigs FASTA (accepts multiple files)."""
-    sys.exit(_run_species(list(contigs), mode, db_dir, output_format, output))
+    sys.exit(_run_species(list(contigs), mode, db_dir, output_format, output, jobs, threads))
 
 
 @click.group(
@@ -254,10 +272,30 @@ def _run_species(
     db_dir: str | None,
     output_format: str = "json",
     output: str | None = None,
+    jobs: int = 1,
+    threads: int = 4,
+) -> int:
+    def identify(contigs: str) -> dict[str, Any]:
+        return _identify_one(contigs, mode, db_dir, threads)
+
+    if jobs > 1:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            payload_source = pool.map(identify, contigs_list)
+            return _emit_species(payload_source, len(contigs_list), output_format, output)
+    return _emit_species(map(identify, contigs_list), len(contigs_list), output_format, output)
+
+
+def _emit_species(
+    payload_source: Iterator[dict[str, Any]],
+    n_inputs: int,
+    output_format: str,
+    output: str | None,
 ) -> int:
     if output_format == "json":
-        payloads = [_identify_one(contigs, mode, db_dir) for contigs in contigs_list]
-        report: Any = payloads[0] if len(payloads) == 1 else payloads
+        payloads = list(payload_source)
+        report: Any = payloads[0] if n_inputs == 1 else payloads
         text = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
         if output is None:
             print(text, end="")
@@ -272,8 +310,7 @@ def _run_species(
 
     def chunks() -> Iterator[str]:
         yield _table_header(markdown) + "\n"
-        for contigs in contigs_list:
-            payload = _identify_one(contigs, mode, db_dir)
+        for payload in payload_source:
             yield _render_row(payload, markdown) + "\n"
 
     if output is None:
@@ -356,7 +393,7 @@ def _render_table(payloads: list[dict[str, Any]], markdown: bool) -> str:
     return "\n".join(lines)
 
 
-def _identify_one(contigs: str, mode: str, db_dir: str | None) -> dict[str, Any]:
+def _identify_one(contigs: str, mode: str, db_dir: str | None, threads: int = 4) -> dict[str, Any]:
     results: dict[str, Any] = {}
 
     modes = ["marker", "panel", "mash_refseq", "sourmash"] if mode == "all" else [mode]
@@ -365,11 +402,13 @@ def _identify_one(contigs: str, mode: str, db_dir: str | None) -> dict[str, Any]
             if m == "marker":
                 from gside.analysis.multigene_identifier import identify_multigene
 
-                results[m] = identify_multigene(contigs).to_dict()
+                results[m] = identify_multigene(contigs, threads=threads).to_dict()
             elif m in ("panel", "mash_refseq"):
                 from gside.analysis.ani_identifier import identify_by_ani
 
-                results[m] = identify_by_ani(contigs, mode=m, db_dir=db_dir).to_dict()
+                results[m] = identify_by_ani(
+                    contigs, mode=m, db_dir=db_dir, threads=threads
+                ).to_dict()
             elif m == "sourmash":
                 from gside.analysis.sourmash_identifier import (
                     identify_by_sourmash as identify_sourmash,

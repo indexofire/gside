@@ -28,12 +28,13 @@ def _find_bin() -> str:
 class SkaniBackend:
     """skani ANI search against a pre-sketched database (skani sketch ... -o db)."""
 
-    def __init__(self) -> None:
+    def __init__(self, threads: int = 4) -> None:
         self._bin = _find_bin()
+        self.threads = threads
 
     def search(self, query: Path, db: Path) -> list[AniHit]:
         result = run_checked(
-            [self._bin, "search", str(query), "-d", str(db)],
+            [self._bin, "search", str(query), "-d", str(db), "-t", str(self.threads)],
             timeout=600,
             name="skani search failed",
             exit_in_msg=False,

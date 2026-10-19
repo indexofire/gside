@@ -89,18 +89,18 @@ class TestRenderTable:
 
 class TestRunSpeciesBatch:
     def test_json_single_is_object(self, monkeypatch, capsys):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d: _payload(c))
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
         assert _run_species(["a.fna"], "marker", None) == 0
         assert json.loads(capsys.readouterr().out)["contigs"] == "a.fna"
 
     def test_json_multi_is_array(self, monkeypatch, capsys):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d: _payload(c))
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
         assert _run_species(["a.fna", "b.fna"], "marker", None) == 0
         docs = json.loads(capsys.readouterr().out)
         assert [d["contigs"] for d in docs] == ["a.fna", "b.fna"]
 
     def test_tsv_and_md(self, monkeypatch, capsys):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d: _payload(c))
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
         assert _run_species(["a.fna"], "marker", None, "tsv") == 0
         assert capsys.readouterr().out.startswith("contigs\t")
         assert _run_species(["a.fna"], "marker", None, "md") == 0
@@ -150,7 +150,7 @@ class TestMultigeneBranches:
         monkeypatch.setattr(
             mg,
             "_blast_contigs",
-            lambda contigs: [
+            lambda contigs, threads=4: [
                 {"gene": "inva", "identity": 80.0, "coverage": 50.0},
             ],
         )
@@ -161,7 +161,7 @@ class TestMultigeneBranches:
     def test_no_hits_no_notes(self, monkeypatch):
         import gside.analysis.multigene_identifier as mg
 
-        monkeypatch.setattr(mg, "_blast_contigs", lambda contigs: [])
+        monkeypatch.setattr(mg, "_blast_contigs", lambda contigs, threads=4: [])
         r = mg.identify_multigene("dummy.fna").to_dict()
         assert r["species"] == "Unknown"
         assert r["notes"] == []
@@ -210,12 +210,12 @@ class TestIdentifyModes:
         import gside.analysis.sourmash_identifier as smod
         import gside.cli as climod
 
-        monkeypatch.setattr(mg, "identify_multigene", lambda c: _FakeResult("M", "high"))
+        monkeypatch.setattr(mg, "identify_multigene", lambda c, threads=4: _FakeResult("M", "high"))
         monkeypatch.setattr(
-            ani, "identify_by_ani", lambda c, mode, db_dir: _FakeResult("A", "high")
+            ani, "identify_by_ani", lambda c, mode, db_dir=None, threads=4: _FakeResult("A", "high")
         )
         monkeypatch.setattr(
-            smod, "identify_by_sourmash", lambda c, db_dir: _FakeResult("S", "high")
+            smod, "identify_by_sourmash", lambda c, db_dir=None: _FakeResult("S", "high")
         )
         payload = climod._identify_one("x.fna", "all", None)
         assert set(payload["methods"]) == {"marker", "panel", "mash_refseq", "sourmash"}
@@ -225,7 +225,7 @@ class TestIdentifyModes:
         import gside.analysis.multigene_identifier as mg
         import gside.cli as climod
 
-        def boom(c):
+        def boom(c, threads=4):
             raise OSError("blast exploded")
 
         monkeypatch.setattr(mg, "identify_multigene", boom)
@@ -284,7 +284,7 @@ class TestSpeciesShortFlags:
 
 class TestSpeciesOutputOption:
     def test_output_writes_file_stdout_clean_stderr_notice(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d: _payload(c))
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
         out = tmp_path / "out.json"
         result = CliRunner().invoke(main, ["species", "--output", str(out), "a.fna"])
         assert result.exit_code == 0
@@ -293,7 +293,7 @@ class TestSpeciesOutputOption:
         assert f"Results written to {out}" in result.stderr
 
     def test_output_short_flag_multi_file_array(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d: _payload(c))
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
         out = tmp_path / "o.json"
         result = CliRunner().invoke(main, ["species", "-o", str(out), "a.fna", "b.fna"])
         assert result.exit_code == 0
@@ -301,7 +301,7 @@ class TestSpeciesOutputOption:
         assert "Results written to" in result.stderr
 
     def test_output_tsv_payload(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d: _payload(c))
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
         out = tmp_path / "o.tsv"
         result = CliRunner().invoke(main, ["species", "-f", "tsv", "-o", str(out), "a.fna"])
         assert result.exit_code == 0
@@ -489,7 +489,7 @@ class TestStreamingOutput:
     def test_output_tsv_rows_appear_as_files_complete(self, monkeypatch, tmp_path):
         seen_during_run = {}
 
-        def fake_identify(contigs, mode, db_dir):
+        def fake_identify(contigs, mode, db_dir, threads=4):
             if contigs == "b.fna":
                 seen_during_run["mid"] = (tmp_path / "out.tsv").read_text()
             return _payload(contigs)
@@ -502,7 +502,7 @@ class TestStreamingOutput:
     def test_output_md_rows_stream(self, monkeypatch, tmp_path):
         seen_during_run = {}
 
-        def fake_identify(contigs, mode, db_dir):
+        def fake_identify(contigs, mode, db_dir, threads=4):
             if contigs == "b.fna":
                 seen_during_run["mid"] = (tmp_path / "out.md").read_text()
             return _payload(contigs)
@@ -515,7 +515,7 @@ class TestStreamingOutput:
     def test_stdout_rows_stream(self, monkeypatch, capsys):
         seen = {}
 
-        def fake_identify(contigs, mode, db_dir):
+        def fake_identify(contigs, mode, db_dir, threads=4):
             if contigs == "b.fna":
                 seen["mid"] = capsys.readouterr().out
             return _payload(contigs)
@@ -526,7 +526,7 @@ class TestStreamingOutput:
         assert "b.fna" not in seen["mid"]
 
     def test_midbatch_failure_persists_prefix(self, monkeypatch, tmp_path):
-        def fake_identify(contigs, mode, db_dir):
+        def fake_identify(contigs, mode, db_dir, threads=4):
             if contigs == "b.fna":
                 raise RuntimeError("boom mid-batch")
             return _payload(contigs)
@@ -538,3 +538,76 @@ class TestStreamingOutput:
         assert persisted[0].startswith("contigs")
         assert "a.fna" in persisted[1]
         assert len(persisted) == 2
+
+
+class TestSpeciesParallelism:
+    def test_jobs_and_threads_options_parse(self, monkeypatch):
+        seen = {}
+
+        def fake_run(*a, **k):
+            seen.update(args=a, kwargs=k)
+            return 0
+
+        monkeypatch.setattr(cli, "_run_species", fake_run)
+        result = CliRunner().invoke(main, ["species", "-j", "3", "-t", "8", "x.fna"])
+        assert result.exit_code == 0
+        assert seen["args"][5:] == (3, 8)
+
+    def test_parallel_run_preserves_input_order(self, monkeypatch, tmp_path):
+        import time
+
+        done = []
+
+        def fake_identify(contigs, mode, db_dir, threads=4):
+            if contigs == "a.fna":
+                time.sleep(0.25)
+            done.append(contigs)
+            return _payload(contigs)
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        out = tmp_path / "o.tsv"
+        cli._run_species(["a.fna", "b.fna", "c.fna"], "marker", None, "tsv", str(out), jobs=3)
+        rows = out.read_text().splitlines()
+        assert [r.split("\t")[0] for r in rows[1:]] == ["a.fna", "b.fna", "c.fna"]
+        assert done[0] != "a.fna"
+
+    def test_parallel_stream_holds_rows_until_input_turn(self, monkeypatch, tmp_path):
+        import time
+
+        seen = {}
+
+        def fake_identify(contigs, mode, db_dir, threads=4):
+            if contigs == "a.fna":
+                time.sleep(0.25)
+            if contigs == "c.fna":
+                seen["mid"] = (tmp_path / "o.tsv").read_text()
+            return _payload(contigs)
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        cli._run_species(
+            ["a.fna", "b.fna", "c.fna"], "marker", None, "tsv", str(tmp_path / "o.tsv"), jobs=3
+        )
+        assert "a.fna" not in seen["mid"]
+        assert "b.fna" not in seen["mid"]
+
+    def test_threads_flow_to_identifiers(self, monkeypatch):
+        cap = {}
+
+        class _Stub:
+            def to_dict(self):
+                return {}
+
+        import gside.analysis.ani_identifier as ani
+        import gside.analysis.multigene_identifier as mg
+
+        monkeypatch.setattr(
+            mg, "identify_multigene", lambda c, threads=4: cap.setdefault("mg", threads) or _Stub()
+        )
+        monkeypatch.setattr(
+            ani,
+            "identify_by_ani",
+            lambda c, mode, db_dir=None, threads=4: cap.setdefault("ani", threads) or _Stub(),
+        )
+        cli._identify_one("q.fna", "marker", None, threads=8)
+        cli._identify_one("q.fna", "panel", None, threads=8)
+        assert cap["mg"] == 8 and cap["ani"] == 8

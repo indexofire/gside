@@ -42,13 +42,13 @@ def _hits_from_rows(rows: list[tuple[str, float, float]]) -> list[AniHit]:
     return [AniHit(ref=r, ani=a, aligned_fraction=af) for r, a, af in rows]
 
 
-def _skani_search(query: str | Path, db: Path) -> list[AniHit]:
+def _skani_search(query: str | Path, db: Path, threads: int = 4) -> list[AniHit]:
     from gside.engine.backends.skani import SkaniBackend
 
-    return SkaniBackend().search(Path(query), db)
+    return SkaniBackend(threads=threads).search(Path(query), db)
 
 
-def _mash_dist(query: str | Path, msh: Path) -> list[tuple[str, float]]:
+def _mash_dist(query: str | Path, msh: Path, threads: int = 4) -> list[tuple[str, float]]:
     from gside.config import which
     from gside.engine._env import require_bin
     from gside.engine.backends.kmer import MashBackend
@@ -62,7 +62,9 @@ def _mash_dist(query: str | Path, msh: Path) -> list[tuple[str, float]]:
     # reference (sketch DB genome) IDs, so the sketch goes in the first slot.
     # MashBackend.distance() places its first positional there; max_distance=1.0
     # is mash's own default cutoff, i.e. no extra filtering vs. a bare `mash dist`.
-    results = MashBackend(binary=mash).distance(Path(msh), Path(query), max_distance=1.0)
+    results = MashBackend(binary=mash, threads=threads).distance(
+        Path(msh), Path(query), max_distance=1.0
+    )
     return [(r.reference_id, 1.0 - r.distance) for r in results]
 
 
@@ -98,6 +100,7 @@ def identify_by_ani(
     contigs: str | Path,
     mode: str,
     db_dir: str | Path | None = None,
+    threads: int = 4,
 ) -> AniIdResult:
     if mode not in _DB_BY_MODE:
         raise ValueError(f"unsupported ANI mode {mode!r}; expected one of {sorted(_DB_BY_MODE)}")
@@ -114,7 +117,7 @@ def identify_by_ani(
             raise RuntimeError(
                 f"mash sketch DB not found in {base} (run: gside db setup --tier mash)"
             )
-        mash_rows = _mash_dist(contigs, msh)
+        mash_rows = _mash_dist(contigs, msh, threads)
         mash_top = sorted(mash_rows, key=lambda r: -r[1])[:_TOP_N]
         best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)
         species = taxa.get(best_ref, _mash_species(best_ref)) if best_ref else "Unknown"
@@ -131,7 +134,7 @@ def identify_by_ani(
 
     skani_db = base / "panel.sketch" if (base / "panel.sketch").exists() else base
     skani_hits = sorted(
-        _skani_search(contigs, skani_db), key=lambda h: (-h.ani, -h.aligned_fraction)
+        _skani_search(contigs, skani_db, threads), key=lambda h: (-h.ani, -h.aligned_fraction)
     )
     top = skani_hits[:_TOP_N]
     best = top[0] if top else None
