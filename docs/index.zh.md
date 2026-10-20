@@ -83,7 +83,7 @@ gside db setup --tier all
 - [宏基因组](usage/meta.zh.md)
 - [分层设计](architecture/layers.zh.md)
 - [JSON 输出契约](reference/json-contract.zh.md)
-- [English](index.md)
+- English version available via the language switcher
 
 ## License
 

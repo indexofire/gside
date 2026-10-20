@@ -83,7 +83,7 @@ See the [JSON Output Contract](reference/json-contract.md) for full examples.
 - [Metagenomic Profiling](usage/meta.md)
 - [Layered Design](architecture/layers.md)
 - [JSON Output Contract](reference/json-contract.md)
-- [中文文档](index.zh.md)
+- 中文版可通过页面语言切换器访问
 
 ## License
 
