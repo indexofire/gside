@@ -10,6 +10,8 @@ gside reference databases are managed via the `gside db` subcommand with tiered 
 | **panel** | D2_ani (291 genomes, skani sketch) | ~130MB | ANI identification (L2) |
 | **mash** | D3_mash (RefSeq MinHash sketch) | ~179MB | Distance identification (L2) |
 | **sourmash** | D4_sourmash (GTDB reps k=31 + lineages) | ~3.9GB | Gather classification (sourmash) |
+| **meta** | D5_kraken2 (Kraken2 Standard-8 index) | ~5.5GB | Metagenomic profiling (`gside meta`) |
+| **meta_sylph** | D6_sylph (sylph GTDB database) | ~14GB | ANI-based metagenomic profiling (`gside meta`) |
 | **all** | panel + mash | ~310MB | Full capability (excludes sourmash) |
 
 ### Directory naming
@@ -58,6 +60,8 @@ gside database status
 gside db setup --tier panel          # Panel only (ANI), the default tier
 gside db setup --tier mash           # MinHash only
 gside db setup --tier sourmash       # GTDB gather db (~3.9GB)
+gside db setup --tier meta           # Kraken2 index (manual, ~5.5GB)
+gside db setup --tier meta_sylph     # sylph GTDB db (manual, ~14GB)
 gside db setup --tier all            # panel + mash (excludes sourmash)
 ```
 
@@ -70,6 +74,23 @@ if any step reports an error.
 `--tier all` installs panel + mash only. The sourmash GTDB database
 (~3.9GB) is never included in `all`; run `gside db setup --tier sourmash`
 separately to provision it.
+
+The metagenomic tiers are **manual setup** — there is no auto-download.
+`gside db setup --tier meta` / `--tier meta_sylph` print an actionable
+pointer and exit non-zero until the database is placed by hand:
+
+```bash
+# D5_kraken2: download a prebuilt index (e.g. Standard-8) from
+# https://benlangmead.github.io/aws-indexes/k2 and extract so that
+# hash.k2d / opts.k2d / taxo.k2d sit in data/db/D5_kraken2/
+# (Bracken additionally needs database100mer.kmer_distrib there)
+
+# D6_sylph: download a prebuilt *.syl2db (e.g. GTDB) from
+# https://sylph-docs.github.io/ and place it under data/db/D6_sylph/
+```
+
+`--source` also works for these tiers, copying an existing local database
+directory into place.
 
 ### Copy from an existing local database directory
 

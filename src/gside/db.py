@@ -44,6 +44,9 @@ SOURMASH_LINEAGES_SHA256 = "98bceab27a50f08b2f777ca7bdfb57c88aabe5ce1fa54cfb103d
 SOURMASH_FARM_BASE = "https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs226"
 SOURMASH_SIG_URL = f"{SOURMASH_FARM_BASE}/gtdb-rs226-reps.k31.sig.zip"
 SOURMASH_LINEAGES_URL = f"{SOURMASH_FARM_BASE}/gtdb-rs226-reps.lineages.csv"
+# Manual-provision tiers (no auto-download): users place the databases themselves.
+K2_INDEXES_URL = "https://benlangmead.github.io/aws-indexes/k2"
+SYLPH_DOCS_URL = "https://sylph-docs.github.io/"
 
 _TIERS: dict[str, dict[str, Any]] = {
     "mini": {
@@ -66,6 +69,16 @@ _TIERS: dict[str, dict[str, Any]] = {
         "size": "~3.9GB",
         "items": ["D4_sourmash"],
     },
+    "meta": {
+        "description": "Kraken2 Standard-8 prebuilt index (metagenomic profiling)",
+        "size": "~5.5GB",
+        "items": ["D5_kraken2"],
+    },
+    "meta_sylph": {
+        "description": "sylph GTDB-r226 database (ANI-based metagenomic profiling)",
+        "size": "~14GB",
+        "items": ["D6_sylph"],
+    },
     "all": {
         "description": "panel + mash",
         "size": "~310MB sketches",
@@ -75,6 +88,11 @@ _TIERS: dict[str, dict[str, Any]] = {
 
 _DOWNLOAD_TIMEOUT = 3600
 _CHUNK = 1024 * 1024
+
+
+def _has_syl2db(db_dir: Path) -> bool:
+    """True when any ``*.syl2db`` database lives under ``db_dir`` (glob probe)."""
+    return any(db_dir.glob("*.syl2db"))
 
 
 # Database components in `db status` order — key: (tier, directory under
@@ -94,6 +112,8 @@ _COMPONENTS: dict[str, tuple[str, str, list[list[tuple[str, Callable[[Path], boo
         "D4_sourmash",
         [[("gtdb-reps-k31.zip", Path.exists), ("lineages.csv", Path.exists)]],
     ),
+    "D5_kraken2": ("meta", "D5_kraken2", [[("hash.k2d", Path.exists)]]),
+    "D6_sylph": ("meta_sylph", "D6_sylph", [[("", _has_syl2db)]]),
 }
 
 
@@ -137,6 +157,10 @@ def db_setup(tier: str = "panel", source: str = "") -> dict[str, str]:
         results["D3_mash"] = _setup_component("D3_mash", _download_mash_zenodo, source)
     if tier == "sourmash":
         results["D4_sourmash"] = _setup_component("D4_sourmash", _download_sourmash_farm, source)
+    if tier == "meta":
+        results["D5_kraken2"] = _setup_component("D5_kraken2", _manual_kraken2_setup, source)
+    if tier == "meta_sylph":
+        results["D6_sylph"] = _setup_component("D6_sylph", _manual_sylph_setup, source)
     if not results:
         results["info"] = "mini tier ships with repo"
     return results
@@ -159,6 +183,16 @@ def _install_panel(dst: Path) -> str:
     """Panel install chain: pre-built GitHub Release sketch, else manifest build."""
     result = _try_download_panel_release(dst)
     return result if result else _build_panel_from_manifest(dst)
+
+
+def _manual_kraken2_setup(dst: Path) -> str:
+    """Kraken2 indexes are huge tarballs; users place them manually for now."""
+    return f"ERROR: not auto-downloadable yet — see {K2_INDEXES_URL}"
+
+
+def _manual_sylph_setup(dst: Path) -> str:
+    """sylph GTDB databases are hosted outside the release pipeline; manual setup."""
+    return f"ERROR: not auto-downloadable yet — see {SYLPH_DOCS_URL}"
 
 
 def _download_sourmash_farm(dst: Path) -> str:

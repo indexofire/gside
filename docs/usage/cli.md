@@ -114,7 +114,7 @@ Database management subcommand.
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `-t`, `--tier` | `panel` | mini / panel / mash / sourmash / all |
+| `-t`, `--tier` | `panel` | mini / panel / mash / sourmash / meta / meta_sylph / all |
 | `-s`, `--source` | — | Copy from an existing local database directory instead of downloading |
 | `-f`, `--format` | `text` | Output format: `text` / `json` (json routes progress to stderr and prints the result dict as a single JSON document on stdout; exit-code contract unchanged) |
 
@@ -124,6 +124,11 @@ Database management subcommand.
 ```bash
 gside db setup --tier sourmash
 ```
+
+The metagenomic tiers `meta` (Kraken2 index, ~5.5GB) and `meta_sylph`
+(sylph GTDB database, ~14GB) are **manual setup** — `db setup` prints a
+pointer to the upstream downloads instead of fetching them. See
+[Metagenomic Profiling](meta.md) for placement instructions.
 
 ### Examples
 
@@ -162,6 +167,37 @@ binaries produce warnings and partial results, never a crash. Configure via
 ```bash
 gside validate contigs.fna --mode simple
 gside validate contigs.fna --mode standard --output-dir ./taxonomy
+```
+
+## gside meta
+
+Metagenomic species profiling from FASTQ reads or assembled contigs
+(Kraken2+Bracken and sylph). See [Metagenomic Profiling](meta.md).
+
+### Usage
+
+```bash
+gside meta <reads.fastq> [reads_2.fastq] [options]
+```
+
+### Arguments
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `reads` | positional | — | 1 file = single-end reads or contigs FASTA; 2 files = paired FASTQ |
+| `-m`, `--mode` | option | `all` | Profiling method: `kraken2` / `sylph` / `all` (all merges the species lists) |
+| `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
+| `-f`, `--format` | option | `json` | Output format: `json` / `tsv` |
+| `-o`, `--output PATH` | option | stdout | Write the report to PATH instead of stdout (json written once at the end; stdout then carries no data, a notice goes to stderr) |
+| `-t`, `--threads N` | option | `4` | Threads per tool invocation |
+
+### Examples
+
+```bash
+gside meta sample_1.fastq sample_2.fastq
+gside meta sample_1.fastq sample_2.fastq -m kraken2 -f tsv -o profile.tsv
+gside meta contigs.fna          # kraken2 only (sylph requires reads)
+gside meta reads.fastq -m sylph
 ```
 
 ## gside --version

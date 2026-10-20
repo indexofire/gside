@@ -41,7 +41,14 @@ def _touch(path: str | Path) -> Path:
 class TestStatus:
     def test_empty_all_not_ready(self, root):
         status = db_status()
-        assert set(status) == {"markers", "D2_ani", "D3_mash", "D4_sourmash"}
+        assert set(status) == {
+            "markers",
+            "D2_ani",
+            "D3_mash",
+            "D4_sourmash",
+            "D5_kraken2",
+            "D6_sylph",
+        }
         assert [status[k]["tier"] for k in ("markers", "D2_ani", "D3_mash")] == [
             "mini",
             "panel",
@@ -55,6 +62,8 @@ class TestStatus:
         _touch(root / "D3_mash" / "payload.bin")
         _touch(root / "D4_sourmash" / "gtdb-reps-k31.zip")
         _touch(root / "D4_sourmash" / "lineages.csv")
+        _touch(root / "D5_kraken2" / "hash.k2d")
+        _touch(root / "D6_sylph" / "gtdb-r226.syl2db")
         status = db_status()
         assert all(v["ready"] for v in status.values())
 
@@ -335,6 +344,57 @@ class TestSourmashTier:
         _touch(src / "gtdb-reps-k31.zip")
         _touch(src / "lineages.csv")
         assert db_setup("sourmash", source=str(tmp_path))["D4_sourmash"].startswith("copied from")
+
+
+class TestMetaTiers:
+    def test_tiers_declared(self):
+        assert db._TIERS["meta"]["items"] == ["D5_kraken2"]
+        assert db._TIERS["meta_sylph"]["items"] == ["D6_sylph"]
+
+    def test_status_rows(self, root):
+        status = db_status()
+        assert status["D5_kraken2"]["tier"] == "meta"
+        assert status["D6_sylph"]["tier"] == "meta_sylph"
+        assert not status["D5_kraken2"]["ready"]
+        assert not status["D6_sylph"]["ready"]
+
+    def test_kraken2_ready_on_k2d(self, root):
+        _touch(root / "D5_kraken2" / "hash.k2d")
+        assert db_status()["D5_kraken2"]["ready"]
+
+    def test_sylph_ready_on_syl2db_glob(self, root):
+        _touch(root / "D6_sylph" / "gtdb-r226.syl2db")
+        assert db_status()["D6_sylph"]["ready"]
+
+    def test_sylph_empty_dir_not_ready(self, root):
+        (root / "D6_sylph").mkdir(parents=True)
+        assert not db_status()["D6_sylph"]["ready"]
+
+    def test_setup_kraken2_not_auto_downloadable(self, root):
+        msg = db_setup("meta")["D5_kraken2"]
+        assert msg.startswith("ERROR: not auto-downloadable")
+        assert "https://benlangmead.github.io/aws-indexes/k2" in msg
+
+    def test_setup_sylph_not_auto_downloadable(self, root):
+        msg = db_setup("meta_sylph")["D6_sylph"]
+        assert msg.startswith("ERROR: not auto-downloadable")
+        assert "https://sylph-docs.github.io/" in msg
+
+    def test_setup_already_ready(self, root):
+        _touch(root / "D5_kraken2" / "hash.k2d")
+        _touch(root / "D6_sylph" / "db.syl2db")
+        assert db_setup("meta") == {"D5_kraken2": "already ready"}
+        assert db_setup("meta_sylph") == {"D6_sylph": "already ready"}
+
+    def test_setup_from_source_copies(self, root, tmp_path):
+        _touch(tmp_path / "D5_kraken2" / "hash.k2d")
+        msg = db_setup("meta", source=str(tmp_path))["D5_kraken2"]
+        assert msg.startswith("copied from")
+        assert (root / "D5_kraken2" / "hash.k2d").is_file()
+
+    def test_setup_error_exits_1(self, root, capsys):
+        assert run_db_command(["setup", "--tier", "meta"]) == 1
+        assert "not auto-downloadable" in capsys.readouterr().out
 
 
 class TestSetupDownloadPaths:

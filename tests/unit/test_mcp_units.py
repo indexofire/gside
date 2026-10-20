@@ -59,6 +59,8 @@ _STATUS: dict[str, dict[str, Any]] = {
     "D2_ani": {"ready": False, "path": "/repo/data/db/D2_ani", "tier": "panel"},
     "D3_mash": {"ready": False, "path": "/repo/data/db/D3_mash", "tier": "mash"},
     "D4_sourmash": {"ready": False, "path": "/repo/data/db/D4_sourmash", "tier": "sourmash"},
+    "D5_kraken2": {"ready": False, "path": "/repo/data/db/D5_kraken2", "tier": "meta"},
+    "D6_sylph": {"ready": False, "path": "/repo/data/db/D6_sylph", "tier": "meta_sylph"},
 }
 
 

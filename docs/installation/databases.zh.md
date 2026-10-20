@@ -10,6 +10,8 @@ gside 的参考数据库通过 `gside db` 子命令管理，支持分层数据�
 | **panel** | D2_ani（291 基因组 skani sketch） | ~130MB | ANI 鉴定（L2） |
 | **mash** | D3_mash（RefSeq MinHash sketch） | ~179MB | 距离鉴定（L2） |
 | **sourmash** | D4_sourmash（GTDB reps k=31 + lineages） | ~3.9GB | gather 分类（sourmash） |
+| **meta** | D5_kraken2（Kraken2 Standard-8 索引） | ~5.5GB | 宏基因组分析（`gside meta`） |
+| **meta_sylph** | D6_sylph（sylph GTDB 数据库） | ~14GB | 基于 ANI 的宏基因组分析（`gside meta`） |
 | **all** | panel + mash | ~310MB | 全层次能力（不含 sourmash） |
 
 ### 目录命名
@@ -55,6 +57,8 @@ gside database status
 gside db setup --tier panel          # 仅面板（ANI），默认
 gside db setup --tier mash           # 仅 MinHash
 gside db setup --tier sourmash       # GTDB gather 库（~3.9GB）
+gside db setup --tier meta           # Kraken2 索引（手动安装，~5.5GB）
+gside db setup --tier meta_sylph     # sylph GTDB 库（手动安装，~14GB）
 gside db setup --tier all            # panel + mash（不含 sourmash）
 ```
 
@@ -62,6 +66,21 @@ gside db setup --tier all            # panel + mash（不含 sourmash）
 
 `--tier all` 仅安装 panel + mash。sourmash GTDB 库（约 3.9GB）不含在 `all`
 内，需另行执行 `gside db setup --tier sourmash` 单独安装。
+
+宏基因组 tier 需**手动安装**——不支持自动下载。在数据库就位之前，
+`gside db setup --tier meta` / `--tier meta_sylph` 只打印上游下载指引并以
+非零码退出：
+
+```bash
+# D5_kraken2：从 https://benlangmead.github.io/aws-indexes/k2 下载预建索引
+# （如 Standard-8），解压使 hash.k2d / opts.k2d / taxo.k2d 位于
+# data/db/D5_kraken2/（Bracken 另需该目录下的 database100mer.kmer_distrib）
+
+# D6_sylph：从 https://sylph-docs.github.io/ 下载预建 *.syl2db（如 GTDB），
+# 放入 data/db/D6_sylph/
+```
+
+这两个 tier 同样支持 `--source`，可直接从本地已有数据库目录复制。
 
 ### 查看可用 tier
 

@@ -20,6 +20,9 @@ skani = "0.3.*"
 mash = ">=2.3"
 mmseqs2 = ">=15"
 sourmash = ">=4.9"
+kraken2 = ">=2.1"
+bracken = ">=2.8"
+sylph = ">=1.0"
 
 [pypi-dependencies]
 gside = { path = ".", editable = true }

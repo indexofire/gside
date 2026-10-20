@@ -55,6 +55,7 @@ nav:
   - Usage:
     - CLI Reference: usage/cli.md
     - Identification Modes: usage/modes.md
+    - Metagenomic Profiling: usage/meta.md
   - Architecture:
     - Layered Design: architecture/layers.md
   - Reference:

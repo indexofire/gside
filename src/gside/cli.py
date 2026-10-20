@@ -17,7 +17,8 @@ from gside import __version__
 HELP_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 MODES = ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk", "all"]
-TIERS = ["mini", "panel", "mash", "sourmash", "all"]
+META_MODES = ["kraken2", "sylph", "all"]
+TIERS = ["mini", "panel", "mash", "sourmash", "meta", "meta_sylph", "all"]
 
 logger = logging.getLogger(__name__)
 
@@ -260,10 +261,67 @@ def validate_cmd(contigs: str, mode: str, output_dir: str | None) -> None:
     print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
 
 
+@main.command("meta", context_settings=HELP_SETTINGS)
+@click.argument("reads", nargs=-1, required=True, type=click.Path(dir_okay=False))
+@click.option(
+    "-m",
+    "--mode",
+    type=click.Choice(META_MODES),
+    default="all",
+    show_default=True,
+    help="Profiling method (all runs kraken2 + sylph, then merges).",
+)
+@click.option(
+    "-D",
+    "--db-dir",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Database root (default: $GSIDE_DB_DIR or data/db).",
+)
+@click.option(
+    "-f",
+    "--format",
+    "output_format",
+    type=click.Choice(["json", "tsv"]),
+    default="json",
+    show_default=True,
+    help="Output format (tsv renders one row per species).",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False),
+    default=None,
+    help=(
+        "Write the report to PATH instead of stdout (truncates; json is written"
+        " once at the end; stdout then carries no data)"
+    ),
+)
+@click.option(
+    "-t",
+    "--threads",
+    type=click.IntRange(min=1),
+    default=4,
+    show_default=True,
+    help="Threads per tool invocation (kraken2 --threads / sylph sketch -t).",
+)
+def meta_cmd(
+    reads: tuple[str, ...],
+    mode: str,
+    db_dir: str | None,
+    output_format: str,
+    output: str | None,
+    threads: int,
+) -> None:
+    """Metagenomic species profiling from FASTQ reads or assembled contigs."""
+    sys.exit(_run_meta(list(reads), mode, db_dir, output_format, output, threads))
+
+
 # Register commands
 main.add_command(species_cmd, name="species")
 main.add_command(db_group, name="db")
 main.add_command(validate_cmd, name="validate")
+main.add_command(meta_cmd, name="meta")
 
 # Imported here, not at the top: gside.mcp pulls in mcp_schemas, which reads
 # MODES/TIERS from this module, so they must already exist when it loads
@@ -577,6 +635,126 @@ def _arbitrate(results: dict[str, Any]) -> dict[str, Any]:
     if best is None:
         return {"species": "Unknown", "confidence": "low", "basis": list(results)}
     return {"species": best[1], "confidence": best[2], "basis": [best[3]]}
+
+
+_META_FASTA_SUFFIXES = (".fna", ".fa", ".fasta")
+_META_TSV_HEADER = "method\tname\tabundance\tconfidence\tani"
+_CONF_RANK = {"high": 2, "medium": 1, "low": 0}
+
+
+def _detect_meta_input(files: list[str]) -> str:
+    """2 files = paired FASTQ; 1 FASTA-suffixed file = contigs; else single FASTQ."""
+    if len(files) == 2:
+        return "fastq_paired"
+    if len(files) == 1 and Path(files[0]).suffix in _META_FASTA_SUFFIXES:
+        return "fasta"
+    return "fastq_single"
+
+
+def _run_meta_method(
+    mode: str,
+    files: list[str],
+    db_dir: str | None,
+    threads: int,
+    input_type: str,
+) -> dict[str, Any]:
+    from gside.analysis.sylph_identifier import FASTA_INPUT_ERROR
+
+    if mode == "sylph" and input_type == "fasta":
+        return {"method": "sylph", "error": FASTA_INPUT_ERROR}
+    try:
+        if mode == "kraken2":
+            from gside.analysis.kraken2_identifier import identify_by_kraken2
+
+            return identify_by_kraken2(files, db_dir=db_dir, threads=threads).to_dict()
+        from gside.analysis.sylph_identifier import identify_by_sylph
+
+        return identify_by_sylph(files, db_dir=db_dir, threads=threads).to_dict()
+    except Exception as e:  # noqa: BLE001 — CLI boundary: method failure recorded, others continue
+        return {"method": mode, "error": str(e)[:300]}
+
+
+def _meta_verdict(methods: dict[str, Any]) -> dict[str, Any]:
+    """Merge species lists from successful methods; on duplicates keep the
+    higher-confidence method's row (sylph ANI outranks a kraken2 fraction)."""
+    merged: dict[str, dict[str, Any]] = {}
+    basis: list[str] = []
+    for mode, payload in methods.items():
+        if "error" in payload:
+            continue
+        basis.append(mode)
+        res = payload.get("result", payload)
+        entries = res.get("top_species") or res.get("species") or []
+        for entry in entries:
+            name = entry.get("name", "")
+            if not name:
+                continue
+            conf = entry.get("confidence", "low")
+            row = {
+                "name": name,
+                "method": mode,
+                "abundance": entry.get("fraction", entry.get("abundance", 0.0)),
+                "confidence": conf,
+                "ani": entry.get("ani"),
+            }
+            prev = merged.get(name)
+            if prev is None or _CONF_RANK[conf] > _CONF_RANK[prev["confidence"]]:
+                merged[name] = row
+    top = sorted(merged.values(), key=lambda r: r["abundance"], reverse=True)
+    return {"top_species": top, "richness": len(top), "basis": basis}
+
+
+def _emit_meta(payload: dict[str, Any], output_format: str, output: str | None) -> int:
+    if output_format == "json":
+        text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+        if output is None:
+            print(text, end="")
+        else:
+            writer = _OutputFileWriter(Path(output))
+            writer(text)
+            writer.close()
+            print(f"Results written to {output}", file=sys.stderr)
+        return 0
+
+    lines = [_META_TSV_HEADER]
+    for row in payload.get("verdict", {}).get("top_species", []):
+        ani = "" if row.get("ani") is None else str(row["ani"])
+        lines.append(
+            f"{row['method']}\t{row['name']}\t{row['abundance']}\t{row['confidence']}\t{ani}"
+        )
+    text = "\n".join(lines) + "\n"
+    if output is None:
+        print(text, end="")
+        return 0
+    writer = _OutputFileWriter(Path(output))
+    try:
+        writer(text)
+    finally:
+        writer.close()
+    print(f"Results written to {output}", file=sys.stderr)
+    return 0
+
+
+def _run_meta(
+    files: list[str],
+    mode: str,
+    db_dir: str | None,
+    output_format: str = "json",
+    output: str | None = None,
+    threads: int = 4,
+) -> int:
+    input_type = _detect_meta_input(files)
+    modes = ["kraken2", "sylph"] if mode == "all" else [mode]
+    methods = {m: _run_meta_method(m, files, db_dir, threads, input_type) for m in modes}
+    payload = {
+        "analysis_type": "metagenomic_profiling",
+        "tool": "gside",
+        "version": __version__,
+        "input": {"files": files, "type": input_type},
+        "methods": methods,
+        "verdict": _meta_verdict(methods),
+    }
+    return _emit_meta(payload, output_format, output)
 
 
 if __name__ == "__main__":
