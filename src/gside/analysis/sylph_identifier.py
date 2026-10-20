@@ -50,8 +50,31 @@ def _looks_like_fasta(files: Sequence[str]) -> bool:
 
 
 def _species_from_genome_file(genome_file: str) -> str:
-    """`Escherichia_coli.fna` → `Escherichia coli` (filename, extension stripped)."""
-    return Path(genome_file).stem.replace("_", " ")
+    """`Escherichia_coli.fna` → `Escherichia coli`; GCF accessions resolved via metadata."""
+    stem = Path(genome_file).stem
+    if stem.startswith("GCF_") or stem.startswith("GCA_"):
+        return stem
+    return stem.replace("_", " ")
+
+
+def _load_taxa_map(db_dir: Path) -> dict[str, str]:
+    """Load filename→species from metadata.tsv if present near the sylph DB."""
+    for candidate in (
+        db_dir / "metadata.tsv",
+        db_dir.parent / "metadata.tsv",
+        db_dir.parent / "D2_ani" / "metadata.tsv",
+    ):
+        if candidate.is_file():
+            mapping: dict[str, str] = {}
+            for ln in candidate.read_text().splitlines()[1:]:
+                cols = ln.split("\t")
+                if len(cols) >= 2:
+                    full = cols[0].strip()
+                    species = cols[1].strip()
+                    mapping[full] = species
+                    mapping[Path(full).stem] = species
+            return mapping
+    return {}
 
 
 def _find_sketch(work: Path) -> Path:
@@ -63,8 +86,9 @@ def _find_sketch(work: Path) -> Path:
     return candidates[0]
 
 
-def _parse_profile(path: Path) -> list[dict[str, Any]]:
+def _parse_profile(path: Path, taxa_map: dict[str, str] | None = None) -> list[dict[str, Any]]:
     """sylph profile TSV → species rows sorted by taxonomic abundance descending."""
+    mapping = taxa_map or {}
     lines = [ln for ln in path.read_text().splitlines() if ln.strip()]
     if len(lines) < 2:
         return []
@@ -74,13 +98,16 @@ def _parse_profile(path: Path) -> list[dict[str, Any]]:
         row = dict(zip(header, line.split("\t"), strict=False))
         try:
             ani = float(row.get("Adjusted_ANI", 0.0))
-            abundance = float(row.get("Taxonomic_abundance", 0.0))
+            abundance = float(row.get("Taxonomic_abundance", 0.0)) / 100.0
             coverage = float(row.get("Eff_cov", 0.0))
         except ValueError:
             continue
+        raw_name = row.get("Genome_file", "")
+        stem = Path(raw_name).stem
+        name = mapping.get(raw_name, mapping.get(stem, _species_from_genome_file(raw_name)))
         species.append(
             {
-                "name": _species_from_genome_file(row.get("Genome_file", "")),
+                "name": name,
                 "ani": ani,
                 "abundance": abundance,
                 "coverage": coverage,
@@ -104,7 +131,7 @@ def identify_by_sylph(
         raise RuntimeError(FASTA_INPUT_ERROR)
 
     base = Path(db_dir) if db_dir else SPECIES_DB_DIR / "D6_sylph"
-    dbs = sorted(base.glob("*.syl2db")) if base.is_dir() else []
+    dbs = sorted(base.glob("*.syldb")) if base.is_dir() else []
     if not dbs:
         raise RuntimeError(f"sylph database not found in {base} (download from {_SYLPH_DOCS_URL})")
     db_file = dbs[0]
@@ -128,7 +155,8 @@ def identify_by_sylph(
             timeout=600,
             name="sylph profile failed",
         )
-        species = _parse_profile(profile)
+        taxa_map = _load_taxa_map(base)
+        species = _parse_profile(profile, taxa_map)
 
     return SylphResult(
         database={"name": "D6_sylph", "path": str(db_file)},

@@ -102,7 +102,7 @@ def _sy_run(profile: str = _PROFILE, cmds: list | None = None, sketch_suffix: st
 def _sy_ready(monkeypatch, tmp_path: Path) -> Path:
     db = tmp_path / "D6_sylph"
     db.mkdir()
-    (db / "gtdb-r226.syl2db").write_bytes(b"x")
+    (db / "gtdb-r226.syldb").write_bytes(b"x")
     monkeypatch.setattr(sy, "which", lambda name: "/bin/sylph")
     return db
 
@@ -268,7 +268,7 @@ class TestSylphUnavailable:
     def test_missing_binary_raises_actionable(self, monkeypatch, tmp_path):
         db = tmp_path / "D6_sylph"
         db.mkdir()
-        (db / "db.syl2db").write_bytes(b"x")
+        (db / "db.syldb").write_bytes(b"x")
         monkeypatch.setattr(sy, "which", lambda name: None)
         with pytest.raises(RuntimeError, match="sylph not found") as exc:
             sy.identify_by_sylph(["r.fq"], db_dir=str(db))
@@ -298,12 +298,12 @@ class TestSylphHappyPath:
         db = _sy_ready(monkeypatch, tmp_path)
         monkeypatch.setattr(sy, "run_checked", _sy_run())
         r = sy.identify_by_sylph(["r.fq"], db_dir=str(db))
-        assert r.database == {"name": "D6_sylph", "path": str(db / "gtdb-r226.syl2db")}
+        assert r.database == {"name": "D6_sylph", "path": str(db / "gtdb-r226.syldb")}
         assert r.result["n_species"] == 3
         first = r.result["species"][0]
         assert first["name"] == "Escherichia coli"
         assert first["ani"] == 97.53
-        assert first["abundance"] == 78.12
+        assert first["abundance"] == pytest.approx(0.7812)
         assert first["coverage"] == 264.0
         assert first["confidence"] == "high"
         assert [s["confidence"] for s in r.result["species"]] == ["high", "medium", "low"]
@@ -323,7 +323,7 @@ class TestSylphHappyPath:
         assert sk_to == 3600 and sk_name == "sylph sketch failed"
         pr_cmd, pr_to, pr_name = cmds[1]
         assert pr_cmd[:3] == ["/bin/sylph", "profile", "-d"]
-        assert pr_cmd[3] == str(db / "gtdb-r226.syl2db")
+        assert pr_cmd[3] == str(db / "gtdb-r226.syldb")
         assert pr_cmd[4].endswith(".sylsp")
         assert pr_cmd[pr_cmd.index("-o") + 1].endswith("profile.tsv")
         assert pr_to == 600 and pr_name == "sylph profile failed"
@@ -410,7 +410,7 @@ def _k2_stub(top_species: list[dict], calls: list | None = None):
 def _sy_stub(species: list[dict]):
     def identify(files, db_dir=None, threads=4):  # noqa: ANN001 — test stub mirrors real sig
         return sy.SylphResult(
-            database={"name": "D6_sylph", "path": "/db/D6_sylph/db.syl2db"},
+            database={"name": "D6_sylph", "path": "/db/D6_sylph/db.syldb"},
             result={"species": species, "n_species": len(species)},
         )
 
@@ -431,14 +431,14 @@ _SY_SPECIES = [
     {
         "name": "Escherichia coli",
         "ani": 97.5,
-        "abundance": 80.0,
+        "abundance": 0.80,
         "coverage": 264.0,
         "confidence": "high",
     },
     {
         "name": "Campylobacter jejuni",
         "ani": 92.0,
-        "abundance": 5.0,
+        "abundance": 0.05,
         "coverage": 10.0,
         "confidence": "low",
     },
@@ -530,15 +530,14 @@ class TestMetaVerdict:
         payload = _run_capture(monkeypatch, capsys, ["r1.fq", "r2.fq"])
         top = payload["verdict"]["top_species"]
         names = [row["name"] for row in top]
-        assert names == ["Escherichia coli", "Campylobacter jejuni", "Salmonella enterica"]
+        assert names == ["Escherichia coli", "Salmonella enterica", "Campylobacter jejuni"]
         e_coli = top[0]
         assert e_coli["method"] == "sylph"  # high (sylph) beats low (kraken2)
-        assert e_coli["abundance"] == 80.0
+        assert e_coli["abundance"] == pytest.approx(0.80)
         assert e_coli["ani"] == 97.5
         assert e_coli["confidence"] == "high"
-        salmonella = top[2]
-        assert salmonella["method"] == "kraken2"
-        assert salmonella["ani"] is None
+        assert top[1]["method"] == "kraken2"
+        assert top[1]["ani"] is None
         assert payload["verdict"]["richness"] == 3
         assert payload["verdict"]["basis"] == ["kraken2", "sylph"]
 
@@ -586,9 +585,9 @@ class TestMetaTsv:
         assert _run_meta(["r1.fq", "r2.fq"], "all", None, output_format="tsv") == 0
         lines = capsys.readouterr().out.splitlines()
         assert lines[0] == "method\tname\tabundance\tconfidence\tani"
-        assert lines[1] == "sylph\tEscherichia coli\t80.0\thigh\t97.5"
-        assert lines[2] == "sylph\tCampylobacter jejuni\t5.0\tlow\t92.0"
-        assert lines[3] == "kraken2\tSalmonella enterica\t0.2\tmedium\t"
+        assert lines[1] == "sylph\tEscherichia coli\t0.8\thigh\t97.5"
+        assert lines[2] == "kraken2\tSalmonella enterica\t0.2\tmedium\t"
+        assert lines[3] == "sylph\tCampylobacter jejuni\t0.05\tlow\t92.0"
 
     def test_kraken2_only_rows_have_blank_ani(self, monkeypatch, capsys):
         _stub_both(monkeypatch)

@@ -90,9 +90,9 @@ _DOWNLOAD_TIMEOUT = 3600
 _CHUNK = 1024 * 1024
 
 
-def _has_syl2db(db_dir: Path) -> bool:
-    """True when any ``*.syl2db`` database lives under ``db_dir`` (glob probe)."""
-    return any(db_dir.glob("*.syl2db"))
+def _has_sylph_db(db_dir: Path) -> bool:
+    """True when any ``*.syldb`` database lives under ``db_dir`` (glob probe)."""
+    return any(db_dir.glob("*.syldb"))
 
 
 # Database components in `db status` order — key: (tier, directory under
@@ -112,8 +112,14 @@ _COMPONENTS: dict[str, tuple[str, str, list[list[tuple[str, Callable[[Path], boo
         "D4_sourmash",
         [[("gtdb-reps-k31.zip", Path.exists), ("lineages.csv", Path.exists)]],
     ),
-    "D5_kraken2": ("meta", "D5_kraken2", [[("hash.k2d", Path.exists)]]),
-    "D6_sylph": ("meta_sylph", "D6_sylph", [[("", _has_syl2db)]]),
+    "D5_kraken2": (
+        "meta",
+        "D5_kraken2",
+        [
+            [("hash.k2d", Path.exists), ("taxo.k2d", Path.exists), ("opts.k2d", Path.exists)],
+        ],
+    ),
+    "D6_sylph": ("meta_sylph", "D6_sylph", [[("", _has_sylph_db)]]),
 }
 
 

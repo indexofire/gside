@@ -640,6 +640,7 @@ def _arbitrate(results: dict[str, Any]) -> dict[str, Any]:
 _META_FASTA_SUFFIXES = (".fna", ".fa", ".fasta")
 _META_TSV_HEADER = "method\tname\tabundance\tconfidence\tani"
 _CONF_RANK = {"high": 2, "medium": 1, "low": 0}
+_METHOD_RANK = {"sylph": 1, "kraken2": 0}
 
 
 def _detect_meta_input(files: list[str]) -> str:
@@ -674,9 +675,17 @@ def _run_meta_method(
         return {"method": mode, "error": str(e)[:300]}
 
 
+def _binomial_key(name: str) -> str:
+    """`Escherichia coli str. K-12 W3110` → `escherichia coli` (dedup key)."""
+    parts = name.split()
+    return " ".join(parts[:2]).lower()
+
+
 def _meta_verdict(methods: dict[str, Any]) -> dict[str, Any]:
     """Merge species lists from successful methods; on duplicates keep the
-    higher-confidence method's row (sylph ANI outranks a kraken2 fraction)."""
+    higher-confidence method's row (sylph ANI outranks a kraken2 fraction).
+    Deduplication uses the binomial (genus + species epithet) so strain-level
+    names from sylph and taxonomy names from kraken2 resolve to one entry."""
     merged: dict[str, dict[str, Any]] = {}
     basis: list[str] = []
     for mode, payload in methods.items():
@@ -697,9 +706,13 @@ def _meta_verdict(methods: dict[str, Any]) -> dict[str, Any]:
                 "confidence": conf,
                 "ani": entry.get("ani"),
             }
-            prev = merged.get(name)
-            if prev is None or _CONF_RANK[conf] > _CONF_RANK[prev["confidence"]]:
-                merged[name] = row
+            key = _binomial_key(name)
+            prev = merged.get(key)
+            wins = prev is None or _CONF_RANK[conf] > _CONF_RANK[prev["confidence"]]
+            if not wins and _CONF_RANK[conf] == _CONF_RANK[prev["confidence"]]:
+                wins = _METHOD_RANK.get(mode, 0) > _METHOD_RANK.get(prev["method"], 0)
+            if wins:
+                merged[key] = row
     top = sorted(merged.values(), key=lambda r: r["abundance"], reverse=True)
     return {"top_species": top, "richness": len(top), "basis": basis}
 

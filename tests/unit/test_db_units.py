@@ -63,7 +63,9 @@ class TestStatus:
         _touch(root / "D4_sourmash" / "gtdb-reps-k31.zip")
         _touch(root / "D4_sourmash" / "lineages.csv")
         _touch(root / "D5_kraken2" / "hash.k2d")
-        _touch(root / "D6_sylph" / "gtdb-r226.syl2db")
+        _touch(root / "D5_kraken2" / "taxo.k2d")
+        _touch(root / "D5_kraken2" / "opts.k2d")
+        _touch(root / "D6_sylph" / "gtdb-r226.syldb")
         status = db_status()
         assert all(v["ready"] for v in status.values())
 
@@ -360,10 +362,12 @@ class TestMetaTiers:
 
     def test_kraken2_ready_on_k2d(self, root):
         _touch(root / "D5_kraken2" / "hash.k2d")
+        _touch(root / "D5_kraken2" / "taxo.k2d")
+        _touch(root / "D5_kraken2" / "opts.k2d")
         assert db_status()["D5_kraken2"]["ready"]
 
     def test_sylph_ready_on_syl2db_glob(self, root):
-        _touch(root / "D6_sylph" / "gtdb-r226.syl2db")
+        _touch(root / "D6_sylph" / "gtdb-r226.syldb")
         assert db_status()["D6_sylph"]["ready"]
 
     def test_sylph_empty_dir_not_ready(self, root):
@@ -382,12 +386,16 @@ class TestMetaTiers:
 
     def test_setup_already_ready(self, root):
         _touch(root / "D5_kraken2" / "hash.k2d")
-        _touch(root / "D6_sylph" / "db.syl2db")
+        _touch(root / "D5_kraken2" / "taxo.k2d")
+        _touch(root / "D5_kraken2" / "opts.k2d")
+        _touch(root / "D6_sylph" / "db.syldb")
         assert db_setup("meta") == {"D5_kraken2": "already ready"}
         assert db_setup("meta_sylph") == {"D6_sylph": "already ready"}
 
     def test_setup_from_source_copies(self, root, tmp_path):
         _touch(tmp_path / "D5_kraken2" / "hash.k2d")
+        _touch(tmp_path / "D5_kraken2" / "taxo.k2d")
+        _touch(tmp_path / "D5_kraken2" / "opts.k2d")
         msg = db_setup("meta", source=str(tmp_path))["D5_kraken2"]
         assert msg.startswith("copied from")
         assert (root / "D5_kraken2" / "hash.k2d").is_file()
