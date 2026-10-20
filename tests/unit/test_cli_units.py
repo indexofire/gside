@@ -30,6 +30,31 @@ def _payload(contigs="a.fna", species="Salmonella", conf="high", rule="inva (1/1
     }
 
 
+def _method_payload(contigs="a.fna", method="sourmash", species="S", conf="high"):
+    return {
+        "contigs": contigs,
+        "methods": {method: {"result": {"species": species, "confidence": conf}}},
+        "verdict": {"species": species, "confidence": conf, "basis": [method]},
+    }
+
+
+def _missing_db_payload(contigs="q.fna", method="sourmash", tier=None, size="~3.9GB"):
+    tier = method if tier is None else tier
+    return {
+        "contigs": contigs,
+        "methods": {
+            method: {
+                "method": method,
+                "error": f"{tier} database not found in /x (run: gside db setup --tier {tier})",
+                "missing_tier": tier,
+                "suggested_command": f"gside db setup --tier {tier}",
+                "estimated_size": size,
+            }
+        },
+        "verdict": {"species": "Unknown", "confidence": "low", "basis": [method]},
+    }
+
+
 class TestSetupLogging:
     def test_conflict_raises(self):
         with pytest.raises(ValueError, match="verbose and quiet"):
@@ -190,6 +215,17 @@ class TestDbCommands:
         assert result.exit_code == 0
         assert "sourmash" in result.output
 
+    def test_bare_db_invokes_status(self, monkeypatch):
+        from click.testing import CliRunner
+
+        import gside.db as dbmod
+
+        seen = []
+        monkeypatch.setattr(dbmod, "run_db_command", lambda args: seen.append(args) or 0)
+        result = CliRunner().invoke(main, ["db"])
+        assert result.exit_code == 0
+        assert seen == [["status"]]
+
     def test_setup_ok_and_error(self, tmp_path, monkeypatch):
         from click.testing import CliRunner
 
@@ -206,6 +242,7 @@ class TestDbCommands:
 class TestIdentifyModes:
     def test_all_branches(self, monkeypatch):
         import gside.analysis.ani_identifier as ani
+        import gside.analysis.gtdbtk_identifier as gmod
         import gside.analysis.multigene_identifier as mg
         import gside.analysis.sourmash_identifier as smod
         import gside.cli as climod
@@ -217,9 +254,12 @@ class TestIdentifyModes:
         monkeypatch.setattr(
             smod, "identify_by_sourmash", lambda c, db_dir=None: _FakeResult("S", "high")
         )
+        monkeypatch.setattr(
+            gmod, "identify_by_gtdbtk", lambda c, threads=4: _FakeResult("G", "high")
+        )
         payload = climod._identify_one("x.fna", "all", None)
-        assert set(payload["methods"]) == {"marker", "panel", "mash_refseq", "sourmash"}
-        assert payload["verdict"]["basis"] == ["panel"]
+        assert set(payload["methods"]) == {"marker", "panel", "mash_refseq", "sourmash", "gtdbtk"}
+        assert payload["verdict"]["basis"] == ["gtdbtk"]
 
     def test_branch_error_entry(self, monkeypatch):
         import gside.analysis.multigene_identifier as mg
@@ -551,7 +591,7 @@ class TestSpeciesParallelism:
         monkeypatch.setattr(cli, "_run_species", fake_run)
         result = CliRunner().invoke(main, ["species", "-j", "3", "-t", "8", "x.fna"])
         assert result.exit_code == 0
-        assert seen["args"][5:] == (3, 8, False)
+        assert seen["args"][5:] == (3, 8, False, False)
 
     def test_parallel_run_preserves_input_order(self, monkeypatch, tmp_path):
         import time
@@ -681,3 +721,214 @@ class TestNoHeaderOption:
         cli._run_species(["a.fna"], "marker", None, "md", str(tmp_path / "o.md"), no_header=True)
         lines = (tmp_path / "o.md").read_text().strip().splitlines()
         assert lines[0].startswith("| contigs")
+
+
+class TestStructuredErrorFields:
+    def test_sourmash_missing_db_gets_structured_fields(self, tmp_path):
+        payload = _identify_one("q.fna", "sourmash", db_dir=str(tmp_path))
+        method = payload["methods"]["sourmash"]
+        assert method["missing_tier"] == "sourmash"
+        assert method["suggested_command"] == "gside db setup --tier sourmash"
+        assert method["estimated_size"] == "~3.9GB"
+        assert method["error"].startswith("sourmash GTDB database not found")
+
+    def test_mash_missing_db_gets_structured_fields(self, tmp_path):
+        payload = _identify_one("q.fna", "mash_refseq", db_dir=str(tmp_path))
+        method = payload["methods"]["mash_refseq"]
+        assert method["missing_tier"] == "mash"
+        assert method["suggested_command"] == "gside db setup --tier mash"
+        assert method["estimated_size"] == "~179MB"
+
+    def test_plain_error_has_no_structured_fields(self, monkeypatch):
+        import gside.analysis.multigene_identifier as mg
+
+        def boom(c, threads=4):
+            raise OSError("blast exploded")
+
+        monkeypatch.setattr(mg, "identify_multigene", boom)
+        payload = cli._identify_one("x.fna", "marker", None)
+        method = payload["methods"]["marker"]
+        assert method["error"] == "blast exploded"
+        assert "missing_tier" not in method
+        assert "suggested_command" not in method
+        assert "estimated_size" not in method
+
+    def test_helper_extracts_known_tiers(self):
+        from gside.cli import _structured_missing_db_fields as fields
+
+        assert fields("panel db gone (run: gside db setup --tier panel)") == {
+            "suggested_command": "gside db setup --tier panel",
+            "missing_tier": "panel",
+            "estimated_size": "~130MB sketch / ~1GB genomes",
+        }
+        assert fields("no setup hint here") == {}
+        assert fields("(run: gside db setup --tier )") == {}
+
+
+class TestAutoSetup:
+    def test_flag_parses_and_defaults_off(self, monkeypatch):
+        seen = []
+        monkeypatch.setattr(cli, "_run_species", lambda *a: seen.append(a) or 0)
+        assert CliRunner().invoke(main, ["species", "--auto-setup", "x.fna"]).exit_code == 0
+        assert CliRunner().invoke(main, ["species", "x.fna"]).exit_code == 0
+        assert seen[0][8] is True
+        assert seen[1][8] is False
+
+    def test_missing_tier_triggers_setup_and_retry(self, monkeypatch, capsys):
+        calls, setups = [], []
+
+        def fake_identify(contigs, mode, db_dir, threads=4):
+            calls.append(mode)
+            if len(calls) == 1:
+                return _missing_db_payload(contigs)
+            return _method_payload(contigs, species="Retried", conf="high")
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        monkeypatch.setattr(cli, "_setup_missing_tier", lambda tier: setups.append(tier))
+        assert _run_species(["q.fna"], "sourmash", None, auto_setup=True) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert setups == ["sourmash"]
+        assert calls == ["sourmash", "sourmash"]
+        assert payload["methods"]["sourmash"]["result"]["species"] == "Retried"
+        assert payload["verdict"]["species"] == "Retried"
+
+    def test_disabled_leaves_error_untouched(self, monkeypatch, capsys):
+        setups = []
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _missing_db_payload(c))
+        monkeypatch.setattr(cli, "_setup_missing_tier", lambda tier: setups.append(tier))
+        assert _run_species(["q.fna"], "sourmash", None) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert setups == []
+        assert "missing_tier" in payload["methods"]["sourmash"]
+        assert payload["verdict"]["species"] == "Unknown"
+
+    def test_retries_only_once(self, monkeypatch, capsys):
+        calls, setups = [], []
+
+        def fake_identify(contigs, mode, db_dir, threads=4):
+            calls.append(mode)
+            return _missing_db_payload(contigs, method="mash_refseq", tier="mash", size="~179MB")
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        monkeypatch.setattr(cli, "_setup_missing_tier", lambda tier: setups.append(tier))
+        assert _run_species(["q.fna"], "mash_refseq", None, auto_setup=True) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert calls == ["mash_refseq", "mash_refseq"]
+        assert setups == ["mash"]
+        assert payload["methods"]["mash_refseq"]["missing_tier"] == "mash"
+
+    def test_no_missing_tier_no_setup(self, monkeypatch, capsys):
+        setups = []
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        monkeypatch.setattr(cli, "_setup_missing_tier", lambda tier: setups.append(tier))
+        assert _run_species(["q.fna"], "marker", None, auto_setup=True) == 0
+        json.loads(capsys.readouterr().out)
+        assert setups == []
+
+    def test_setup_failure_keeps_error_entry(self, monkeypatch, capsys):
+        calls = []
+
+        def fake_identify(contigs, mode, db_dir, threads=4):
+            calls.append(mode)
+            return _missing_db_payload(contigs)
+
+        def boom(tier):
+            raise RuntimeError("network down")
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        monkeypatch.setattr(cli, "_setup_missing_tier", boom)
+        assert _run_species(["q.fna"], "sourmash", None, auto_setup=True) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert calls == ["sourmash"]
+        assert "missing_tier" in payload["methods"]["sourmash"]
+        assert payload["verdict"]["species"] == "Unknown"
+
+    def test_setup_progress_goes_to_stderr_not_stdout(self, monkeypatch, capsys):
+        import gside.db as dbmod
+
+        calls = []
+
+        def fake_identify(contigs, mode, db_dir, threads=4):
+            calls.append(mode)
+            if len(calls) == 1:
+                return _missing_db_payload(contigs)
+            return _method_payload(contigs)
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        monkeypatch.setattr(
+            dbmod,
+            "db_setup",
+            lambda tier, source="": print(f"downloading {tier}...") or {"x": "ok"},
+        )
+        assert _run_species(["q.fna"], "sourmash", None, auto_setup=True) == 0
+        captured = capsys.readouterr()
+        assert "downloading sourmash" in captured.err
+        assert "downloading sourmash" not in captured.out
+        assert json.loads(captured.out)["methods"]["sourmash"]["result"]["species"] == "S"
+
+    def test_all_mode_verdict_recomputed_after_retry(self, monkeypatch, capsys):
+        setups = []
+
+        def fake_identify(contigs, mode, db_dir, threads=4):
+            if mode == "all":
+                payload = _payload(contigs, species="M", conf="high")
+                payload["methods"]["sourmash"] = _missing_db_payload(contigs)["methods"]["sourmash"]
+                payload["verdict"] = {"species": "M", "confidence": "high", "basis": ["marker"]}
+                return payload
+            return _method_payload(contigs, species="S", conf="high")
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        monkeypatch.setattr(cli, "_setup_missing_tier", lambda tier: setups.append(tier))
+        assert _run_species(["q.fna"], "all", None, auto_setup=True) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert setups == ["sourmash"]
+        assert payload["methods"]["sourmash"]["result"]["species"] == "S"
+        assert payload["verdict"]["basis"] == ["sourmash"]
+        assert payload["verdict"]["species"] == "S"
+
+
+class TestGtdbtkMode:
+    def test_modes_list_order(self):
+        from gside.cli import MODES
+
+        assert MODES == ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk", "all"]
+
+    def test_cli_accepts_gtdbtk_mode(self, monkeypatch):
+        seen = {}
+        monkeypatch.setattr(cli, "_run_species", lambda *a: seen.update(mode=a[1]) or 0)
+        result = CliRunner().invoke(main, ["species", "-m", "gtdbtk", "x.fna"])
+        assert result.exit_code == 0
+        assert seen["mode"] == "gtdbtk"
+
+    def test_identify_one_dispatches_gtdbtk_with_threads(self, monkeypatch):
+        import gside.analysis.gtdbtk_identifier as gmod
+
+        got = {}
+        monkeypatch.setattr(
+            gmod,
+            "identify_by_gtdbtk",
+            lambda c, threads=4: got.update(threads=threads) or _FakeResult("G", "high"),
+        )
+        payload = cli._identify_one("x.fna", "gtdbtk", None, threads=7)
+        assert payload["methods"]["gtdbtk"]["species"] == "G"
+        assert got["threads"] == 7
+
+    def test_arbitrate_layer3_beats_ani_high(self):
+        from gside.cli import _arbitrate
+
+        verdict = _arbitrate(
+            {
+                "marker": {"species": "M", "confidence": "high"},
+                "panel": {"result": {"species": "P", "confidence": "high"}},
+                "gtdbtk": {"result": {"species": "G", "confidence": "medium"}},
+            }
+        )
+        assert verdict["basis"] == ["gtdbtk"]
+        assert verdict["species"] == "G"
+
+    def test_help_lists_gtdbtk_choice_and_auto_setup(self):
+        result = CliRunner().invoke(main, ["species", "-h"])
+        assert result.exit_code == 0
+        assert "gtdbtk" in result.output
+        assert "--auto-setup" in result.output
+        assert "Automatically install missing database tiers" in result.output

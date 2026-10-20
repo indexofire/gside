@@ -34,6 +34,11 @@ class TestCliModesDocumented:
         for mode in ("simple", "standard"):
             assert mode in en and mode in zh
 
+    def test_species_auto_setup_documented(self):
+        en, zh = _read("usage/cli.md"), _read("usage/cli.zh.md")
+        assert "--auto-setup" in en
+        assert "--auto-setup" in zh
+
 
 class TestDatabaseDocs:
     def test_tier_dirs(self):

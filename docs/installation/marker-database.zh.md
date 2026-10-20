@@ -17,10 +17,6 @@
 4. 命中基因平均 identity >= 90% 判 **high** 置信度，否则 **medium**；
    临界命中的 marker 结果会建议进行 ANI 复核。
 
-产毒性仅作为上下文报告，绝不改变物种判定：作出霍乱弧菌判定后，`ctxA`
-命中会附加"产毒株"提示（无命中则附加"ctxA not detected"提示）——毒素基因
-不参与物种定义，因为非 O1 血清群与 *V. mimicus* 也可能携带 `ctxA`。
-
 规则文件格式见[标记规则](../reference/marker-rules.zh.md)，marker 与 ANI 方法的仲裁关系见
 [鉴定模式](../usage/modes.zh.md)。
 
@@ -30,9 +26,8 @@
 |---|---|---|
 | `primary` | Species-defining marker; a rule's `genes` draw from these | 46 |
 | `confirm` | Corroborating evidence reported alongside the verdict | 22 |
-| `virulence` | Toxin / virulence factors, reported as findings | 10 |
 
-## 基因清单（81 条序列）
+## 基因清单（80 条序列）
 
 | 基因 | 角色 | 参考文献 |
 |---|---|---|
@@ -49,7 +44,6 @@
 | `toxr` | primary | NC_004603.1 toxR regulatory protein [Vibrio parahaemolyticus] |
 | `tlh` | confirm | M36437.1 thermolabile hemolysin tlh [Vibrio parahaemolyticus] |
 | `tdh` | virulence | M10069.1 thermostable direct hemolysin [Vibrio parahaemolyticus] |
-| `ctxa` | virulence | X00171.1 cholera enterotoxin A subunit [Vibrio cholerae] |
 | `vvha` | primary | PQ308339.1 hemolysin vvhA [Vibrio vulnificus] |
 | `hly` | primary | M24199.1 listeriolysin O hly [Listeria monocytogenes] |
 | `prs` | confirm | LC700425.1 phosphoribosyl pyrophosphate synthetase prs [Listeria monocytogenes] |

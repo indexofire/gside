@@ -96,9 +96,10 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-10-03): 389 tests, total coverage **97%** — all modules 100%
-except: ani 93%, multigene 98%, taxonomic 93% (quarantined), cli 99%,
-db 92%, kma 94%, kmer 99%, read_mapper 99%. Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
+Baseline (2026-10-20): 423 tests, total coverage **97%** — all modules 100%
+(including cli.py and gtdbtk_identifier.py)
+except: ani 93%, multigene 99%, taxonomic 93% (quarantined),
+db 92%, kma 94%, kmer 99%, read_mapper 99%, progress 97%. Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
 raise it every time coverage climbs.
 
 ---
@@ -178,10 +179,10 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 
 ### CLI Patterns
 - Click group style (mirrors gmlst/gapit family): `HELP_SETTINGS` (`-h`/`--help`), bare invocation prints help and exits 2 (`no_args_is_help`), `-v`/`-q` mutually exclusive (UsageError), thin commands registered via `add_command`
-- Every option carries a short flag: species `-m/--mode -f/--format -D/--db-dir -o/--output`; db `-t/--tier -s/--source -f/--format`
+- Every option carries a short flag: species `-m/--mode -f/--format -D/--db-dir -o/--output -a/--auto-setup`; db `-t/--tier -s/--source -f/--format`
 - Agent-friendly outputs: species defaults to JSON on stdout; `-o` writes the payload to a file with gapit-style streaming (tsv/md rows flushed per input as they complete — a mid-batch failure persists the prefix; json single document at the end; stdout stays empty, notice on stderr); `db status|list` accept `--format table|tsv|json`; `db setup` accepts `--format text|json` (json routes progress to stderr); `-V -J` prints version as JSON
 - Subcommands: `species` / `db` group (`status|setup|list`) / `validate` / `--version`; entry `gside.cli:main`
-- `--mode` choices are exactly `marker|panel|mash_refseq|sourmash|all` — do not invent modes
+- `--mode` choices are exactly `marker|panel|mash_refseq|sourmash|gtdbtk|all` — do not invent modes
 - `--db-dir` overrides the database root for one invocation
 
 ### File & Module Organization
@@ -200,6 +201,7 @@ src/gside/
     ├── multigene_identifier.py   # L1 marker rules (blastn, live)
     ├── ani_identifier.py         # L2 panel/mash (live)
     ├── sourmash_identifier.py    # L2 sourmash (needs external binary + GTDB db)
+    ├── gtdbtk_identifier.py      # L3 GTDB-Tk placement (needs external gtdbtk + GTDBTK_DATA_PATH)
     ├── taxonomic_validator.py    # L3 (gside validate; standard needs CheckM2/GTDB-Tk env)
     └── species_canon.py          # DORMANT (no importers)
 tests/
@@ -257,7 +259,8 @@ testpaths = ["tests"]
 - **`gside species` never fails loud**: check `methods.<mode>.error` in JSON, not the exit code.
 - **Marker thresholds are global**: `_MIN_IDENTITY=85.0` / `_MIN_COVERAGE=60.0` / `_HIGH_CONF=90.0`; rule-level `min_coverage` in YAML is currently **ignored** by the engine; `priority_over` is dead code.
 - **Panel thresholds**: ANI ≥ 95 + AF ≥ 0.65 → high; 93–95 → medium. Mash identity ≥ 0.97 → high, 0.90–0.97 → medium.
-- **Arbitration is layer-first**: `(layer, confidence)` tuple — any L2 hit beats any L1 hit (`cli.py:_arbitrate`).
+- **Arbitration is layer-first**: `(layer, confidence)` tuple — gtdbtk=3 beats any L2 hit, any L2 hit beats any L1 hit (`cli.py:_arbitrate`).
+- **Missing-database errors are structured**: alongside `methods.<mode>.error`, the payload carries `suggested_command` / `missing_tier` / `estimated_size` (from `gside.db._TIERS`); `species --auto-setup` installs the tier (progress on stderr) and retries that single method once, then recomputes the verdict. GTDB-Tk's own database is external (`GTDBTK_DATA_PATH`/`GTDBDB`) — it is NOT a `db setup` tier.
 - **`sourmash` needs its GTDB db**: provisioned via pixi (`sourmash>=4.9`) + `gside db setup --tier sourmash` (~3.9GB rs226 reps, renamed in place); `gather` output is read from `-o` file, never `--csv -` (unsupported flag).
 - **DB download verification**: `db.py` pins digests (`MASH_MD5`, `PANEL_SHA256`, `SOURMASH_LINEAGES_SHA256`); empty constants (`SOURMASH_SIG_SHA256`) mean warn-and-skip. Tar extraction uses `filter="data"`. All pinned artifacts live in the GitHub release tag `db-v0.1` (panel) — re-pin `PANEL_SHA256` whenever the release asset is replaced.
 - **`engine/` is wired for the species-ID hot paths**: marker → `BlastBackend`, panel → `SkaniBackend`, mash_refseq → `MashBackend` (analysis layer resolves binaries via `require_bin` and injects them with `binary=`; outputs are byte-equivalent to the former inline subprocess calls). Shared scaffolding lives in `engine/_env.py` (`require_bin`/`run_checked`; backends pass their module-level `which` as `resolver=` to keep test monkeypatch points). Still unconsumed: `KmaBackend`, `Mmseqs2Backend`, `MinimapBackend`, `ReadMapper`, `SequenceMatcher` — `KmaBackend` imports cleanly (`parse_db_header` ported verbatim into `gside/utils.py`) but has no in-repo callers and no provisioned binary.

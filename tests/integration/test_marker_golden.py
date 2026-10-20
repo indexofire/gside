@@ -23,7 +23,8 @@ class TestCholeraeN16961:
         assert r.species == "Vibrio_cholerae"
         assert r.confidence == "high"
         detected = {m["gene"] for m in r.detected_markers}
-        assert {"ompw", "ctxa"} <= detected
+        assert "ompw" in detected
+        assert "ctxa" not in detected
         assert "wben" not in detected
         assert "wbfr" not in detected
-        assert any("toxigenic" in note for note in r.notes)
+        assert not any("toxigenic" in note for note in r.notes)

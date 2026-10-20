@@ -2,9 +2,10 @@
 
 ## 分层架构
 
-gside 的鉴定按证据强度分层，ANI 层优先于 marker 层（记录不致命）：
+gside 的鉴定按证据强度分层，高层优先于低层（记录不致命）：
 
 ```
+L3  gtdbtk（GTDB-Tk 系统发育 placement）      [layer=3]
 L2  panel skani / mash_refseq / sourmash    [layer=2]
 L1  marker 靶基因组合规则                    [layer=1]
 ```
@@ -108,17 +109,55 @@ gather 分解出多个显著匹配成分时，结果携带 `possible_mixture` �
 - 混合样本（gather 可分解）
 - 需下载 sourmash GTDB 库
 
+## L3: gtdbtk（GTDB-Tk 系统发育 placement）
+
+### 原理
+
+GTDB-Tk `classify_wf` 将组装放入 GTDB 参考树
+（`classify_wf --genome_dir ... --out_dir ... --database $GTDBTK_DATA_PATH`）。
+分类串从 `gtdbtk.bac120.summary.tsv` 解析（回退 `gtdbtk.ar122.summary.tsv`），
+物种名取最后一个 `s__` 位阶。
+
+### 判定阈值
+
+| 分类串 | 判定 |
+|---|---|
+| 含 `s__` 位阶 | 提取物种名，confidence=high（权威） |
+| 无 `s__` 位阶 | Unknown，confidence=low |
+
+GTDB-Tk 视为最高权威层：`gtdbtk` 的判定优先于任何 L2 ANI/MinHash 判定，
+与低层置信度无关。
+
+### 依赖
+
+- 外部安装的 GTDB-Tk（`gside db setup` 不负责安装）：PATH 中的 `gtdbtk`
+  二进制 + 通过 `GTDBTK_DATA_PATH`（或 `GTDBDB`）指定的参考库——见
+  https://ecogenomics.github.io/GTDBTk/
+- 较慢：每基因组分钟级（MAFFT + pplacer）；可用 `-t/--threads` 提线程
+
+### 适用场景
+
+- 需要 GTDB 树上的权威物种判定
+- 裁决 L1/L2 方法之间的分歧
+- 论文级分类学指定
+
 ## all 模式（多法仲裁）
 
-运行全部 4 种方法（marker + panel + mash_refseq + sourmash），按层级仲裁取最优：
+运行全部 5 种方法（marker + panel + mash_refseq + sourmash + gtdbtk），
+按层级仲裁取最优：
 
 ```
-ANI 层（panel/mash_refseq/sourmash，layer=2）优先于 marker 层（layer=1）：
+L3（gtdbtk）优先于 L2（panel/mash_refseq/sourmash）优先于 L1（marker）：
 先比较层级，再比较置信度。
 ```
 
 单个方法失败不会终止整体流程，错误信息写入该方法结果
-（`methods.<mode>.error`）。
+（`methods.<mode>.error`）。缺库错误额外携带结构化字段
+（`missing_tier`、`suggested_command`、`estimated_size`）；加上
+`--auto-setup` 后 gside 会自行安装该 tier 并对该方法重试一次。
+
+`gtdbtk` 包含在 `all` 内但较慢（每基因组分钟级）——追求速度时请显式
+指定 `-m` 跳过。
 
 ```bash
 gside species contigs.fna --mode all
@@ -137,7 +176,8 @@ gside species contigs.fna --mode all
     "marker": { "species": "Campylobacter_jejuni", ... },
     "panel": { "result": { "species": "...", "ani": 100.0, ... } },
     "mash_refseq": { "result": { "species": "...", ... } },
-    "sourmash": { "result": { "species": "...", ... } }
+    "sourmash": { "result": { "species": "...", ... } },
+    "gtdbtk": { "result": { "species": "...", "classification": "...", ... } }
   }
 }
 ```
@@ -150,5 +190,6 @@ gside species contigs.fna --mode all
 | 精确鉴定 | `panel` | ANI 金标准 |
 | 广谱筛查 | `mash_refseq` | 覆盖全 RefSeq |
 | GTDB 体系对齐 | `sourmash` | LCA 分类，可提示混合样本 |
+| 权威 placement | `gtdbtk` | GTDB 树系统发育 placement（慢） |
 | 综合判定 | `all` | 多法互补 + 仲裁 |
 | 近缘种区分 | `panel` 或 `all` | marker 可能交叉反应 |

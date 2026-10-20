@@ -6,6 +6,7 @@ gside's identification is layered by evidence strength — higher layers
 override lower ones:
 
 ```
+L3  gtdbtk (GTDB-Tk phylogenetic placement)                        [authority=3]
 L2  panel (skani) / mash_refseq (mash) / sourmash (GTDB gather)   [authority=2]
 L1  marker target gene combination rules                          [authority=1]
 ```
@@ -118,16 +119,53 @@ is withheld.
 - Mixed samples (gather decomposes the query and can flag `possible_mixture`)
 - Requires the sourmash GTDB database
 
+## L3: gtdbtk (GTDB-Tk Phylogenetic Placement)
+
+### Principle
+
+GTDB-Tk `classify_wf` places the assembly into the GTDB reference tree
+(`classify_wf --genome_dir ... --out_dir ... --database $GTDBTK_DATA_PATH`).
+The classification string is parsed from `gtdbtk.bac120.summary.tsv`
+(fallback: `gtdbtk.ar122.summary.tsv`); the species is the last `s__` rank.
+
+### Thresholds
+
+| Classification | Call |
+|----------------|------|
+| contains an `s__` rank | species extracted, confidence=high (authoritative) |
+| no `s__` rank | Unknown, confidence=low |
+
+GTDB-Tk is treated as the most authoritative layer: a `gtdbtk` call beats any
+L2 ANI/MinHash call regardless of the lower layer's confidence.
+
+### Requirements
+
+- External GTDB-Tk install (not provisioned by `gside db setup`): the
+  `gtdbtk` binary on PATH plus the reference database via `GTDBTK_DATA_PATH`
+  (or `GTDBDB`) — see https://ecogenomics.github.io/GTDBTk/
+- Slow: minutes per genome (MAFFT + pplacer); pass `-t/--threads` through
+
+### Use Cases
+
+- Authoritative species calls aligned to the GTDB tree
+- Resolving disagreements between L1/L2 methods
+- Publication-grade taxonomic assignment
+
 ## all Mode (Multi-Method Arbitration)
 
 Runs all available methods and arbitrates. A single-method failure does not
 abort the run: the error goes into that method's JSON entry and arbitration
-uses the methods that succeeded.
+uses the methods that succeeded. Missing-database errors carry structured
+fields (`missing_tier`, `suggested_command`, `estimated_size`); with
+`--auto-setup` gside installs the tier itself and retries that method once.
 
 ```
-Layer 2 (panel/mash_refseq/sourmash) beats layer 1 (marker);
+Layer 3 (gtdbtk) beats layer 2 (panel/mash_refseq/sourmash) beats layer 1 (marker);
 within the same layer, high confidence beats lower confidence.
 ```
+
+`gtdbtk` is included in `all` but is slow (minutes per genome) — use an
+explicit `-m` to skip it when speed matters.
 
 ```bash
 gside species contigs.fna --mode all
@@ -145,7 +183,9 @@ Output includes all method results plus final verdict:
   "methods": {
     "marker": { "species": "Campylobacter_jejuni", "..." : "..." },
     "panel": { "result": { "species": "...", "ani": 100.0, "..." : "..." } },
-    "mash_refseq": { "result": { "species": "...", "..." : "..." } }
+    "mash_refseq": { "result": { "species": "...", "..." : "..." } },
+    "sourmash": { "result": { "species": "...", "..." : "..." } },
+    "gtdbtk": { "result": { "species": "...", "classification": "...", "..." : "..." } }
   }
 }
 ```
@@ -158,5 +198,6 @@ Output includes all method results plus final verdict:
 | Precise identification | `panel` | ANI gold standard |
 | Broad-spectrum scan | `mash_refseq` | Covers all RefSeq |
 | GTDB-aligned call | `sourmash` | LCA classification under GTDB |
+| Authoritative placement | `gtdbtk` | Phylogenetic placement in the GTDB tree (slow) |
 | Comprehensive | `all` | Multi-method complementary + arbitration |
 | Near-relative discrimination | `panel` or `all` | marker may cross-react |

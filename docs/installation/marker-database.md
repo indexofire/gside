@@ -2,7 +2,7 @@
 
 The marker database (`data/db/D1_marker/`, the bundled **mini** tier) powers the
 default `--mode marker` identification: `blastn` maps query contigs against
-81 curated reference sequences, and 38 species rules turn the hits into a
+80 curated reference sequences, and 38 species rules turn the hits into a
 verdict. gside is a species-identification engine: every reference is anchored
 to a verifiable NCBI/RefSeq accession and was validated by blast against the
 291-genome panel. Sub-species typing is gapit's job — the V. cholerae
@@ -21,11 +21,6 @@ O1/O139 serogroup database lives there (`gapit screen --db vc_serogroup`).
 4. Mean identity of matched genes >= 90% reports **high** confidence,
    otherwise **medium**; near-threshold marker calls suggest an ANI recheck.
 
-Toxigenicity is reported as context, never as the species call: when a
-*V. cholerae* verdict is made, a `ctxA` hit adds a "toxigenic strain" note
-(absence adds a "ctxA not detected" note) — the toxin gene never defines the
-species, because non-O1 serogroups and *V. mimicus* can also carry `ctxA`.
-
 See [Marker Rules](../reference/marker-rules.md) for the rule-file format and
 [Identification Modes](../usage/modes.md) for how marker results arbitrate
 against ANI methods.
@@ -36,9 +31,8 @@ against ANI methods.
 |---|---|---|
 | `primary` | Species-defining marker; a rule's `genes` draw from these | 46 |
 | `confirm` | Corroborating evidence reported alongside the verdict | 22 |
-| `virulence` | Toxin / virulence factors, reported as findings | 10 |
 
-## Gene inventory (81 sequences)
+## Gene inventory (80 sequences)
 
 | Gene | Role | Reference |
 |---|---|---|
@@ -55,7 +49,6 @@ against ANI methods.
 | `toxr` | primary | NC_004603.1 toxR regulatory protein [Vibrio parahaemolyticus] |
 | `tlh` | confirm | M36437.1 thermolabile hemolysin tlh [Vibrio parahaemolyticus] |
 | `tdh` | virulence | M10069.1 thermostable direct hemolysin [Vibrio parahaemolyticus] |
-| `ctxa` | virulence | X00171.1 cholera enterotoxin A subunit [Vibrio cholerae] |
 | `vvha` | primary | PQ308339.1 hemolysin vvhA [Vibrio vulnificus] |
 | `hly` | primary | M24199.1 listeriolysin O hly [Listeria monocytogenes] |
 | `prs` | confirm | LC700425.1 phosphoribosyl pyrophosphate synthetase prs [Listeria monocytogenes] |

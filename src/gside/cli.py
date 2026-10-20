@@ -16,7 +16,7 @@ from gside import __version__
 
 HELP_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
-MODES = ["marker", "panel", "mash_refseq", "sourmash", "all"]
+MODES = ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk", "all"]
 TIERS = ["mini", "panel", "mash", "sourmash", "all"]
 
 logger = logging.getLogger(__name__)
@@ -121,6 +121,13 @@ def main(ctx: click.Context, version: bool, version_json: bool, verbose: bool, q
     default=False,
     help="Suppress the TSV header row (tsv only; md/json keep their structure).",
 )
+@click.option(
+    "-a",
+    "--auto-setup",
+    is_flag=True,
+    default=False,
+    help="Automatically install missing database tiers before identification (progress on stderr).",
+)
 def species_cmd(
     contigs: tuple[str, ...],
     mode: str,
@@ -130,10 +137,13 @@ def species_cmd(
     jobs: int,
     threads: int,
     no_header: bool,
+    auto_setup: bool,
 ) -> None:
     """Identify species from assembled contigs FASTA (accepts multiple files)."""
     sys.exit(
-        _run_species(list(contigs), mode, db_dir, output_format, output, jobs, threads, no_header)
+        _run_species(
+            list(contigs), mode, db_dir, output_format, output, jobs, threads, no_header, auto_setup
+        )
     )
 
 
@@ -285,12 +295,16 @@ def _run_species(
     jobs: int = 1,
     threads: int = 4,
     no_header: bool = False,
+    auto_setup: bool = False,
     quiet: bool = False,
 ) -> int:
     from gside.progress import species_progress
 
     def identify(contigs: str) -> dict[str, Any]:
-        return _identify_one(contigs, mode, db_dir, threads)
+        payload = _identify_one(contigs, mode, db_dir, threads)
+        if auto_setup:
+            payload = _auto_setup_retry(contigs, payload, mode, db_dir, threads)
+        return payload
 
     if jobs > 1:
         from concurrent.futures import ThreadPoolExecutor
@@ -432,10 +446,74 @@ def _render_table(payloads: list[dict[str, Any]], markdown: bool) -> str:
     return "\n".join(lines)
 
 
+def _structured_missing_db_fields(error: str) -> dict[str, str]:
+    """Agent-friendly fields for a missing-database error (empty dict otherwise)."""
+    marker = "(run: gside db setup --tier "
+    idx = error.find(marker)
+    if idx == -1:
+        return {}
+    tier = error[idx + len(marker) :].split(")", 1)[0].strip()
+    if not tier:
+        return {}
+    from gside.db import _TIERS  # lazy: db.py is only needed for this lookup
+
+    fields = {
+        "suggested_command": f"gside db setup --tier {tier}",
+        "missing_tier": tier,
+    }
+    size = _TIERS.get(tier, {}).get("size")
+    if size:
+        fields["estimated_size"] = str(size)
+    return fields
+
+
+def _setup_missing_tier(tier: str) -> None:
+    """Install one database tier with progress routed to stderr."""
+    from gside.db import db_setup
+
+    with contextlib.redirect_stdout(sys.stderr):
+        db_setup(tier)
+
+
+def _auto_setup_retry(
+    contigs: str,
+    payload: dict[str, Any],
+    mode: str,
+    db_dir: str | None,
+    threads: int,
+) -> dict[str, Any]:
+    """--auto-setup: install each missing tier once, retry that method once."""
+    methods = payload.get("methods", {})
+    for m, method_payload in methods.items():
+        tier = method_payload.get("missing_tier") if isinstance(method_payload, dict) else None
+        if not tier:
+            continue
+        try:
+            _setup_missing_tier(tier)
+        except Exception as e:  # noqa: BLE001 — CLI boundary: setup failure keeps the error entry
+            logger.warning("auto-setup of tier %s failed: %s", tier, e)
+            continue
+        retry = _identify_one(contigs, m, db_dir, threads)
+        methods[m] = retry["methods"].get(m, method_payload)
+    payload["verdict"] = _verdict_for(methods, mode)
+    return payload
+
+
+def _verdict_for(results: dict[str, Any], mode: str) -> dict[str, Any]:
+    if mode == "all" and len(results) > 1:
+        return _arbitrate(results)
+    first = next(iter(results.values()), {})
+    return {
+        "species": first.get("species", first.get("result", {}).get("species", "Unknown")),
+        "confidence": first.get("confidence", first.get("result", {}).get("confidence", "low")),
+        "basis": list(results),
+    }
+
+
 def _identify_one(contigs: str, mode: str, db_dir: str | None, threads: int = 4) -> dict[str, Any]:
     results: dict[str, Any] = {}
 
-    modes = ["marker", "panel", "mash_refseq", "sourmash"] if mode == "all" else [mode]
+    modes = ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk"] if mode == "all" else [mode]
     for m in modes:
         try:
             if m == "marker":
@@ -454,18 +532,16 @@ def _identify_one(contigs: str, mode: str, db_dir: str | None, threads: int = 4)
                 )
 
                 results[m] = identify_sourmash(contigs, db_dir=db_dir).to_dict()
-        except Exception as e:  # noqa: BLE001 — CLI 边界：单法失败不终止其他方法
-            results[m] = {"method": m, "error": str(e)[:300]}
+            elif m == "gtdbtk":
+                from gside.analysis.gtdbtk_identifier import identify_by_gtdbtk
 
-    if mode == "all" and len(results) > 1:
-        verdict = _arbitrate(results)
-    else:
-        first = next(iter(results.values()), {})
-        verdict = {
-            "species": first.get("species", first.get("result", {}).get("species", "Unknown")),
-            "confidence": first.get("confidence", first.get("result", {}).get("confidence", "low")),
-            "basis": list(results),
-        }
+                results[m] = identify_by_gtdbtk(contigs, threads=threads).to_dict()
+        except Exception as e:  # noqa: BLE001 — CLI 边界：单法失败不终止其他方法
+            entry = {"method": m, "error": str(e)[:300]}
+            entry.update(_structured_missing_db_fields(entry["error"]))
+            results[m] = entry
+
+    verdict = _verdict_for(results, mode)
 
     payload = {
         "analysis_type": "species_identification",
@@ -479,8 +555,8 @@ def _identify_one(contigs: str, mode: str, db_dir: str | None, threads: int = 4)
 
 
 def _arbitrate(results: dict[str, Any]) -> dict[str, Any]:
-    """ANI-layer (panel/mash/sourmash) high-confidence beats marker; else marker."""
-    _LAYER = {"panel": 2, "mash_refseq": 2, "sourmash": 2, "marker": 1}
+    """Layer-first arbitration: gtdbtk (phylogenetic) > panel/mash/sourmash (ANI) > marker."""
+    _LAYER = {"gtdbtk": 3, "panel": 2, "mash_refseq": 2, "sourmash": 2, "marker": 1}
     best = None
     for mode, payload in results.items():
         if "error" in payload:

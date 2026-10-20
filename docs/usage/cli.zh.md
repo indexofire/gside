@@ -19,13 +19,14 @@ gside species <contigs.fasta> [选项]
 | `-D`，`--db-dir` | 选项 | 自动 | 数据库根目录 |
 | `-f`，`--format` | 选项 | `json` | 输出格式：`json` / `tsv` / `md` |
 | `-n`，`--no-header` | 选项 | 关 | 隐藏 TSV 表头行（仅 tsv；md/json 保持结构） |
+| `-a`，`--auto-setup` | 选项 | 关 | 鉴定前自动安装缺失的数据库 tier（进度走 stderr） |
 | `-j`，`--jobs N` | 选项 | `1` | 并发鉴定的输入文件数（输出顺序恒为输入顺序） |
 | `-t`，`--threads N` | 选项 | `4` | 每次比对调用的线程数（blastn `-num_threads` / skani `-t` / mash `-p`） |
 | `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH 而非 stdout（截断写入；tsv/md 逐输入流式落盘、逐行 flush——批次中途失败已写前缀仍保留；json 为单文档收尾一次写入；stdout 不再输出数据，提示信息走 stderr） |
 
 ### 鉴定模式
 
-共 5 种模式，默认 `marker`：
+共 6 种模式，默认 `marker`：
 
 | Mode | 说明 | 数据库需求 |
 |---|---|---|
@@ -33,7 +34,28 @@ gside species <contigs.fasta> [选项]
 | `panel` | ANI 比对精选面板（skani） | panel tier |
 | `mash_refseq` | MinHash 距离（mash） | mash tier |
 | `sourmash` | sourmash GTDB gather | sourmash GTDB 库 |
-| `all` | 运行全部 4 种方法 + 仲裁 | 按需 |
+| `gtdbtk` | GTDB-Tk 系统发育 placement（classify_wf） | 外部安装的 GTDB-Tk（`GTDBTK_DATA_PATH`） |
+| `all` | 运行全部 5 种方法 + 仲裁 | 按需 |
+
+注意 `gtdbtk` 较慢（每基因组分钟级）；`all` 模式也会运行它——如需跳过请显式指定 `-m`。
+
+### 结构化错误字段（面向 agent）
+
+当某方法因数据库 tier 缺失而失败时，该方法的 JSON 条目在 `error` 字符串
+之外还携带结构化字段，无需正则解析：
+
+```json
+{
+  "method": "sourmash",
+  "error": "sourmash GTDB database not found in ... (run: gside db setup --tier sourmash)",
+  "suggested_command": "gside db setup --tier sourmash",
+  "missing_tier": "sourmash",
+  "estimated_size": "~3.9GB"
+}
+```
+
+加上 `--auto-setup` 后，gside 会自行执行 `suggested_command`（进度走
+stderr），对该方法重试一次，并重算 verdict。
 
 ### 示例
 
@@ -47,11 +69,17 @@ gside species contigs.fna --mode panel
 # sourmash GTDB gather
 gside species contigs.fna --mode sourmash
 
-# 多法仲裁（marker + panel + mash_refseq + sourmash）
+# GTDB-Tk 系统发育 placement（慢，需外部 gtdbtk + GTDBTK_DATA_PATH）
+gside species contigs.fna --mode gtdbtk
+
+# 多法仲裁（marker + panel + mash_refseq + sourmash + gtdbtk）
 gside species contigs.fna --mode all
 
 # 指定数据库目录
 gside species contigs.fna --mode panel --db-dir /path/to/dbs
+
+# 自动安装缺失数据库 tier 后鉴定
+gside species contigs.fna --mode all --auto-setup
 
 # 报告写入文件（stdout 保持为空，提示信息走 stderr）
 gside species contigs.fna -m all -o report.json

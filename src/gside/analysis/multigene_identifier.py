@@ -185,12 +185,6 @@ def identify_multigene(contigs_fasta: str, threads: int = 4) -> MultiGeneResult:
             for g, h in sorted(significant.items(), key=lambda x: -x[1]["identity"])
         ]
 
-    if best_species.startswith("Vibrio_cholerae"):
-        if "ctxa" in significant:
-            result.notes.append("ctxA detected - toxigenic Vibrio cholerae strain.")
-        else:
-            result.notes.append("ctxA not detected - non-toxigenic by this marker assay.")
-
     if not significant and raw_hits:
         near = [h for h in raw_hits if h["identity"] >= 75 and h["coverage"] >= 20]
         if near:

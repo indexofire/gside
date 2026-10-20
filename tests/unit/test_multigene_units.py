@@ -167,42 +167,6 @@ class TestMainOutput:
         assert "Species: Salmonella (high)" in capsys.readouterr().out
 
 
-class TestCholeraeToxigenicityNotes:
-    @staticmethod
-    def _hit(gene: str, identity: float = 99.0) -> dict[str, object]:
-        return {
-            "gene": gene,
-            "identity": identity,
-            "coverage": 100.0,
-            "ref_len": 900,
-            "seqid": f"markers~~~{gene}~~~x",
-        }
-
-    def test_species_call_with_ctxa_flags_toxigenic(self, monkeypatch):
-        monkeypatch.setattr(
-            mg,
-            "_blast_contigs",
-            lambda contigs, threads=4: [
-                self._hit("ompw", 95.0),
-                self._hit("ctxa", 99.0),
-            ],
-        )
-        result = mg.identify_multigene("q.fna")
-        assert result.species == "Vibrio_cholerae"
-        assert result.confidence == "high"
-        assert any("toxigenic" in note for note in result.notes)
-
-    def test_species_call_without_ctxa_notes_nontoxigenic(self, monkeypatch):
-        monkeypatch.setattr(
-            mg,
-            "_blast_contigs",
-            lambda contigs, threads=4: [self._hit("ompw", 95.0)],
-        )
-        result = mg.identify_multigene("q.fna")
-        assert result.species == "Vibrio_cholerae"
-        assert any("ctxA not detected" in note for note in result.notes)
-
-
 class TestBestHitSelection:
     def test_short_fragment_does_not_displace_full_length_hit(self, monkeypatch):
         monkeypatch.setattr(
