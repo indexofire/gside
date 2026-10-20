@@ -709,7 +709,7 @@ def _meta_verdict(methods: dict[str, Any]) -> dict[str, Any]:
             key = _binomial_key(name)
             prev = merged.get(key)
             wins = prev is None or _CONF_RANK[conf] > _CONF_RANK[prev["confidence"]]
-            if not wins and _CONF_RANK[conf] == _CONF_RANK[prev["confidence"]]:
+            if not wins and prev is not None and _CONF_RANK[conf] == _CONF_RANK[prev["confidence"]]:
                 wins = _METHOD_RANK.get(mode, 0) > _METHOD_RANK.get(prev["method"], 0)
             if wins:
                 merged[key] = row
