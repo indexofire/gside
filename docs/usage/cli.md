@@ -204,8 +204,8 @@ gside meta reads.fastq -m sylph
 
 ```bash
 gside --version
-# gside, version 0.1.2
+# gside, version 0.1.3
 
 gside --version --json     # or -V -J
-# {"tool": "gside", "version": "0.1.2"}
+# {"tool": "gside", "version": "0.1.3"}
 ```

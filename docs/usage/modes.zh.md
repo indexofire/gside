@@ -193,3 +193,14 @@ gside species contigs.fna --mode all
 | 权威 placement | `gtdbtk` | GTDB 树系统发育 placement（慢） |
 | 综合判定 | `all` | 多法互补 + 仲裁 |
 | 近缘种区分 | `panel` 或 `all` | marker 可能交叉反应 |
+
+## 宏基因组谱分析（`gside meta`）
+
+混合群落样本可使用 `gside meta` 做分类学谱分析。详见
+[宏基因组谱分析](meta.zh.md)。
+
+| 模式 | 引擎 | 输入 | 置信度依据 |
+|------|--------|-------|-----------------|
+| `kraken2` | Kraken2 + Bracken | FASTQ / FASTA | Bracken 丰度（≥10% high，≥1% medium） |
+| `sylph` | sylph | 仅 FASTQ | Adjusted ANI（≥95 high，≥93 medium） |
+| `all` | 双引擎 | FASTQ / FASTA | 合并谱 |

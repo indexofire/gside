@@ -201,3 +201,14 @@ Output includes all method results plus final verdict:
 | Authoritative placement | `gtdbtk` | Phylogenetic placement in the GTDB tree (slow) |
 | Comprehensive | `all` | Multi-method complementary + arbitration |
 | Near-relative discrimination | `panel` or `all` | marker may cross-react |
+
+## Metagenomic Profiling (`gside meta`)
+
+For mixed-community samples, `gside meta` provides taxonomic profiling using
+two complementary classifiers. See [Metagenomic Profiling](meta.md) for details.
+
+| Mode | Engine | Input | Confidence basis |
+|------|--------|-------|-----------------|
+| `kraken2` | Kraken2 + Bracken | FASTQ / FASTA | Bracken fraction (≥10% high, ≥1% medium) |
+| `sylph` | sylph | FASTQ reads only | Adjusted ANI (≥95 high, ≥93 medium) |
+| `all` | Both | FASTQ (both) / FASTA (kraken2) | Merged profile |
