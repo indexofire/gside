@@ -1,92 +1,187 @@
-# gside（Genome Species IDentification Engine）
+# gside — Genome Species IDentification Engine
 
-独立自包含的基因组物种鉴定 CLI：blastn 靶基因组合规则打底，skani / mash / sourmash
-三路比对补充，`all` 模式按层仲裁，最终输出单一 JSON 判定。
+[![CI](https://github.com/indexofire/gside/actions/workflows/test.yml/badge.svg)](https://github.com/indexofire/gside/actions)
+[![Docs](https://github.com/indexofire/gside/actions/workflows/docs.yml/badge.svg)](https://github.com/indexofire/gside/actions)
+[![PyPI](https://img.shields.io/pypi/v/gside.svg)](https://pypi.org/project/gside/)
 
-## 鉴定模式
+A standalone CLI for multi-layer species identification from assembled contigs and metagenomic profiling from FASTQ reads.
 
-| mode | 底层引擎 | 原理 |
+```bash
+pip install gside
+
+# Single-genome species identification
+gside species contigs.fna --mode all
+
+# Metagenomic profiling
+gside meta reads_R1.fq reads_R2.fq --mode all
+```
+
+## Species Identification (`gside species`)
+
+| Mode | Engine | Method | Database |
+|---|---|---|---|
+| `marker` (default) | blastn | Target-gene combination rules (38 rules, 80 reference sequences) | Bundled (mini tier) |
+| `panel` | skani | ANI against curated reference panel (291 genomes) | ~130 MB |
+| `mash_refseq` | mash | RefSeq MinHash distance | ~179 MB |
+| `sourmash` | sourmash | GTDB gather | ~3.9 GB |
+| `gtdbtk` | GTDB-Tk | Phylogenetic placement | External |
+| `all` | All above | Sequential execution + layered arbitration | As needed |
+
+### Layered arbitration
+
+| Layer | Methods | Rationale |
 |---|---|---|
-| `marker`（默认） | blastn | 靶基因组合规则（38 条规则，81 条参考序列） |
-| `panel` | skani | ANI 比对精选参考面板（291 基因组） |
-| `mash_refseq` | mash | RefSeq MinHash 距离 |
-| `sourmash` | sourmash | GTDB gather |
-| `all` | 上述全部 | 顺序执行 4 种方法并按层仲裁 |
+| L3 | gtdbtk | Phylogenetic placement — most authoritative |
+| L2 | panel, mash_refseq, sourmash | Comparative genomics (ANI / sketch) |
+| L1 | marker | Target-gene presence/absence |
 
-## 快速开始
+Higher layers always outrank lower ones; within a layer, higher confidence wins.
+
+### Quick start
 
 ```bash
 pixi install && pip install -e .
 
-# 物种鉴定（--mode 可选 marker/panel/mash_refseq/sourmash/all，默认 marker）
-gside species contigs.fna --mode marker
-gside species contigs.fna --mode panel
-gside species contigs.fna --mode mash_refseq
-gside species contigs.fna --mode sourmash
-gside species contigs.fna --mode all
+# Identify species (marker mode works out of the box)
+gside species contigs.fna
 
-# 数据库管理（panel/mash/sourmash 需先下载对应库）
-gside db status
+# Install reference databases
 gside db setup --tier panel
 
-gside --version
+# Multi-method identification
+gside species contigs.fna --mode all
+
+# Parallel batch processing with streaming output
+gside species *.fna --mode all -j 8 -t 4 -o results.tsv
 ```
 
-## 判定阈值
+## Metagenomic Profiling (`gside meta`)
 
-- marker：命中需同时满足 identity >= 85% 且 coverage >= 60%（全局阈值，逐 hit 过滤）；
-  规则字段 `min_hits`（默认 1）、`min_identity`（默认 90）；命中基因平均
-  identity >= 90% 判 high，否则 medium。
-- panel：ANI >= 95% 且 aligned_fraction >= 0.65 判 high；93% <= ANI < 95% 且
-  aligned_fraction >= 0.65 判 medium。
-- mash_refseq：identity >= 0.97 判 high；0.90 <= identity < 0.97 判 medium，更低为 low。
-
-## 仲裁（all 模式）
-
-按 marker、panel、mash_refseq、sourmash 顺序执行，随后仲裁：
-
-- panel / mash_refseq / sourmash 为第 2 层，marker 为第 1 层，层高者优先
-- 层优先于置信度，同层内 high 优先
-- 单法失败不终止其余方法，错误写入该方法在 JSON 中的条目
-
-## 数据目录
-
-| 变量 | 默认 | 内容 |
-|---|---|---|
-| `GSIDE_DATA_DIR` | `<repo>/data` | 参考数据根目录（规则、fasta、预建库） |
-| `GSIDE_DB_DIR` | `<data>/db` | 大型数据库（panel / mash sketch 等） |
-| `GSIDE_PIXI_BIN` | 自动发现 | 生信二进制目录（blastn / skani / mash） |
-
-数据分层：
-
-- mini：随仓库分发，含 marker_rules.yaml（38 条规则）、markers.fasta（81 序列）
-  与预建 BLAST 库，开箱即用
-- panel：skani 精选面板 sketch，约 130MB
-- mash：RefSeq MinHash sketch，约 179MB
-
-## 自定义规则
-
-编辑 `data/db/D1_marker/marker_rules.yaml`，字段为 `species` / `genes` /
-`min_hits` / `min_identity` / `exclude_genes`。修改 fasta 后重建 BLAST 库即生效，
-无需改代码：
+| Mode | Engine | Input | Best for |
+|---|---|---|---|
+| `kraken2` | Kraken2 + Bracken | FASTQ / FASTA | Fast screening, contig support, abundance |
+| `sylph` | sylph | FASTQ only | ANI-anchored precision, species-level calls |
+| `all` | Both | FASTQ (both) / FASTA (kraken2) | Merged profile |
 
 ```bash
-makeblastdb -in markers.fasta -dbtype nucl -out markers_blastdb
+gside meta reads_R1.fq reads_R2.fq --mode all
+gside meta contigs.fna --mode kraken2
 ```
 
-## 输出
+## Agent-Friendly Design
 
-统一 JSON 输出（stdout）。顶层字段：`analysis_type` / `tool` / `version` /
-`contigs` / `methods` / `verdict`。`methods` 内 panel、mash_refseq、sourmash 为
-`result` 嵌套结构，marker 为扁平结构（无 `result` key）。`gside species` 恒以
-退出码 0 结束，单法错误写入 JSON，不影响其余方法。
+gside is built for AI agents as much as humans:
 
-## 验证状态
+```bash
+# JSON on stdout (always exit 0; errors in methods.<mode>.error)
+gside species genome.fna --mode all
 
-- marker 法 17/17 金标准基因组（含 10 株近缘阴性对照）
-- 3/3 新增物种真实参考株（C. jejuni / C. coli / S. pyogenes）
-- panel 法 17/17（291 基因组精选面板）
+# Structured missing-database errors
+# → methods.panel.suggested_command = "gside db setup --tier panel"
+# → methods.panel.missing_tier = "panel"
+# → methods.panel.estimated_size = "~130MB sketch / ~1GB genomes"
+
+# Auto-install missing databases
+gside species genome.fna --mode panel --auto-setup
+
+# Machine-readable database status
+gside db status -f json
+gside db list -f json
+```
+
+### MCP Server
+
+gside includes an MCP (Model Context Protocol) stdio server:
+
+```bash
+gside mcp    # or: gside-mcp
+```
+
+Exposes `species`, `db_status`, `db_list`, `db_setup` as MCP tools for Claude Desktop or any MCP client.
+
+```json
+{
+  "mcpServers": {
+    "gside": { "command": "gside-mcp" }
+  }
+}
+```
+
+## CLI Reference
+
+```
+gside species <contigs.fna> [options]
+  -m, --mode         marker|panel|mash_refseq|sourmash|gtdbtk|all
+  -D, --db-dir       Database root
+  -f, --format       json|tsv|md
+  -o, --output       Write to file (tsv/md stream per input)
+  -j, --jobs         Parallel input files
+  -t, --threads      Threads per aligner
+  -a, --auto-setup   Install missing databases automatically
+  -n, --no-header    Suppress TSV header row
+
+gside meta <reads/files> [options]
+  -m, --mode         kraken2|sylph|all
+  -D, --db-dir       Database root
+  -f, --format       json|tsv
+  -o, --output       Write to file
+  -t, --threads      Threads per tool
+
+gside db <subcommand>
+  status             Show database readiness (--format table|tsv|csv|json)
+  setup              Install databases (--tier mini|panel|mash|sourmash|all)
+  list               List tiers with readiness (--format table|tsv|csv|json)
+
+gside validate <contigs.fna>
+  --mode simple|standard
+
+gside mcp            MCP stdio server
+gside --version      Version info
+gside -V -J          Version as JSON
+```
+
+## Databases
+
+| Tier | Size | Engine | Status |
+|---|---|---|---|
+| mini | ~1 MB | blastn (marker) | ✅ Bundled |
+| panel | ~130 MB | skani | Downloadable |
+| mash | ~179 MB | mash | Downloadable |
+| sourmash | ~3.9 GB | sourmash | Downloadable |
+| meta | ~5.5 GB | kraken2 | Manual setup |
+| meta_sylph | ~14 GB | sylph | Manual setup |
+
+GTDB-Tk manages its own external database (`GTDBTK_DATA_PATH`).
+
+## Installation
+
+```bash
+# With pixi (recommended — includes blastn, skani, mash, sourmash)
+curl -fsSL https://pixi.sh/install.sh | bash
+pixi install
+pip install -e .
+
+# From PyPI (Python 3.12, binaries not included)
+pip install gside
+```
+
+## Documentation
+
+- [Quick Start](https://indexofire.github.io/gside/)
+- [CLI Reference](https://indexofire.github.io/gside/usage/cli/)
+- [Identification Modes](https://indexofire.github.io/gside/usage/modes/)
+- [Metagenomic Profiling](https://indexofire.github.io/gside/usage/meta/)
+- [JSON Output Contract](https://indexofire.github.io/gside/reference/json-contract/)
+- [中文文档](README.zh.md)
 
 ## License
 
 MIT
+
+## Ecosystem
+
+| Tool | Purpose |
+|---|---|
+| [gside](https://github.com/indexofire/gside) | Species identification + metagenomic profiling |
+| [gapit](https://github.com/indexofire/gapit) | Gene screening + phenotype designation (serogroup, toxigenicity) |
+| [gmlst](https://github.com/indexofire/gmlst) | MLST / cgMLST typing |
