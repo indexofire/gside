@@ -96,8 +96,8 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-10-20): 423 tests, total coverage **97%** — all modules 100%
-(including cli.py and gtdbtk_identifier.py)
+Baseline (2026-10-20): 475 tests, total coverage **97.5%** — all modules 100%
+(including cli.py, gtdbtk_identifier.py, and mcp*.py)
 except: ani 93%, multigene 99%, taxonomic 93% (quarantined),
 db 92%, kma 94%, kmer 99%, read_mapper 99%, progress 97%. Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
 raise it every time coverage climbs.
@@ -181,7 +181,7 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 - Click group style (mirrors gmlst/gapit family): `HELP_SETTINGS` (`-h`/`--help`), bare invocation prints help and exits 2 (`no_args_is_help`), `-v`/`-q` mutually exclusive (UsageError), thin commands registered via `add_command`
 - Every option carries a short flag: species `-m/--mode -f/--format -D/--db-dir -o/--output -a/--auto-setup`; db `-t/--tier -s/--source -f/--format`
 - Agent-friendly outputs: species defaults to JSON on stdout; `-o` writes the payload to a file with gapit-style streaming (tsv/md rows flushed per input as they complete — a mid-batch failure persists the prefix; json single document at the end; stdout stays empty, notice on stderr); `db status|list` accept `--format table|tsv|json`; `db setup` accepts `--format text|json` (json routes progress to stderr); `-V -J` prints version as JSON
-- Subcommands: `species` / `db` group (`status|setup|list`) / `validate` / `--version`; entry `gside.cli:main`
+- Subcommands: `species` / `db` group (`status|setup|list`) / `validate` / `mcp` (MCP stdio server) / `--version`; entry `gside.cli:main`
 - `--mode` choices are exactly `marker|panel|mash_refseq|sourmash|gtdbtk|all` — do not invent modes
 - `--db-dir` overrides the database root for one invocation
 
@@ -192,6 +192,9 @@ src/gside/
 ├── cli.py                    # Entry point; all-mode runner + _arbitrate()
 ├── config.py                 # DATA_DIR / SPECIES_DB_DIR / pixi binary discovery
 ├── db.py                     # gside db status/setup/list + downloaders
+├── mcp.py                    # MCP stdio server: JSON-RPC protocol + serve loop (`gside mcp`)
+├── mcp_schemas.py            # MCP tools/list declarations (species/db_status/db_list/db_setup)
+├── mcp_tools.py              # MCP tool handlers (call cli._identify_one + db callables)
 ├── engine/                   # Algorithm abstraction (mostly unused, see gotchas)
 │   ├── hits.py               #   Unified Hit dataclass
 │   ├── registry.py           #   Backend registry

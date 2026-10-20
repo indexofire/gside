@@ -265,6 +265,13 @@ main.add_command(species_cmd, name="species")
 main.add_command(db_group, name="db")
 main.add_command(validate_cmd, name="validate")
 
+# Imported here, not at the top: gside.mcp pulls in mcp_schemas, which reads
+# MODES/TIERS from this module, so they must already exist when it loads
+# (unavoidable circular-import constraint).
+from gside.mcp import register_mcp_command  # noqa: E402
+
+register_mcp_command(main)
+
 
 class _OutputFileWriter:
     """Chunk sink behind ``species --output`` (gapit OutputFileWriter semantics):
