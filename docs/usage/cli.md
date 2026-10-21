@@ -83,12 +83,18 @@ applies.
 | `--meta` | flag | off | Treat the input as a metagenomic community |
 | `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
 | `-f`, `--format` | option | `json` | `json` / `tsv` / `md` / `csv` |
-| `-o`, `--output PATH` | option | stdout | Write the report to PATH (row formats stream as inputs complete; json once at the end) |
+| `-o`, `--output PATH` | option | stdout | Write the report to PATH (row formats stream as samples complete; json once at the end) |
 | `-j`, `--jobs N` | option | `1` | Concurrent samples (isolate batch, positional `--meta` batch, or `--samples`) |
 | `-t`, `--threads N` | option | `4` | Threads per tool invocation |
 | `-n`, `--no-header` | option | off | Suppress the header row (tsv/csv/md) |
 | `-a`, `--auto-setup` | option | off | Install a missing database tier, then retry that method once |
 | `-s`, `--samples PATH` | option | — | `--meta` batch manifest: `sample_id<TAB>reads [<TAB>reads2]` |
+
+With more than one sample on a TTY, a progress bar is drawn on stderr. Streamed
+rows are handed to that bar: it is suspended for each write and redrawn
+afterwards, so JSON/TSV/CSV/MD output appears immediately and stays intact
+instead of being overwritten by the next refresh. When stdout is piped or
+redirected, no bar is shown and stdout contains data only.
 
 ### Examples
 

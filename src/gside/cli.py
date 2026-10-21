@@ -722,23 +722,28 @@ class _OutputFileWriter:
             self._handle.close()
 
 
-def _write_text_document(text: str, output: str | None) -> int:
+def _write_text_document(text: str, output: str | None, bar: Any = None) -> int:
     """Emit rendered rows to stdout or to the ``-o`` file (truncating)."""
     if output is None:
-        print(text, end="")
+        if bar is not None:
+            bar.write(text)
+        else:
+            print(text, end="")
         return 0
     writer = _OutputFileWriter(Path(output))
     try:
         writer(text)
     finally:
         writer.close()
-    print(f"Results written to {output}", file=sys.stderr)
+    notice = f"Results written to {output}"
+    bar.notice(notice) if bar is not None else print(notice, file=sys.stderr)
     return 0
 
 
-def _write_json_document(payload: Any, output: str | None) -> int:
+def _write_json_document(payload: Any, output: str | None, bar: Any = None) -> int:
     """Emit one JSON document to stdout or to the ``-o`` file (truncating)."""
-    return _write_text_document(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", output)
+    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    return _write_text_document(text, output, bar)
 
 
 def _run_species(
@@ -780,6 +785,7 @@ def _run_species(
                 output_format,
                 output,
                 no_header,
+                bar,
             )
     with species_progress(samples, quiet=quiet) as (bar, _tid):
         return _emit_species(
@@ -788,6 +794,7 @@ def _run_species(
             output_format,
             output,
             no_header,
+            bar,
         )
 
 
@@ -797,11 +804,17 @@ def _tracked(source: Iterator[dict[str, Any]], bar: Any) -> Iterator[dict[str, A
         bar.advance()
 
 
-def _emit_chunks(chunks: Iterator[str], output: str | None) -> int:
-    """Stream rendered chunks to stdout (flushed per row) or to ``-o``."""
+def _emit_chunks(chunks: Iterator[str], output: str | None, bar: Any = None) -> int:
+    """Stream rendered chunks to stdout (flushed per row) or to ``-o``.
+
+    When stdout is the destination and a live progress bar exists, every
+    chunk goes through ``bar.write`` so the bar is suspended first; otherwise
+    Rich's next refresh would erase the row.
+    """
     if output is None:
+        write = bar.write if bar is not None else lambda text: print(text, end="", flush=True)
         for chunk in chunks:
-            print(chunk, end="", flush=True)
+            write(chunk)
         return 0
     writer = _OutputFileWriter(Path(output))
     try:
@@ -809,7 +822,8 @@ def _emit_chunks(chunks: Iterator[str], output: str | None) -> int:
             writer(chunk)
     finally:
         writer.close()
-    print(f"Results written to {output}", file=sys.stderr)
+    notice = f"Results written to {output}"
+    bar.notice(notice) if bar is not None else print(notice, file=sys.stderr)
     return 0
 
 
@@ -825,11 +839,12 @@ def _emit_species(
     output_format: str,
     output: str | None,
     no_header: bool = False,
+    bar: Any = None,
 ) -> int:
     if output_format == "json":
         payloads = list(payload_source)
         report: Any = payloads[0] if n_inputs == 1 else payloads
-        return _write_json_document(report, output)
+        return _write_json_document(report, output, bar)
 
     markdown = output_format == "md"
     is_csv = output_format == "csv"
@@ -846,7 +861,7 @@ def _emit_species(
             else:
                 yield _render_row(payload, markdown) + "\n"
 
-    return _emit_chunks(chunks(), output)
+    return _emit_chunks(chunks(), output, bar)
 
 
 TABLE_COLUMNS = [

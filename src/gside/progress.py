@@ -6,13 +6,19 @@ never pollute stdout data streams (gside's stdout-purity law, same as
 gapit). ``redirect_stdout=False`` / ``redirect_stderr=False`` are pinned
 so rich's Live cannot reroute streamed report bytes.
 
-The bar is ACTIVE only when ``--quiet`` is off, more than one input file
+The bar is ACTIVE only when ``--quiet`` is off, more than one sample
 is given, and stderr is a TTY. When inactive, :func:`species_progress`
 yields a no-op shim (task id ``None``) so call sites keep one code path.
+
+Streamed report rows are written through :meth:`BatchProgress.write`, which
+suspends the Live display before touching stdout and restarts it afterwards.
+Without that hand-off Rich's next refresh erases the row (the bar assumes the
+cursor is still directly below it). The same applies to stderr notices.
 """
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from typing import Final, Protocol
@@ -35,6 +41,8 @@ STATUS_CONSOLE: Final = Console(stderr=True)
 class BatchProgress(Protocol):
     def describe(self, text: str) -> None: ...
     def advance(self) -> None: ...
+    def write(self, text: str) -> None: ...
+    def notice(self, text: str) -> None: ...
 
 
 class IdleBatch:
@@ -43,6 +51,12 @@ class IdleBatch:
 
     def advance(self) -> None:
         return None
+
+    def write(self, text: str) -> None:
+        print(text, end="", flush=True)
+
+    def notice(self, text: str) -> None:
+        print(text, file=sys.stderr)
 
 
 class _LiveBatch:
@@ -55,6 +69,23 @@ class _LiveBatch:
 
     def advance(self) -> None:
         self._progress.advance(self._task_id)
+
+    def write(self, text: str) -> None:
+        """Print a report row, suspending the live bar around the write."""
+        self._progress.stop()
+        try:
+            sys.stdout.write(text)
+            sys.stdout.flush()
+        finally:
+            self._progress.start()
+
+    def notice(self, text: str) -> None:
+        """Print a stderr notice without corrupting the live bar."""
+        self._progress.stop()
+        try:
+            print(text, file=sys.stderr)
+        finally:
+            self._progress.start()
 
 
 _IDLE: Final = IdleBatch()
@@ -72,6 +103,7 @@ def make_progress() -> Progress:
         console=STATUS_CONSOLE,
         redirect_stdout=False,
         redirect_stderr=False,
+        transient=True,
     )
 
 

@@ -77,12 +77,16 @@ gside scan --meta --samples samples.tsv [选项]
 | `--meta` | 开关 | 关 | 输入视为宏基因组群落 |
 | `-D`，`--db-dir` | 选项 | 自动 | 数据库根目录 |
 | `-f`，`--format` | 选项 | `json` | `json` / `tsv` / `md` / `csv` |
-| `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH（行式格式随输入完成流式写入；json 最后一次性写入） |
-| `-j`，`--jobs N` | 选项 | `1` | 单菌株并发输入数，或 `--meta --samples` 的并发样本数 |
+| `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH（行式格式随样本完成流式写入；json 最后一次性写入） |
+| `-j`，`--jobs N` | 选项 | `1` | 并发样本数（单菌株批量、位置参数 `--meta` 批量或 `--samples`） |
 | `-t`，`--threads N` | 选项 | `4` | 每次工具调用的线程数 |
 | `-n`，`--no-header` | 选项 | 关 | 隐藏表头行（tsv/csv/md） |
 | `-a`，`--auto-setup` | 选项 | 关 | 自动安装缺失档位并重试该方法一次 |
 | `-s`，`--samples PATH` | 选项 | — | `--meta` 批量清单：`sample_id<TAB>reads [<TAB>reads2]` |
+
+多样本且 stderr 为 TTY 时会显示进度条。流式输出行会交给进度条协调：每次写入前
+暂停进度条、写完再恢复，因此 JSON/TSV/CSV/MD 结果会实时出现且不会被下一次刷新
+覆盖。stdout 被管道或重定向时不显示进度条，stdout 只有数据。
 
 ### 示例
 
