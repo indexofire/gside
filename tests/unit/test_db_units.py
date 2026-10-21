@@ -926,3 +926,11 @@ class TestPanelGenomeUnzip:
         assert error is None
         assert (genomes / "g_genomic.fna").is_file()
         assert not (dst / "_genomes.zip").exists()
+
+
+class TestStatusCsv:
+    def test_csv_output(self, root):
+        _touch(root / "D1_marker" / "markers.fasta")
+        text = db.format_status("csv").splitlines()
+        assert text[0] == "COMPONENT,READY,TIER,PATH"
+        assert text[1].startswith("D1_marker,ready,mini,")

@@ -554,6 +554,15 @@ def format_status(fmt: str) -> str:
             for name, info in status.items()
         ]
         return "\n".join(lines)
+    if fmt == "csv":
+        out = io.StringIO()
+        writer = csv.writer(out, lineterminator="\n")
+        writer.writerow(["COMPONENT", "READY", "TIER", "PATH"])
+        writer.writerows(
+            [name, "ready" if info["ready"] else "missing", info["tier"], info["path"]]
+            for name, info in status.items()
+        )
+        return out.getvalue().rstrip("\n")
     name_w = max((len(n) for n in status), default=8)
     tier_w = max((len(i["tier"]) for i in status.values()), default=4)
     lines = ["gside database status", "─" * 55]
