@@ -14,15 +14,20 @@ L1  marker 靶基因组合规则                    [layer=1]
 
 ### 原理
 
-对 contigs 执行一次 BLAST（vs markers 库，81 条序列），将命中基因与
-38 条组合规则匹配（数据驱动，`marker_rules.yaml`）。
+**FASTA**：对 contigs 执行一次 BLAST（vs markers 库，81 条序列）。
+**FASTQ**：用 minimap2 比对读段（短读 `-x sr`，长读 `-x map-ont`），每个基因的
+breadth = 所有 primary 比对的参考区间并集 / 基因长度（与 gapit reads 模式相同的
+聚合算法）。随后把检出基因与 38 条组合规则匹配（数据驱动，`marker_rules.yaml`）。
+
+读段只需约 1× 基因组覆盖：150bp 读段在 1× 时对 400–1000bp 标记基因即可达到
+60–80% breadth（10× 约 99%）。不会先把读段组装成 contigs。
 
 ### 判定阈值
 
 | 门槛 | 值 | 说明 |
 |---|---|---|
 | 全局最低一致性 | 85% | 低于此值的命中不计入 |
-| 全局最低覆盖率 | 60% | 防短 HSP 高一致性误报 |
+| 全局最低覆盖率 | 60% | 每基因 breadth（比对区间并集，读段/contigs 通用） |
 | 高置信分界 | 平均一致性 90% | 命中基因平均一致性 ≥90% 时 confidence=high，低于则为 medium |
 
 ### 规则机制
@@ -69,6 +74,15 @@ skani 对 contigs 与精选参考面板（291 基因组，30 启用物种）做�
 
 ## L2: mash_refseq（MinHash 距离）
 
+### 输入：读段或组装
+
+组装直接比较。FASTQ 会先执行 `mash sketch -m 2 -r`（过滤单拷贝 k-mer，按 k-mer
+含量估计基因组大小），再把读段 sketch 与参考 sketch 比较。Mash 论文报告：对
+未组装读段（含高错误率 Nanopore）可正确判定**种**，但最佳**菌株**常出错；
+官方文档建议 10×–100× 覆盖，且距离会随覆盖度/错误率升高（D ≈ 1 - ANI 是在
+组装上标定的）。因此 reads 上的 `mash_refseq` 应视为种级筛查，而非组装级 ANI。
+读段的 containment 筛查是另一个工具 `mash screen`。
+
 ### 原理
 
 mash 对 contigs 与 RefSeq 全库 sketch（mash.msh，~179MB）做 MinHash 距离估算。
@@ -88,6 +102,14 @@ mash 对 contigs 与 RefSeq 全库 sketch（mash.msh，~179MB）做 MinHash 距�
 - 精度低于 panel ANI（MinHash 是估算）
 
 ## L2: sourmash（GTDB gather）
+
+### 输入：读段或组装
+
+`sourmash sketch` 接受 FASTQ，`gather` 本身就是为宏基因组设计的——"组装与
+未组装"读段都可用（sourmash 文档；Irber et al. 2022）。在读段上它是
+**containment 谱**：最佳参考覆盖了多大比例的读段 k-mer，而不是组装对组装的
+ANI。覆盖空缺与测序错误会降低灵敏度，短读段不会被逐条分类（推荐 gather 后
+再回贴读段）。10× 读段通常需要分钟级时间，而非秒级。
 
 ### 原理
 

@@ -17,12 +17,12 @@ gside scan --meta --samples samples.tsv [options]
 
 | Mode | `--meta` | FASTA | FASTQ | Notes |
 |---|---|---|---|---|
-| `marker` | no | ✅ | ✅ | FASTQ is read as sequences; only reads long enough to cover a marker gene pass the 60% coverage gate |
+| `marker` | no | ✅ | ✅ | FASTQ: reads mapped with minimap2 (`sr`/`map-ont`); per-gene breadth is the union of read alignments — ~1x genome coverage suffices |
 | `panel` | no | ✅ | ❌ | skani ANI |
-| `mash_refseq` | no | ✅ | ❌ | MinHash distance |
-| `sourmash` | no | ✅ | ❌ | GTDB gather (containment ANI) |
+| `mash_refseq` | no | ✅ | ✅ | reads are sketched with `mash sketch -m 2 -r`; species-level at >=10x, strain calls unreliable |
+| `sourmash` | no | ✅ | ✅ | gather on read sketches (slow: minutes); containment-ANI based |
 | `gtdbtk` | no | ✅ | ❌ | phylogenetic placement |
-| `all` | no | ✅ | ❌ | every species tier + arbitration |
+| `all` | no | ✅ | ❌ | every species tier + arbitration (panel/gtdbtk are assembly-only) |
 | `kraken2` | yes | ✅ | ✅ | reads or contigs |
 | `sylph` | yes | ❌ | ✅ | reads only |
 | `all` | yes | ✅ | ✅ | kraken2 (+ sylph when FASTQ) |

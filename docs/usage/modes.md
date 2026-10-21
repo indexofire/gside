@@ -15,16 +15,24 @@ L1  marker target gene combination rules                          [authority=1]
 
 ### Principle
 
-Performs a single BLAST scan of contigs against the markers database
-(81 sequences), then matches detected genes against 38 combination rules
+**FASTA**: one BLAST scan of the contigs against the markers database
+(81 sequences). **FASTQ**: reads are mapped with minimap2 (`-x sr` for short
+reads, `-x map-ont` for long) and each gene's breadth is the union of the
+reference intervals covered by its primary alignments, divided by gene
+length (the same aggregate-breadth recipe as gapit's reads mode). Detected
+genes are then matched against the 38 combination rules
 (data-driven, `marker_rules.yaml`).
+
+Reads only need ~1x genome coverage: 150 bp reads at 1x already reach
+60-80% breadth for 400-1000 bp marker genes (10x reaches ~99%). Marker
+genes are not assembled first, so a read set is never turned into contigs.
 
 ### Thresholds
 
 | Gate | Value | Description |
 |------|-------|-------------|
 | Global minimum identity | 85% | Hits below this are discarded outright |
-| Global minimum coverage | 60% | Prevents short-HSP high-identity false fires |
+| Global minimum coverage | 60% | Per-gene breadth (union of aligned intervals, reads or contigs) |
 | Rule minimum identity | 90% default | Per-rule override via `min_identity` |
 | High confidence | average identity ≥ 90% | `confidence=high`, otherwise `medium` |
 
@@ -75,6 +83,18 @@ reference panel (291 genomes, 30 enabled pathogen species).
 
 ## L2: mash_refseq (MinHash Distance)
 
+### Inputs: reads or assemblies
+
+Assemblies are compared directly. For FASTQ, gside runs
+`mash sketch -m 2 -r` first (drop single-copy k-mers, estimate genome size
+from k-mer content) and compares that read sketch to the reference sketch.
+The Mash paper reports correct **species** calls from unassembled reads
+(including noisy Nanopore), but the best-hit **strain** was often wrong;
+mash's own docs recommend 10x-100x coverage, and the distance inflates with
+coverage/error rate (D ≈ 1 - ANI is calibrated on assemblies). Treat
+`mash_refseq` on reads as a species-level screen, not an assembly-grade ANI.
+Containment screening of reads is `mash screen`, a different tool.
+
 ### Principle
 
 mash computes MinHash distance between contigs and the entire RefSeq sketch
@@ -95,6 +115,16 @@ mash computes MinHash distance between contigs and the entire RefSeq sketch
 - Lower precision than panel ANI (MinHash is an estimate)
 
 ## L2: sourmash (GTDB gather)
+
+### Inputs: reads or assemblies
+
+`sourmash sketch` accepts FASTQ, and `gather` is explicitly designed for
+metagenomes — "assembled and unassembled" reads both work (sourmash docs;
+Irber et al. 2022). On reads this is a **containment profile**: the fraction
+of read k-mers in the best reference, not an assembly-vs-assembly ANI.
+Coverage gaps and sequencing errors lower sensitivity, and short reads are
+not individually classified (gather + read mapping is the recommended
+follow-up). Expect minutes rather than seconds for a 10x read set.
 
 ### Principle
 

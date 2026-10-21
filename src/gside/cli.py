@@ -120,8 +120,8 @@ _FASTQ_SUFFIXES = (".fq", ".fastq")
 _MODE_INPUTS: dict[str, frozenset[str]] = {
     "marker": frozenset({"fasta", "fastq"}),
     "panel": frozenset({"fasta"}),
-    "mash_refseq": frozenset({"fasta"}),
-    "sourmash": frozenset({"fasta"}),
+    "mash_refseq": frozenset({"fasta", "fastq"}),
+    "sourmash": frozenset({"fasta", "fastq"}),
     "gtdbtk": frozenset({"fasta"}),
 }
 _META_MODE_INPUTS: dict[str, frozenset[str]] = {

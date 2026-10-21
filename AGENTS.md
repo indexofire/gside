@@ -7,7 +7,7 @@ Agent guidance for this repository. Read this before writing or editing any code
 ## Project Overview
 
 - **Language**: Python 3.12 (standalone species-identification CLI, no frontend)
-- **Package manager**: [pixi](https://pixi.sh) — conda tools (blast/skani/mash/sourmash/kraken2/bracken/sylph) + PyPI editable install via `pixi.toml`
+- **Package manager**: [pixi](https://pixi.sh) — conda tools (blast/minimap2/skani/mash/sourmash/kraken2/bracken/sylph) + PyPI editable install via `pixi.toml`
 - **Linter + Formatter**: [ruff](https://docs.astral.sh/ruff/) (config in `pyproject.toml`; `pixi run -e dev check`, or the pip-installed dev extras)
 - **Testing**: pytest — `tests/unit/` hermetic (no binaries), `tests/integration/` needs real binaries/databases (skipif-guarded)
 - **Docs**: MkDocs Material + static-i18n, English default + Chinese secondary (`docs/*.md` + `*.zh.md` pairs)
@@ -96,8 +96,8 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-10-21): **620 tests**, total coverage **98.9%**
-— all modules 100% except: ani 93%, multigene 98%, sourmash 99%,
+Baseline (2026-10-21): **651 tests**, total coverage **99.0%**
+— all modules 100% except: ani 94%, multigene 99%, sourmash 99%,
 taxonomic 93% (quarantined), db 99%, kraken2 99%, progress 97%.
 Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
 raise it every time coverage climbs.
@@ -186,7 +186,7 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 - `species` and `meta` are **hidden compatibility aliases** (preset `meta=False/True`) for `scan`; bacmap still calls `gside species`, so keep them until that pin moves
 - `--meta` batch mode: `-s/--samples sample_id<TAB>r1[<TAB>r2]` + `-j/--jobs` (order preserved); JSON becomes an array with a `sample` key, tsv/csv/md gain a leading `sample` column. `--samples` and positional reads are mutually exclusive (UsageError); `-j` without `--samples` is rejected
 - Mode choices: isolate `marker|panel|mash_refseq|sourmash|gtdbtk|all`; meta `kraken2|sylph|all` — do not invent modes. `scan -m` accepts the union and `_validate_scan` enforces the context
-- Input kinds are inferred from the extension (`.fna/.fa/.fasta` vs `.fq/.fastq`, `.gz` stripped) and validated **before** any tool runs: `_MODE_INPUTS` / `_META_MODE_INPUTS` in `cli.py` define the matrix (marker accepts both; panel/mash/sourmash/gtdbtk isolate are FASTA-only; kraken2 both; sylph FASTQ-only; isolate `all` FASTA-only). Update the matrix and docs together when adding a mode
+- Input kinds are inferred from the extension (`.fna/.fa/.fasta` vs `.fq/.fastq`, `.gz` stripped) and validated **before** any tool runs: `_MODE_INPUTS` / `_META_MODE_INPUTS` in `cli.py` define the matrix (marker/mash_refseq/sourmash accept both; panel/gtdbtk are FASTA-only — skani and GTDB-Tk need assemblies; kraken2 both; sylph FASTQ-only; isolate `all` stays FASTA-only because panel/gtdbtk cannot read FASTQ). Update the matrix and docs together when adding a mode
 - `--db-dir` overrides the database root for one invocation
 - `verdict` shape is shared by single-mode and `all`: `species` (canonical), `display_name`, `strain`, `confidence`, `basis` (winner only), `supporting`, `agreement`
 
@@ -208,6 +208,7 @@ src/gside/
     ├── _envelope.py              # Shared {analysis_type,method,database,result}
     ├── _thresholds.py            # Shared ANI_HIGH/ANI_MEDIUM + ani_confidence()
     ├── species_name.py           # Genus_species canonicalizer (bacmap contract)
+    ├── read_screening.py         # FASTQ marker screening via minimap2 (gapit recipe)
     ├── multigene_identifier.py   # L1 marker rules (blastn, live)
     ├── ani_identifier.py         # L2 panel/mash (live)
     ├── sourmash_identifier.py    # L2 sourmash (needs external binary + GTDB db)
@@ -272,9 +273,10 @@ testpaths = ["tests"]
 
 - **Binary discovery**: `GSIDE_PIXI_BIN` env → repo `.pixi/envs/default/bin` → `~/.pixi/envs/default/bin` → `PATH` (`config.py`). There is no machine-specific path in the package; point `GSIDE_PIXI_BIN` at a conda env when the tools live elsewhere.
 - **`gside species` never fails loud**: check `methods.<mode>.error` in JSON, not the exit code.
-- **Marker on FASTQ**: `multigene_identifier._as_fasta` converts FASTQ (plain or `.gz`) to a temporary FASTA so blastn can read it; reads are treated as plain sequences, so only long reads that cover >=60% of a marker gene can satisfy a rule. Illumina 150bp reads therefore return `Unknown` — that is expected, use `--meta -m kraken2` for short-read data.
+- **Marker on FASTQ**: `analysis/read_screening.py` maps reads to the marker FASTA with minimap2 (`-x sr` short / `-x map-ont` long, `--secondary=no`); per-gene breadth is the union of reference intervals across primary alignments, identity is the alignment-weighted `nmatch/alen`. The rule engine is unchanged. Measured on a 1.65Mb genome: 10x -> 98-99% breadth, 1x -> 60-79% (still high), 0.3x -> Unknown. No assembly step, no read->FASTA conversion. Minimap2 is a declared pixi dependency.
 - **Marker thresholds**: global `_MIN_IDENTITY=85.0` / `_MIN_COVERAGE=60.0` / `_HIGH_CONF=90.0` gate `detected_markers` and `exclude_genes`. Rule matching uses each rule's own `min_identity`/`min_coverage` (defaults 90/60) against every raw hit of the gene, so the two *Campylobacter* rules with `min_coverage: 50` really do accept 50-60% coverage. `priority_over` is supported (priority species suppress non-priority ones) but no shipped rule uses it.
 - **Panel thresholds**: ANI ≥ 95 + AF ≥ 0.65 → high; 93–95 → medium. Mash identity ≥ 0.97 → high, 0.90–0.97 → medium.
+- **Mash/sourmash on reads are species-level, not assembly-grade ANI**: mash sketches reads with `-m 2 -r` (Mash paper: species correct, best strain often wrong; distance inflates with coverage/error; 10x-100x recommended). sourmash `sketch` accepts FASTQ and `gather` is built for unassembled reads, but the result is a containment profile, not an assembly-vs-assembly ANI, and short reads are not individually classified.
 - **Arbitration is layer-first**: `(layer, confidence-rank)` tuple — gtdbtk=3 beats any L2 hit, any L2 hit beats any L1 hit, and within a layer `medium` now beats `low` (`cli.py:_arbitrate`). `verdict.basis` stays the single winning method (bacmap maps it to a validated `method`); `verdict.supporting` + `verdict.agreement` expose cross-method corroboration (exact label match — `DEC` vs `Escherichia_coli` is intentionally a non-match; do not alias them).
 - **Missing-database errors are structured**: alongside `methods.<mode>.error`, the payload carries `suggested_command` / `missing_tier` / `estimated_size` and `help_url` (from `gside.db._TIERS`). Both `species --auto-setup` and `meta --auto-setup` install the tier once (progress on stderr) and retry that method; meta's batch mode installs on the first sample, then fans out. With an explicit `--db-dir`, auto-setup is skipped (user-managed root). GTDB-Tk's own database is external (`GTDBTK_DATA_PATH`/`GTDBDB`) — it is NOT a `db setup` tier.
 - **`sourmash` needs its GTDB db**: provisioned via pixi (`sourmash>=4.9`) + `gside db setup --tier sourmash` (~3.9GB rs226 reps, renamed in place); `gather` output is read from `-o` file, never `--csv -` (unsupported flag). Confidence comes from the gather containment ANI (`average_containment_ani`, 95/93 bands, shared with panel); the old `f_unique_weighted` 0.90/0.70 bands remain only as a fallback when that column is absent. `possible_mixture` requires >=2 **distinct species** at >=10% with ANI >=93 — multiple strains of one species do not trigger it.

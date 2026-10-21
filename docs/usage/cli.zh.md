@@ -16,12 +16,12 @@ gside scan --meta --samples samples.tsv [选项]
 
 | 模式 | `--meta` | FASTA | FASTQ | 说明 |
 |---|---|---|---|---|
-| `marker` | 否 | ✅ | ✅ | FASTQ 按序列读取；只有长度足以覆盖标记基因的读段才能通过 60% 覆盖门槛 |
+| `marker` | 否 | ✅ | ✅ | FASTQ：minimap2（`sr`/`map-ont`）比对，基因 breadth 取所有读段比对区间的并集——约 1× 基因组覆盖即可 |
 | `panel` | 否 | ✅ | ❌ | skani ANI |
-| `mash_refseq` | 否 | ✅ | ❌ | MinHash 距离 |
-| `sourmash` | 否 | ✅ | ❌ | GTDB gather（containment ANI） |
+| `mash_refseq` | 否 | ✅ | ✅ | 读段先 `mash sketch -m 2 -r`；≥10× 可做种级判定，菌株级不可靠 |
+| `sourmash` | 否 | ✅ | ✅ | 对读段签名做 gather（较慢，分钟级）；基于 containment ANI |
 | `gtdbtk` | 否 | ✅ | ❌ | 系统发育 placement |
-| `all` | 否 | ✅ | ❌ | 全部物种层 + 仲裁 |
+| `all` | 否 | ✅ | ❌ | 全部物种层 + 仲裁（panel/gtdbtk 仅接受组装） |
 | `kraken2` | 是 | ✅ | ✅ | 读段或 contigs |
 | `sylph` | 是 | ❌ | ✅ | 仅读段 |
 | `all` | 是 | ✅ | ✅ | kraken2（FASTQ 时加 sylph） |

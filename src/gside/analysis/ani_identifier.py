@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from gside.analysis._envelope import MethodEnvelope
 from gside.analysis._thresholds import ANI_HIGH, ANI_MEDIUM
+from gside.analysis.read_screening import is_fastq
 from gside.analysis.species_name import apply_species_name
 from gside.config import SPECIES_DB_DIR
 from gside.engine.backends.skani import AniHit
@@ -59,6 +61,33 @@ def _mash_dist(query: str | Path, msh: Path, threads: int = 4) -> list[tuple[str
     return [(r.reference_id, 1.0 - r.distance) for r in results]
 
 
+def _mash_dist_reads(reads: str | Path, msh: Path, threads: int = 4) -> list[tuple[str, float]]:
+    """Sketch FASTQ reads (error-filtered) and compare against the mash DB.
+
+    ``-m 2`` drops single-copy k-mers (sequencing errors) and ``-r`` estimates
+    genome size from k-mer content so p-values stay meaningful. Mash then
+    compares a read sketch to the reference sketch: valid for species-level
+    calls at >=10x coverage, but strain-level hits are unreliable and the
+    distance inflates with coverage/error rate (Mash paper; mash docs).
+    """
+    from gside.config import which
+    from gside.engine._env import require_bin, run_checked
+
+    mash = require_bin(
+        "mash",
+        hint="mash not found — install via pixi (conda) or point GSIDE_PIXI_BIN at a bin dir",
+        resolver=which,
+    )
+    with tempfile.TemporaryDirectory(prefix="gside-mash-") as tmp:
+        sketch = Path(tmp) / "reads.msh"
+        run_checked(
+            [mash, "sketch", "-m", "2", "-r", "-o", str(sketch), str(reads)],
+            timeout=3600,
+            name="mash sketch failed",
+        )
+        return _mash_dist(sketch, msh, threads)
+
+
 def _mash_species(ref_id: str) -> str:
     return ref_id
 
@@ -100,7 +129,10 @@ def _mash_result(
     if not msh.exists():
         raise RuntimeError(f"mash sketch DB not found in {base} (run: gside db setup --tier mash)")
 
-    mash_rows = _mash_dist(contigs, msh, threads)
+    if is_fastq(contigs):
+        mash_rows = _mash_dist_reads(contigs, msh, threads)
+    else:
+        mash_rows = _mash_dist(contigs, msh, threads)
     mash_top = sorted(mash_rows, key=lambda r: -r[1])[:_TOP_N]
     best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)
     raw_species = taxa.get(best_ref, _mash_species(best_ref)) if best_ref else "Unknown"

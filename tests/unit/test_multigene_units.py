@@ -283,49 +283,30 @@ class TestFastqInput:
             lambda: [{"species": "Salmonella", "genes": ["inva"], "min_hits": 1}],
         )
 
-    def test_fastq_is_converted_for_blast(self, monkeypatch, tmp_path):
+    def test_fastq_uses_minimap2_screening(self, monkeypatch, tmp_path):
         seen: dict[str, str] = {}
 
-        def fake_blast(path, threads=4):
-            seen["text"] = Path(path).read_text()
-            seen["path"] = str(path)
+        def fake_screen(reads, markers, threads=4):
+            seen["reads"] = str(reads)
+            seen["markers"] = str(markers)
             return [{"gene": "inva", "identity": 99.0, "coverage": 100.0}]
 
         self._rules(monkeypatch)
-        monkeypatch.setattr(mg, "_blast_contigs", fake_blast)
+        monkeypatch.setattr(mg, "screen_reads", fake_screen)
         fq = tmp_path / "reads.fq"
-        fq.write_text("@r1\nACGT\n+\nIIII\n@r2\nTTTT\n+\nIIII\n")
+        fq.write_text("@r1\nACGT\n+\nIIII\n")
         from gside.analysis.multigene_identifier import identify_multigene
 
         assert identify_multigene(str(fq)).to_dict()["species"] == "Salmonella"
-        assert seen["text"] == ">r1\nACGT\n>r2\nTTTT\n"
-        assert not Path(seen["path"]).exists(), "converted FASTA must live in a temp dir"
+        assert seen["reads"] == str(fq)
+        assert seen["markers"].endswith("markers.fasta")
 
-    def test_gzipped_fastq_is_supported(self, monkeypatch, tmp_path):
-        import gzip
-
-        captured: dict[str, str] = {}
+    def test_fasta_still_uses_blast(self, monkeypatch, tmp_path):
+        seen: dict[str, str] = {}
 
         def fake_blast(path, threads=4):
-            captured["text"] = Path(path).read_text()
-            return []
-
-        self._rules(monkeypatch)
-        monkeypatch.setattr(mg, "_blast_contigs", fake_blast)
-        fq = tmp_path / "reads.fastq.gz"
-        with gzip.open(fq, "wt") as fh:
-            fh.write("@r1\nACGT\n+\nIIII\n")
-        from gside.analysis.multigene_identifier import identify_multigene
-
-        identify_multigene(str(fq))
-        assert captured["text"] == ">r1\nACGT\n"
-
-    def test_fasta_is_passed_through(self, monkeypatch, tmp_path):
-        captured: dict[str, str] = {}
-
-        def fake_blast(path, threads=4):
-            captured["path"] = str(path)
-            return []
+            seen["path"] = str(path)
+            return [{"gene": "inva", "identity": 99.0, "coverage": 100.0}]
 
         self._rules(monkeypatch)
         monkeypatch.setattr(mg, "_blast_contigs", fake_blast)
@@ -333,5 +314,5 @@ class TestFastqInput:
         genome.write_text(">c1\nACGT\n")
         from gside.analysis.multigene_identifier import identify_multigene
 
-        identify_multigene(str(genome))
-        assert captured["path"] == str(genome)
+        assert identify_multigene(str(genome)).to_dict()["species"] == "Salmonella"
+        assert seen["path"] == str(genome)

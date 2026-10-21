@@ -221,3 +221,25 @@ class TestAliases:
         result = CliRunner().invoke(main, ["meta", "-h"])
         assert result.exit_code == 0
         assert "-m, --mode" in result.output
+
+
+class TestReadsCapableGenomeTiers:
+    def test_mash_refseq_accepts_fastq(self, monkeypatch):
+        calls = _capture(monkeypatch, "_run_species")
+        assert CliRunner().invoke(main, ["scan", "r.fq", "-m", "mash_refseq"]).exit_code == 0
+        assert calls["args"][1] == "mash_refseq"
+
+    def test_sourmash_accepts_fastq(self, monkeypatch):
+        calls = _capture(monkeypatch, "_run_species")
+        assert CliRunner().invoke(main, ["scan", "r.fq", "-m", "sourmash"]).exit_code == 0
+        assert calls["args"][1] == "sourmash"
+
+    def test_panel_still_rejects_fastq(self):
+        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "panel"])
+        assert result.exit_code == 2
+        assert "does not accept FASTQ" in result.output
+
+    def test_all_still_rejects_fastq(self):
+        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "all"])
+        assert result.exit_code == 2
+        assert "does not accept FASTQ" in result.output

@@ -217,3 +217,53 @@ class TestMashFailures:
         )
         with pytest.raises(RuntimeError, match="sketch version mismatch"):
             ani._mash_dist("q.fna", tmp_path / "mash.msh")
+
+
+class TestMashReads:
+    def test_fastq_uses_read_sketching(self, monkeypatch, taxadb):
+        calls: list[str] = []
+
+        def fake_reads(reads, msh, threads=4):
+            calls.append("reads")
+            return [("GCF_A", 0.99)]
+
+        def fake_assembly(query, msh, threads=4):
+            calls.append("assembly")
+            return [("GCF_A", 0.99)]
+
+        monkeypatch.setattr(ani, "_mash_dist_reads", fake_reads)
+        monkeypatch.setattr(ani, "_mash_dist", fake_assembly)
+        r = identify_by_ani("reads.fq", mode="mash_refseq", db_dir=taxadb).result
+        assert calls == ["reads"]
+        assert r["species"] == "Escherichia_coli"
+
+    def test_fasta_uses_direct_dist(self, monkeypatch, taxadb):
+        calls: list[str] = []
+        monkeypatch.setattr(
+            ani, "_mash_dist", lambda q, m, threads=4: calls.append("assembly") or [("GCF_A", 0.99)]
+        )
+        identify_by_ani("g.fna", mode="mash_refseq", db_dir=taxadb)
+        assert calls == ["assembly"]
+
+
+class TestMashReadSketch:
+    def test_sketch_then_dist(self, monkeypatch, tmp_path):
+        import types
+
+        import gside.engine._env as env
+
+        seen: dict[str, object] = {}
+
+        def fake_run(cmd, **kwargs):
+            seen["cmd"] = cmd
+            return types.SimpleNamespace(stdout="", returncode=0)
+
+        monkeypatch.setattr(env, "require_bin", lambda *a, **k: "/bin/mash")
+        monkeypatch.setattr(env, "run_checked", fake_run)
+        monkeypatch.setattr(
+            ani, "_mash_dist", lambda sketch, msh, threads=4: seen.update(sketch=sketch) or []
+        )
+        ani._mash_dist_reads("reads.fq", tmp_path / "db.msh", threads=2)
+        assert seen["cmd"][:6] == ["/bin/mash", "sketch", "-m", "2", "-r", "-o"]
+        assert seen["cmd"][-1] == "reads.fq"
+        assert str(seen["sketch"]).endswith("reads.msh")
