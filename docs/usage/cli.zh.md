@@ -24,11 +24,15 @@ gside scan --meta --samples samples.tsv [选项]
 | `all` | 否 | ✅ | ❌ | 全部物种层 + 仲裁（panel/gtdbtk 仅接受组装） |
 | `kraken2` | 是 | ✅ | ✅ | 读段或 contigs |
 | `sylph` | 是 | ❌ | ✅ | 仅读段 |
-| `all` | 是 | ✅ | ✅ | kraken2（FASTQ 时加 sylph） |
+| `all` | 是 | ❌ | ✅ | kraken2+sylph；contigs 请用 `-m kraken2` |
+
+`-m` 支持 `+` 组合（如 `marker+sourmash`、`kraken2+sylph`）；重复项自动去重，
+顺序保留。`all` 表示当前上下文的全部模式，不能与其他模式组合。
 
 输入类型由扩展名推断（`.fna/.fa/.fasta` 与 `.fq/.fastq`，支持 `.gz`），并在
-**任何工具启动前**校验：不匹配时退出码 2 并列出支持的类型。`--meta` 同样拒绝
-单菌株模式，单菌株模式也拒绝 `kraken2`/`sylph`。
+**任何工具启动前**校验：不匹配时退出码 2 并指出具体模式。`--meta` 同样拒绝
+单菌株模式，单菌株模式也拒绝 `kraken2`/`sylph`。由于 `all` 含 sylph，
+`--meta -m all` 需要 FASTQ；contigs 请用 `-m kraken2`。
 
 ### 参数
 
@@ -52,6 +56,7 @@ gside scan --meta --samples samples.tsv [选项]
 # 单基因组（isolate 或 MAG）
 gside scan contigs.fna                      # marker
 gside scan contigs.fna -m panel -f csv
+gside scan contigs.fna -m marker+sourmash
 gside scan *.fna -m marker -j 8 -o results.tsv
 
 # 长读长单菌株（marker 把读段当序列比对）

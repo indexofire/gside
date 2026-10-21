@@ -25,12 +25,17 @@ gside scan --meta --samples samples.tsv [options]
 | `all` | no | ✅ | ❌ | every species tier + arbitration (panel/gtdbtk are assembly-only) |
 | `kraken2` | yes | ✅ | ✅ | reads or contigs |
 | `sylph` | yes | ❌ | ✅ | reads only |
-| `all` | yes | ✅ | ✅ | kraken2 (+ sylph when FASTQ) |
+| `all` | yes | ❌ | ✅ | kraken2+sylph; for contigs use `-m kraken2` |
+
+`-m` accepts a `+`-joined combination (e.g. `marker+sourmash`,
+`kraken2+sylph`); duplicates collapse and order is preserved. `all` means
+every mode for the current context and cannot be combined with others.
 
 The input type is inferred from the extension (`.fna/.fa/.fasta` vs
 `.fq/.fastq`, `.gz` allowed) and validated **before** any tool runs: a
-mismatch exits 2 and lists the supported types. `--meta` likewise rejects
-isolate modes, and isolate mode rejects `kraken2`/`sylph`.
+mismatch exits 2 and names the offending mode. `--meta` likewise rejects
+isolate modes, and isolate mode rejects `kraken2`/`sylph`. Because `all`
+includes sylph, `--meta -m all` needs FASTQ; use `-m kraken2` for contigs.
 
 ### Arguments
 
@@ -54,6 +59,7 @@ isolate modes, and isolate mode rejects `kraken2`/`sylph`.
 # One genome (isolate or MAG)
 gside scan contigs.fna                      # marker
 gside scan contigs.fna -m panel -f csv
+gside scan contigs.fna -m marker+sourmash
 gside scan *.fna -m marker -j 8 -o results.tsv
 
 # Long-read isolate data (marker treats reads as sequences)

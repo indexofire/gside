@@ -1070,3 +1070,33 @@ class TestMetaMarkdown:
         assert _run_meta(["r.fq"], "kraken2", None, output_format="md", no_header=True) == 0
         first = capsys.readouterr().out.splitlines()[0]
         assert first.startswith("| kraken2 |")
+
+
+class TestMetaCompositeModes:
+    def test_selected_methods_run_in_order(self, monkeypatch):
+        calls: list[str] = []
+
+        def fake(mode, files, db_dir, threads, input_type):
+            calls.append(mode)
+            return {"method": mode, "result": {"top_species": [], "n_species": 0}}
+
+        monkeypatch.setattr(cli, "_run_meta_method", fake)
+        payload = cli._meta_payload(["r.fq"], "kraken2+sylph", None)
+        assert calls == ["kraken2", "sylph"]
+        assert list(payload["methods"]) == ["kraken2", "sylph"]
+
+    def test_duplicates_collapse(self, monkeypatch):
+        calls: list[str] = []
+        monkeypatch.setattr(
+            cli,
+            "_run_meta_method",
+            lambda mode, *a, **k: calls.append(mode) or {"method": mode, "result": {}},
+        )
+        cli._meta_payload(["r.fq"], "kraken2+kraken2", None)
+        assert calls == ["kraken2"]
+
+
+class TestMetaUnknownMode:
+    def test_payload_rejects_unknown_mode(self):
+        with pytest.raises(ValueError, match="unsupported meta mode"):
+            cli._meta_payload(["r.fq"], "bogus", None)

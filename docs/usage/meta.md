@@ -130,7 +130,7 @@ gside scan --meta sample_1.fastq sample_2.fastq
 gside scan --meta sample_1.fastq sample_2.fastq -m kraken2 -f tsv -o profile.tsv
 
 # Contigs / assembled FASTA (kraken2 handles FASTA, sylph reports the structured error)
-gside scan --meta contigs.fna
+gside scan --meta contigs.fna -m kraken2
 
 # Single-end reads with sylph ANI profiling
 gside scan --meta reads.fastq -m sylph

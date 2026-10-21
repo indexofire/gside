@@ -96,7 +96,7 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-10-21): **651 tests**, total coverage **99.0%**
+Baseline (2026-10-21): **668 tests**, total coverage **99.0%**
 — all modules 100% except: ani 94%, multigene 99%, sourmash 99%,
 taxonomic 93% (quarantined), db 99%, kraken2 99%, progress 97%.
 Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
@@ -185,8 +185,8 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 - Subcommands: `scan` / `db` group (`status|setup|list`) / `validate` / `mcp` (MCP stdio server) / `--version`; entry `gside.cli:main`
 - `species` and `meta` are **hidden compatibility aliases** (preset `meta=False/True`) for `scan`; bacmap still calls `gside species`, so keep them until that pin moves
 - `--meta` batch mode: `-s/--samples sample_id<TAB>r1[<TAB>r2]` + `-j/--jobs` (order preserved); JSON becomes an array with a `sample` key, tsv/csv/md gain a leading `sample` column. `--samples` and positional reads are mutually exclusive (UsageError); `-j` without `--samples` is rejected
-- Mode choices: isolate `marker|panel|mash_refseq|sourmash|gtdbtk|all`; meta `kraken2|sylph|all` — do not invent modes. `scan -m` accepts the union and `_validate_scan` enforces the context
-- Input kinds are inferred from the extension (`.fna/.fa/.fasta` vs `.fq/.fastq`, `.gz` stripped) and validated **before** any tool runs: `_MODE_INPUTS` / `_META_MODE_INPUTS` in `cli.py` define the matrix (marker/mash_refseq/sourmash accept both; panel/gtdbtk are FASTA-only — skani and GTDB-Tk need assemblies; kraken2 both; sylph FASTQ-only; isolate `all` stays FASTA-only because panel/gtdbtk cannot read FASTQ). Update the matrix and docs together when adding a mode
+- Mode choices: isolate `marker|panel|mash_refseq|sourmash|gtdbtk|all`; meta `kraken2|sylph|all` — do not invent modes. `-m` also accepts `+` combinations (`marker+sourmash`): `_split_modes` dedupes in order, `all` cannot be combined, and `_validate_scan` checks **every** component against the context and input kind
+- Input kinds are inferred from the extension (`.fna/.fa/.fasta` vs `.fq/.fastq`, `.gz` stripped) and validated **before** any tool runs: `_MODE_INPUTS` / `_META_MODE_INPUTS` in `cli.py` define the matrix (marker/mash_refseq/sourmash accept both; panel/gtdbtk are FASTA-only — skani and GTDB-Tk need assemblies; kraken2 both; sylph FASTQ-only). `all` expands to the context's full list (`_ISOLATE_MODES` / `_META_METHODS`) and is validated component-by-component, so isolate `all` needs FASTA and meta `all` needs FASTQ. Update the matrix and docs together when adding a mode
 - `--db-dir` overrides the database root for one invocation
 - `verdict` shape is shared by single-mode and `all`: `species` (canonical), `display_name`, `strain`, `confidence`, `basis` (winner only), `supporting`, `agreement`
 

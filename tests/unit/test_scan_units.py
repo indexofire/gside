@@ -126,10 +126,16 @@ class TestScanMeta:
         assert CliRunner().invoke(main, ["scan", "r.fq", "--meta"]).exit_code == 0
         assert calls["args"][1] == "all"
 
-    def test_fasta_all_runs(self, monkeypatch):
+    def test_fasta_all_rejected_because_sylph_needs_reads(self):
+        result = CliRunner().invoke(main, ["scan", "g.fna", "--meta", "-m", "all"])
+        assert result.exit_code == 2
+        assert "sylph" in result.output and "FASTQ" in result.output
+        assert "use -m kraken2" in result.output
+
+    def test_fasta_kraken2_explicit(self, monkeypatch):
         calls = _capture(monkeypatch, "_run_meta")
-        assert CliRunner().invoke(main, ["scan", "g.fna", "--meta", "-m", "all"]).exit_code == 0
-        assert calls["args"][1] == "all"
+        assert CliRunner().invoke(main, ["scan", "g.fna", "--meta", "-m", "kraken2"]).exit_code == 0
+        assert calls["args"][1] == "kraken2"
 
     def test_paired_fastq(self, monkeypatch):
         calls = _capture(monkeypatch, "_run_meta")
@@ -193,7 +199,7 @@ class TestAliases:
     def test_species_alias_rejects_meta_modes(self):
         result = CliRunner().invoke(main, ["species", "r.fq", "-m", "kraken2"])
         assert result.exit_code == 2
-        assert "Invalid value" in result.output
+        assert "not available without --meta" in result.output
 
     def test_meta_alias_forces_meta(self, monkeypatch):
         calls = _capture(monkeypatch, "_run_meta")
@@ -208,7 +214,7 @@ class TestAliases:
     def test_meta_alias_rejects_isolate_modes(self):
         result = CliRunner().invoke(main, ["meta", "g.fna", "-m", "panel"])
         assert result.exit_code == 2
-        assert "Invalid value" in result.output
+        assert "not available with --meta" in result.output
 
     def test_scan_is_the_only_visible_command(self):
         result = CliRunner().invoke(main, ["--help"])
@@ -243,3 +249,61 @@ class TestReadsCapableGenomeTiers:
         result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "all"])
         assert result.exit_code == 2
         assert "does not accept FASTQ" in result.output
+
+
+class TestCompositeModes:
+    def test_isolate_combination_is_forwarded(self, monkeypatch):
+        calls = _capture(monkeypatch, "_run_species")
+        result = CliRunner().invoke(main, ["scan", "g.fna", "-m", "marker+sourmash"])
+        assert result.exit_code == 0
+        assert calls["args"][1] == "marker+sourmash"
+
+    def test_combination_of_reads_capable_tiers(self, monkeypatch):
+        calls = _capture(monkeypatch, "_run_species")
+        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "marker+mash_refseq+sourmash"])
+        assert result.exit_code == 0
+        assert calls["args"][1] == "marker+mash_refseq+sourmash"
+
+    def test_incompatible_component_is_named(self):
+        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "marker+panel"])
+        assert result.exit_code == 2
+        assert "mode 'panel' does not accept FASTQ" in result.output
+
+    def test_all_cannot_be_combined(self):
+        result = CliRunner().invoke(main, ["scan", "g.fna", "-m", "all+marker"])
+        assert result.exit_code == 2
+        assert "cannot be combined" in result.output
+
+    def test_empty_mode_rejected(self):
+        result = CliRunner().invoke(main, ["scan", "g.fna", "-m", "  "])
+        assert result.exit_code == 2
+        assert "--mode is empty" in result.output
+
+    def test_meta_combination_is_forwarded(self, monkeypatch):
+        calls = _capture(monkeypatch, "_run_meta")
+        result = CliRunner().invoke(main, ["scan", "r.fq", "--meta", "-m", "kraken2+sylph"])
+        assert result.exit_code == 0
+        assert calls["args"][1] == "kraken2+sylph"
+
+    def test_meta_combination_rejects_fasta_component(self):
+        result = CliRunner().invoke(main, ["scan", "g.fna", "--meta", "-m", "kraken2+sylph"])
+        assert result.exit_code == 2
+        assert "mode 'sylph' does not accept FASTA" in result.output
+
+
+class TestExpandModes:
+    def test_all_expands_per_context(self):
+        assert cli._expand_modes("all", meta=False) == [
+            "marker",
+            "panel",
+            "mash_refseq",
+            "sourmash",
+            "gtdbtk",
+        ]
+        assert cli._expand_modes("all", meta=True) == ["kraken2", "sylph"]
+
+    def test_duplicates_are_dropped_in_order(self):
+        assert cli._expand_modes("marker+panel+marker", meta=False) == ["marker", "panel"]
+
+    def test_whitespace_is_tolerated(self):
+        assert cli._expand_modes("marker + sourmash", meta=False) == ["marker", "sourmash"]

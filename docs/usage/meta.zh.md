@@ -119,7 +119,7 @@ gside scan --meta sample_1.fastq sample_2.fastq
 gside scan --meta sample_1.fastq sample_2.fastq -m kraken2 -f tsv -o profile.tsv
 
 # contigs / 组装 FASTA（kraken2 支持 FASTA，sylph 报结构化错误）
-gside scan --meta contigs.fna
+gside scan --meta contigs.fna -m kraken2
 
 # 单端读段 sylph ANI 分析
 gside scan --meta reads.fastq -m sylph

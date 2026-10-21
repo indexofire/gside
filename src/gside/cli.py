@@ -19,8 +19,10 @@ from gside.analysis.species_name import UNKNOWN, display_name, parse_species_nam
 
 HELP_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
-MODES = ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk", "all"]
-META_MODES = ["kraken2", "sylph", "all"]
+_ISOLATE_MODES = ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk"]
+_META_METHODS = ["kraken2", "sylph"]
+MODES = [*_ISOLATE_MODES, "all"]
+META_MODES = [*_META_METHODS, "all"]
 TIERS = ["mini", "panel", "mash", "sourmash", "meta", "meta_sylph", "all"]
 
 
@@ -129,8 +131,7 @@ _META_MODE_INPUTS: dict[str, frozenset[str]] = {
     "sylph": frozenset({"fastq"}),
     "all": frozenset({"fasta", "fastq"}),
 }
-_ISOLATE_ALL_INPUTS = frozenset({"fasta"})
-SCAN_MODES = ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk", "kraken2", "sylph", "all"]
+SCAN_MODES = [*_ISOLATE_MODES, *_META_METHODS, "all"]
 
 
 def _input_kind(path: str) -> str:
@@ -147,20 +148,42 @@ def _input_kind(path: str) -> str:
 
 
 def _supported_inputs(mode: str, meta: bool) -> frozenset[str]:
-    if meta:
-        return _META_MODE_INPUTS[mode]
-    return _ISOLATE_ALL_INPUTS if mode == "all" else _MODE_INPUTS[mode]
+    return _META_MODE_INPUTS[mode] if meta else _MODE_INPUTS[mode]
 
 
-def _validate_scan(files: list[str], mode: str, meta: bool) -> None:
+def _split_modes(raw: str) -> list[str]:
+    """``marker+sourmash`` → ['marker', 'sourmash'] (order kept, dupes dropped)."""
+    return list(dict.fromkeys(part.strip() for part in raw.split("+") if part.strip()))
+
+
+def _expand_modes(raw: str, meta: bool) -> list[str]:
+    parts = _split_modes(raw)
+    if parts == ["all"]:
+        return list(_META_METHODS if meta else _ISOLATE_MODES)
+    return parts
+
+
+def _resolve_modes(raw: str, meta: bool) -> list[str]:
+    """Validated expansion used before any tool runs."""
+    parts = _split_modes(raw)
+    if not parts:
+        raise click.UsageError("--mode is empty")
+    if "all" in parts and len(parts) > 1:
+        raise click.UsageError("'all' cannot be combined with other modes")
+    return _expand_modes(raw, meta)
+
+
+def _validate_scan(files: list[str], raw_mode: str, meta: bool) -> None:
     """Reject mode/flag and mode/input mismatches before any tool runs."""
-    allowed_modes = META_MODES if meta else MODES
-    if mode not in allowed_modes:
-        hint = "drop --meta" if mode in MODES else "add --meta"
-        raise click.UsageError(
-            f"mode {mode!r} is not available {'with' if meta else 'without'} --meta"
-            f" ({hint}); allowed: {', '.join(allowed_modes)}"
-        )
+    modes = _resolve_modes(raw_mode, meta)
+    allowed_modes = _META_METHODS if meta else _ISOLATE_MODES
+    for mode in modes:
+        if mode not in allowed_modes:
+            hint = "drop --meta" if mode in _ISOLATE_MODES else "add --meta"
+            raise click.UsageError(
+                f"mode {mode!r} is not available {'with' if meta else 'without'} --meta"
+                f" ({hint}); allowed: {', '.join(allowed_modes)}"
+            )
 
     kinds = {_input_kind(f) for f in files}
     if "unknown" in kinds:
@@ -172,14 +195,24 @@ def _validate_scan(files: list[str], mode: str, meta: bool) -> None:
     if meta and len(files) == 2 and kinds != {"fastq"}:
         raise click.UsageError("paired input must be two FASTQ files")
 
-    allowed = _supported_inputs(mode, meta)
-    unsupported = kinds - allowed
-    if unsupported:
+    for mode in modes:
+        allowed = _supported_inputs(mode, meta)
+        unsupported = kinds - allowed
+        if not unsupported:
+            continue
         kind = sorted(unsupported)[0]
-        extra = "; for reads use --meta -m kraken2" if not meta and kind == "fastq" else ""
+        if raw_mode == "all":
+            hint = (
+                "; all includes panel/gtdbtk, which need FASTA;"
+                " for reads use e.g. -m marker+sourmash"
+                if not meta
+                else "; all includes sylph, which needs FASTQ; for contigs use -m kraken2"
+            )
+        else:
+            hint = "; for reads use --meta -m kraken2" if not meta and kind == "fastq" else ""
         raise click.UsageError(
             f"mode {mode!r} does not accept {kind.upper()} input"
-            f" (supported: {', '.join(sorted(k.upper() for k in allowed))}){extra}"
+            f" (supported: {', '.join(sorted(k.upper() for k in allowed))}){hint}"
         )
 
 
@@ -273,9 +306,14 @@ def _scan_options(*, meta_preset: bool | None, with_samples: bool, modes: list[s
             click.option(
                 "-m",
                 "--mode",
-                type=click.Choice(modes),
                 default=None,
-                help="Identification method (default: marker; all with --meta).",
+                metavar="MODE[+MODE...]",
+                help=(
+                    f"Method or '+'-joined combination ({', '.join(modes)}); "
+                    f"default: {'all' if meta_preset else 'marker'}"
+                    + (" (all with --meta)" if meta_preset is None else "")
+                    + "."
+                ),
             ),
         ]
         if meta_preset is None:
@@ -817,7 +855,7 @@ def _auto_setup_retry(
             continue
         retry = _identify_one(contigs, m, db_dir, threads)
         methods[m] = retry["methods"].get(m, method_payload)
-    payload["verdict"] = _verdict_for(methods, mode)
+    payload["verdict"] = _verdict_for(methods)
     return payload
 
 
@@ -874,8 +912,8 @@ def _verdict_payload(
     }
 
 
-def _verdict_for(results: dict[str, Any], mode: str) -> dict[str, Any]:
-    if mode == "all" and len(results) > 1:
+def _verdict_for(results: dict[str, Any]) -> dict[str, Any]:
+    if len(results) > 1:
         return _arbitrate(results)
     first = next(iter(results.values()), {})
     if not first or "error" in first:
@@ -887,7 +925,10 @@ def _verdict_for(results: dict[str, Any], mode: str) -> dict[str, Any]:
 def _identify_one(contigs: str, mode: str, db_dir: str | None, threads: int = 4) -> dict[str, Any]:
     results: dict[str, Any] = {}
 
-    modes = ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk"] if mode == "all" else [mode]
+    modes = _expand_modes(mode, meta=False)
+    unknown = [m for m in modes if m not in _ISOLATE_MODES]
+    if unknown:
+        raise ValueError(f"unsupported isolate mode(s): {', '.join(unknown)}")
     for m in modes:
         try:
             if m == "marker":
@@ -915,7 +956,7 @@ def _identify_one(contigs: str, mode: str, db_dir: str | None, threads: int = 4)
             entry.update(_structured_missing_db_fields(entry["error"]))
             results[m] = entry
 
-    verdict = _verdict_for(results, mode)
+    verdict = _verdict_for(results)
 
     payload = {
         "analysis_type": "species_identification",
@@ -1132,7 +1173,10 @@ def _meta_payload(
 ) -> dict[str, Any]:
     """Profile one sample into the JSON payload (shared by CLI, MCP, batch)."""
     input_type = _detect_meta_input(files)
-    modes = ["kraken2", "sylph"] if mode == "all" else [mode]
+    modes = _expand_modes(mode, meta=True)
+    unknown = [m for m in modes if m not in _META_METHODS]
+    if unknown:
+        raise ValueError(f"unsupported meta mode(s): {', '.join(unknown)}")
     methods = {m: _run_meta_method(m, files, db_dir, threads, input_type) for m in modes}
     return {
         "analysis_type": "metagenomic_profiling",

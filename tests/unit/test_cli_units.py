@@ -940,3 +940,60 @@ class TestGtdbtkMode:
         assert "gtdbtk" in result.output
         assert "--auto-setup" in result.output
         assert "Install a missing database tier" in result.output
+
+
+class TestCompositeIdentify:
+    def test_runs_only_selected_methods(self, monkeypatch):
+        import types
+
+        import gside.analysis.multigene_identifier as mg
+        import gside.analysis.sourmash_identifier as sm
+
+        def fake_marker(contigs, threads=4):
+            return types.SimpleNamespace(
+                to_dict=lambda: {
+                    "species": "Salmonella",
+                    "confidence": "high",
+                    "database": {},
+                }
+            )
+
+        def fake_sourmash(contigs, db_dir=None):
+            return types.SimpleNamespace(
+                to_dict=lambda: {
+                    "species": "Salmonella",
+                    "confidence": "medium",
+                    "database": {},
+                }
+            )
+
+        monkeypatch.setattr(mg, "identify_multigene", fake_marker)
+        monkeypatch.setattr(sm, "identify_by_sourmash", fake_sourmash)
+        payload = _identify_one("g.fna", "marker+sourmash", None)
+        assert set(payload["methods"]) == {"marker", "sourmash"}
+        assert payload["verdict"]["species"] == "Salmonella"
+        assert payload["verdict"]["agreement"] == "2/2"
+
+    def test_deduplicated_modes_run_once(self, monkeypatch):
+        import types
+
+        import gside.analysis.multigene_identifier as mg
+
+        calls: list[str] = []
+
+        def fake_marker(contigs, threads=4):
+            calls.append("marker")
+            return types.SimpleNamespace(
+                to_dict=lambda: {"species": "Salmonella", "confidence": "high", "database": {}}
+            )
+
+        monkeypatch.setattr(mg, "identify_multigene", fake_marker)
+        payload = _identify_one("g.fna", "marker+marker", None)
+        assert calls == ["marker"]
+        assert list(payload["methods"]) == ["marker"]
+
+
+class TestCompositeUnknownMode:
+    def test_identify_one_rejects_unknown_mode(self):
+        with pytest.raises(ValueError, match="unsupported isolate mode"):
+            _identify_one("g.fna", "bogus", None)

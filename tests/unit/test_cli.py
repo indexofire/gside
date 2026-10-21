@@ -124,8 +124,7 @@ class TestSingleModeVerdict:
                         "strain": "K12",
                     }
                 }
-            },
-            "panel",
+            }
         )
         assert verdict["species"] == "Escherichia_coli"
         assert verdict["display_name"] == "Escherichia coli"
