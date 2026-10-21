@@ -40,12 +40,16 @@ MASH_MD5 = "dee53b23af3ab120333f9eb1b95ae60f"
 # Pinned SHA256 digests (hex) of downloaded artifacts. An empty string means
 # no checksum is pinned yet; _verify_sha256 prints a warning and skips.
 PANEL_SHA256 = "f9bdbeeaa744a6ed9fafef98e854d309eebc8d060df787345c2d7cdd1e36e595"
-SOURMASH_SIG_SHA256 = ""
+# Upstream publishes no digest for the 3.9GB signature zip; this value was
+# pinned after a locally verified download (2026-10-21): complete size, zip
+# integrity, 143,385 k=31 DNA signatures, CC0. Override at runtime with
+# GSIDE_SOURMASH_SIG_SHA256=<hex>.
+SOURMASH_SIG_SHA256 = "6f3cc74f0bdcf6f84466ba91f87d6f2bf30081d5814bdf006cafd1e9cbbeada9"
 SOURMASH_LINEAGES_SHA256 = "98bceab27a50f08b2f777ca7bdfb57c88aabe5ce1fa54cfb103dd0ad51b67624"
 SOURMASH_FARM_BASE = "https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs226"
 SOURMASH_SIG_URL = f"{SOURMASH_FARM_BASE}/gtdb-rs226-reps.k31.sig.zip"
 SOURMASH_LINEAGES_URL = f"{SOURMASH_FARM_BASE}/gtdb-rs226-reps.lineages.csv"
-# Manual-provision tiers (no auto-download): users place the databases themselves.
+# Upstream landing pages referenced by db setup / error hints.
 K2_INDEXES_URL = "https://benlangmead.github.io/aws-indexes/k2"
 SYLPH_DOCS_URL = "https://sylph-docs.github.io/"
 

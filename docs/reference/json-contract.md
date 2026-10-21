@@ -168,6 +168,18 @@ Species-group placeholders (`Campylobacter sp.`) and `Unknown` are emitted as
 | `result.aligned_fraction` | float | Alignment coverage fraction |
 | `result.top_hits` | list | Top N hits (genome/species/ani/af) |
 
+## sourmash-Specific Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `result.ani` | float \| null | Containment ANI of the best match (0-100) |
+| `result.f_unique_weighted` | float | Fraction of query hashes in the best match |
+| `result.gather_partition` | list | Per-match `species` / `f_unique_weighted` / `ani` |
+| `result.flags` | list[str] | `possible_mixture` when >=2 distinct species each reach 10% with ANI >= 93 |
+
+Confidence follows the containment ANI (95/93 bands, same as panel). If the
+gather CSV has no ANI column, the hash-fraction fallback (0.90/0.70) applies.
+
 ## Consuming the output
 
 The JSON is self-describing, so consuming it from Python needs nothing

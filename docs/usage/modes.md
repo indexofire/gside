@@ -103,15 +103,25 @@ framework.
 
 ### Thresholds
 
-| f_unique_weighted | Call |
-|-------------------|------|
-| ≥0.90 | confidence=high (unless a mixture is flagged) |
-| 0.70-0.90 | confidence=medium |
-| <0.70 | Mixed/Unknown |
+Confidence comes from the gather containment ANI (`average_containment_ani`),
+using the same 95/93 bands as the panel layer:
 
-When two or more gathered lineages each reach `f_unique_weighted` ≥ 0.10,
-the result carries a `possible_mixture` flag and the high-confidence branch
-is withheld.
+| Containment ANI | Call |
+|-----------------|------|
+| ≥95 | confidence=high (unless a mixture is flagged) |
+| 93-95 | confidence=medium |
+| <93 | Mixed/Unknown |
+
+If the gather CSV has no ANI column (old exports), the fallback bands are
+`f_unique_weighted` ≥0.90 → high, ≥0.70 → medium.
+
+When two or more **distinct species** each reach `f_unique_weighted` ≥ 0.10
+with ANI ≥ 93, the result carries a `possible_mixture` flag and the
+high-confidence branch is withheld. Multiple strains of one species do not
+trigger it.
+
+The result also exposes `ani` and a per-match `gather_partition`
+(`species`, `f_unique_weighted`, `ani`).
 
 ### Use Cases
 

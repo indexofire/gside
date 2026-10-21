@@ -342,6 +342,7 @@ class TestSourmashTier:
             Path(dst).write_bytes(b"x")
 
         monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "SOURMASH_SIG_SHA256", hashlib.sha256(b"x").hexdigest())
         monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
         msg = db_setup("sourmash")["D4_sourmash"]
         assert msg.startswith("downloaded from farm.cse.ucdavis.edu")
@@ -564,6 +565,7 @@ class TestSourmashRenameErrors:
             Path(dst).write_bytes(b"x")
 
         monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "SOURMASH_SIG_SHA256", hashlib.sha256(b"x").hexdigest())
         monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
         dst = root / "D4_sourmash"
         dst.mkdir(parents=True)
@@ -577,6 +579,7 @@ class TestSourmashRenameErrors:
             Path(dst).write_bytes(b"x")
 
         monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "SOURMASH_SIG_SHA256", hashlib.sha256(b"x").hexdigest())
         monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
         monkeypatch.setattr(db, "_check_sourmash", lambda: False)
         assert db_setup("sourmash")["D4_sourmash"].startswith("ERROR: download incomplete")
@@ -587,7 +590,9 @@ class TestPinnedChecksumConstants:
         assert db.PANEL_SHA256 == (
             "f9bdbeeaa744a6ed9fafef98e854d309eebc8d060df787345c2d7cdd1e36e595"
         )
-        assert db.SOURMASH_SIG_SHA256 == ""
+        assert db.SOURMASH_SIG_SHA256 == (
+            "6f3cc74f0bdcf6f84466ba91f87d6f2bf30081d5814bdf006cafd1e9cbbeada9"
+        )
         assert db.SOURMASH_LINEAGES_SHA256 == (
             "98bceab27a50f08b2f777ca7bdfb57c88aabe5ce1fa54cfb103dd0ad51b67624"
         )
@@ -723,6 +728,7 @@ class TestSourmashChecksumVerification:
             Path(d).write_bytes(b"x")
 
         monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "SOURMASH_SIG_SHA256", hashlib.sha256(b"x").hexdigest())
         dst = root / "D4_sourmash"
         dst.mkdir(parents=True)
         msg = db._download_sourmash_farm(dst)
@@ -736,6 +742,8 @@ class TestSourmashChecksumVerification:
             Path(d).write_bytes(b"x")
 
         monkeypatch.setattr(db, "_download_file", fake_download)
+        monkeypatch.setattr(db, "SOURMASH_SIG_SHA256", "")
+        monkeypatch.delenv("GSIDE_SOURMASH_SIG_SHA256", raising=False)
         monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
         dst = root / "D4_sourmash"
         dst.mkdir(parents=True)

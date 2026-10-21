@@ -95,13 +95,23 @@ sourmash gather 对 contigs 做 LCA 分类，基于 GTDB 分类框架。
 
 ### 判定阈值
 
-| 匹配比例 | 判定 |
-|---|---|
-| ≥0.90 | confidence=high |
-| 0.70~0.90 | confidence=medium（建议复核） |
-| <0.70 | Unknown |
+置信度取自 gather 的 containment ANI（`average_containment_ani`），与 panel
+层共用 95/93 分界：
 
-gather 分解出多个显著匹配成分时，结果携带 `possible_mixture` 提示。
+| Containment ANI | 判定 |
+|---|---|
+| ≥95 | confidence=high（除非标记为混合） |
+| 93~95 | confidence=medium |
+| <93 | Unknown |
+
+若 gather CSV 没有 ANI 列（旧版导出），回退到 `f_unique_weighted`：
+≥0.90 → high，≥0.70 → medium。
+
+当两个及以上**不同物种**各自 `f_unique_weighted` ≥ 0.10 且 ANI ≥ 93 时，
+结果携带 `possible_mixture` 标记并降为 medium；同一物种的多个菌株不会触发。
+
+结果同时给出 `ani` 以及逐匹配的 `gather_partition`
+（`species`、`f_unique_weighted`、`ani`）。
 
 ### 适用场景
 

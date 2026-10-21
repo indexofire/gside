@@ -11,9 +11,12 @@ from pathlib import Path
 from typing import Any
 
 from gside.analysis._envelope import MethodEnvelope
-from gside.analysis.species_name import apply_species_name
+from gside.analysis._thresholds import ANI_HIGH, ANI_MEDIUM
+from gside.analysis.species_name import UNKNOWN, apply_species_name, canonical_species
 from gside.config import SPECIES_DB_DIR
 
+# Fallback bands for gather CSVs without the containment-ANI column
+# (sourmash >= 4.x always emits it; older exports may not).
 _FUW_HIGH = 0.90
 _FUW_MEDIUM = 0.70
 _MIXTURE_MEMBER = 0.10
@@ -22,6 +25,28 @@ _MIXTURE_MEMBER = 0.10
 @dataclass
 class SourmashIdResult(MethodEnvelope):
     pass
+
+
+def _float(row: dict[str, str], key: str) -> float:
+    try:
+        return float(row.get(key, "") or 0.0)
+    except ValueError:
+        return 0.0
+
+
+def _confidence(ani: float, fuw: float) -> str:
+    """Containment ANI when available, hash-fraction bands otherwise."""
+    if ani > 0:
+        if ani >= ANI_HIGH:
+            return "high"
+        if ani >= ANI_MEDIUM:
+            return "medium"
+        return "low"
+    if fuw >= _FUW_HIGH:
+        return "high"
+    if fuw >= _FUW_MEDIUM:
+        return "medium"
+    return "low"
 
 
 def _run(cmd: list[str]) -> str:
@@ -56,11 +81,19 @@ def _gather_and_tax(contigs: str | Path, db_dir: Path) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for row in rows:
         name = row.get("name", "")
-        try:
-            fuw = float(row.get("f_unique_weighted", 0.0))
-        except ValueError:
-            fuw = 0.0
-        out.append({"lineage": lineage_map.get(name, name), "f_unique_weighted": fuw})
+        # gather's `name` is the signature name ("GCF_... Species"); the
+        # lineage table is keyed by accession.
+        accession = name.split()[0] if name else ""
+        species = lineage_map.get(accession) or lineage_map.get(name) or name
+        ani = _float(row, "average_containment_ani") or _float(row, "match_containment_ani")
+        out.append(
+            {
+                "species": species,
+                "f_unique_weighted": _float(row, "f_unique_weighted"),
+                "ani": round(ani * 100.0, 2),
+            }
+        )
+    out.sort(key=lambda hit: hit["f_unique_weighted"], reverse=True)
     return out
 
 
@@ -91,24 +124,34 @@ def identify_by_sourmash(contigs: str | Path, db_dir: str | Path | None = None) 
     partition = _gather_and_tax(contigs, base)
     database = {"name": "D4_sourmash", "version": _db_version(base)}
 
-    best_fuw = max((p["f_unique_weighted"] for p in partition), default=0.0)
-    flags: list[str] = []
-    strong_members = [p for p in partition if p["f_unique_weighted"] >= _MIXTURE_MEMBER]
-    if len(strong_members) >= 2:
-        flags.append("possible_mixture")
+    best = partition[0] if partition else None
+    best_fuw = best["f_unique_weighted"] if best else 0.0
+    best_ani = best["ani"] if best else 0.0
 
-    if best_fuw >= _FUW_HIGH and not flags:
-        species, confidence = partition[0]["lineage"], "high"
-    elif best_fuw >= _FUW_MEDIUM:
-        species, confidence = partition[0]["lineage"], "medium"
-    else:
-        species, confidence = "Mixed/Unknown", "low"
+    strong_members = [
+        p
+        for p in partition
+        if p["f_unique_weighted"] >= _MIXTURE_MEMBER and (p["ani"] >= ANI_MEDIUM or p["ani"] == 0.0)
+    ]
+    # Several strains of one species are not a mixture; distinct species are.
+    strong_species = {canonical_species(p["species"]) for p in strong_members} - {UNKNOWN}
+    flags = ["possible_mixture"] if len(strong_species) >= 2 else []
+
+    confidence = _confidence(best_ani, best_fuw)
+    if flags and confidence == "high":
+        confidence = "medium"
+    species = best["species"] if best is not None and confidence != "low" else "Mixed/Unknown"
 
     result = {
         "confidence": confidence,
         "f_unique_weighted": best_fuw,
+        "ani": best_ani if best_ani > 0 else None,
         "gather_partition": [
-            {"lineage": p["lineage"], "f_unique_weighted": p["f_unique_weighted"]}
+            {
+                "species": p["species"],
+                "f_unique_weighted": p["f_unique_weighted"],
+                "ani": p["ani"] if p["ani"] > 0 else None,
+            }
             for p in partition
         ],
         "flags": flags,

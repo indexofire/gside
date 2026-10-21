@@ -162,6 +162,18 @@ DEC 折叠成 `Escherichia_coli`——这个区分正是下游致病型分型的
 | `result.aligned_fraction` | float | 比对覆盖比例 |
 | `result.top_hits` | list | 前 N 个命中（genome/species/ani/af） |
 
+## sourmash 特有字段
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `result.ani` | float \| null | 最佳匹配的 containment ANI（0-100） |
+| `result.f_unique_weighted` | float | 最佳匹配占查询哈希的比例 |
+| `result.gather_partition` | list | 逐匹配的 `species` / `f_unique_weighted` / `ani` |
+| `result.flags` | list[str] | 两个及以上不同物种各自 ≥10% 且 ANI ≥93 时为 `possible_mixture` |
+
+置信度按 containment ANI 的 95/93 分界（与 panel 一致）；若 gather CSV 无 ANI
+列，则回退到哈希比例 0.90/0.70。
+
 ## 消费输出
 
 用 subprocess 调用 gside，再用标准库 json 解析 stdout：

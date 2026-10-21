@@ -16,13 +16,14 @@ from gside.analysis.sourmash_identifier import (
 )
 
 _GATHER_CSV = (
-    "intersect_bp,f_match,f_unique_weighted,filename,name\n900,1.0,0.9,/tmp/db.zip,GCF_A\n"
+    "intersect_bp,f_unique_weighted,name,average_containment_ani\n"
+    "900,0.9,GCF_A Vibrio parahaemolyticus,0.99\n"
 )
 
 
 def _seed_db(db_dir: Path) -> None:
     (db_dir / "gtdb-reps-k31.zip").write_bytes(b"x")
-    (db_dir / "lineages.csv").write_text("GCF_A,s__Vp\n")
+    (db_dir / "lineages.csv").write_text("ident,species\nGCF_A,s__Vibrio parahaemolyticus\n")
 
 
 def _fake_run_writing_outputs(csv_text: str = _GATHER_CSV):
@@ -73,34 +74,84 @@ class TestToDict:
 
 
 def _partition(*members):
-    return [{"lineage": lin, "f_unique_weighted": fuw} for lin, fuw in members]
+    """members: (species, f_unique_weighted, ani_percent)"""
+    return [
+        {"species": species, "f_unique_weighted": fuw, "ani": ani} for species, fuw, ani in members
+    ]
 
 
 class TestConfidence:
     def test_high(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(sm, "_gather_and_tax", lambda c, b: _partition(("Vp", 0.95)))
+        monkeypatch.setattr(sm, "_gather_and_tax", lambda c, b: _partition(("Vp", 0.95, 99.0)))
         r = identify_by_sourmash("q.fna", db_dir=tmp_path).result
         assert (r["species"], r["confidence"]) == ("Vp", "high")
+        assert r["ani"] == 99.0
         assert r["flags"] == []
+
+    def test_medium_ani_band(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(sm, "_gather_and_tax", lambda c, b: _partition(("Vp", 0.8, 94.0)))
+        assert identify_by_sourmash("q.fna", db_dir=tmp_path).result["confidence"] == "medium"
+
+    def test_low_ani_is_unknown(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(sm, "_gather_and_tax", lambda c, b: _partition(("Vp", 0.95, 90.0)))
+        r = identify_by_sourmash("q.fna", db_dir=tmp_path).result
+        assert (r["species"], r["confidence"]) == ("Unknown", "low")
 
     def test_mixture_flag_blocks_high(self, monkeypatch, tmp_path):
         monkeypatch.setattr(
             sm,
             "_gather_and_tax",
-            lambda c, b: _partition(("Vp", 0.95), ("Vc", 0.20)),
+            lambda c, b: _partition(("Vp", 0.95, 99.0), ("Vc", 0.20, 98.0)),
         )
         r = identify_by_sourmash("q.fna", db_dir=tmp_path).result
         assert r["flags"] == ["possible_mixture"]
         assert r["confidence"] == "medium"
 
-    def test_medium(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(sm, "_gather_and_tax", lambda c, b: _partition(("Vp", 0.8)))
-        assert identify_by_sourmash("q.fna", db_dir=tmp_path).result["confidence"] == "medium"
+    def test_second_strain_below_mixture_threshold(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            sm,
+            "_gather_and_tax",
+            lambda c, b: _partition(("Vp", 0.95, 99.0), ("Vp2", 0.05, 98.0)),
+        )
+        r = identify_by_sourmash("q.fna", db_dir=tmp_path).result
+        assert r["flags"] == []
+        assert r["confidence"] == "high"
+
+    def test_same_species_strains_are_not_a_mixture(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            sm,
+            "_gather_and_tax",
+            lambda c, b: _partition(
+                ("s__Escherichia coli", 0.6, 98.0), ("s__Escherichia coli", 0.2, 97.0)
+            ),
+        )
+        r = identify_by_sourmash("q.fna", db_dir=tmp_path).result
+        assert r["flags"] == []
+        assert r["confidence"] == "high"
+
+    def test_distinct_species_set_the_mixture_flag(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            sm,
+            "_gather_and_tax",
+            lambda c, b: _partition(
+                ("s__Escherichia coli", 0.6, 98.0), ("s__Shigella flexneri", 0.2, 97.0)
+            ),
+        )
+        r = identify_by_sourmash("q.fna", db_dir=tmp_path).result
+        assert r["flags"] == ["possible_mixture"]
+        assert r["confidence"] == "medium"
+
+    def test_missing_ani_column_falls_back_to_fraction(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(sm, "_gather_and_tax", lambda c, b: _partition(("Vp", 0.95, 0.0)))
+        r = identify_by_sourmash("q.fna", db_dir=tmp_path).result
+        assert (r["species"], r["confidence"]) == ("Vp", "high")
+        assert r["ani"] is None
 
     def test_low_empty(self, monkeypatch, tmp_path):
         monkeypatch.setattr(sm, "_gather_and_tax", lambda c, b: [])
         r = identify_by_sourmash("q.fna", db_dir=tmp_path).result
         assert (r["species"], r["confidence"]) == ("Unknown", "low")
+        assert r["ani"] is None
 
 
 class TestGatherAndTax:
@@ -109,11 +160,16 @@ class TestGatherAndTax:
 
         _seed_db(tmp_path)
         csv_text = (
-            "intersect_bp,f_match,f_unique_weighted,filename,name\n900,1.0,0.9,/tmp/db.zip,GCF_A\n"
+            "intersect_bp,f_unique_weighted,name,average_containment_ani\n"
+            "900,0.9,GCF_A Vibrio parahaemolyticus,0.99\n"
         )
         monkeypatch.setattr(mod, "_run", _fake_run_writing_outputs(csv_text))
         out = mod._gather_and_tax("q.fna", tmp_path)
-        assert out[0] == {"lineage": "s__Vp", "f_unique_weighted": 0.9}
+        assert out[0] == {
+            "species": "s__Vibrio parahaemolyticus",
+            "f_unique_weighted": 0.9,
+            "ani": 99.0,
+        }
 
     def test_missing_db_files(self, tmp_path):
         import gside.analysis.sourmash_identifier as mod
@@ -138,12 +194,16 @@ class TestGatherAndTax:
 
         _seed_db(tmp_path)
         bad_csv = (
-            "intersect_bp,f_match,f_unique_weighted,filename,name\n"
-            "900,1.0,notanum,/tmp/db.zip,GCF_A\n"
+            "intersect_bp,f_unique_weighted,name,average_containment_ani\n"
+            "900,notanum,GCF_A Vibrio parahaemolyticus,0.99\n"
         )
         monkeypatch.setattr(mod, "_run", _fake_run_writing_outputs(bad_csv))
         out = mod._gather_and_tax("q.fna", tmp_path)
-        assert out[0] == {"lineage": "s__Vp", "f_unique_weighted": 0.0}
+        assert out[0] == {
+            "species": "s__Vibrio parahaemolyticus",
+            "f_unique_weighted": 0.0,
+            "ani": 99.0,
+        }
 
     def test_bad_json_version(self, tmp_path):
         (tmp_path / "D4_sourmash").mkdir()
@@ -180,8 +240,8 @@ class TestTempDirIntermediates:
 
         monkeypatch.setattr(sm, "_run", fake_run)
         result = identify_by_sourmash("q.fna", db_dir=tmp_path)
-        assert result.result["species"] == "Vp"
-        assert result.result["species_raw"] == "s__Vp"
+        assert result.result["species"] == "Vibrio_parahaemolyticus"
+        assert result.result["species_raw"] == "s__Vibrio parahaemolyticus"
         assert not (tmp_path / "query.sig").exists()
         assert not (tmp_path / "gather.csv").exists()
         assert outs, "expected sketch and gather to run"

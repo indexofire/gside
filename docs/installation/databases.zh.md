@@ -92,13 +92,19 @@ gside db setup --tier meta_sylph   # sylph GTDB r226，.syl2db（约 14GB）
 |---|---|---|
 | panel | SHA256（`PANEL_SHA256`） | GitHub Release 资产 |
 | mash | MD5（`MASH_MD5`） | 上游 Zenodo 仅提供 MD5 |
-| sourmash | SHA256（`SOURMASH_LINEAGES_SHA256`）+ 可选签名 SHA256 | 见下 |
+| sourmash | lineages SHA256 + 签名 SHA256（`SOURMASH_SIG_SHA256`） | 签名值来自已验证下载 |
 
-sourmash 签名 zip（约 3.9GB）上游没有摘要。可自行设置以下环境变量强制校验；
-未设置时只告警并继续：
+sourmash 签名 zip（约 3.9GB）上游没有摘要。gside 记录了一次本地人工校验后的值
+（体积精确、zip 完整、143,385 条 k=31 DNA 签名、CC0）：
+
+```
+SOURMASH_SIG_SHA256 = 6f3cc74f0bdcf6f84466ba91f87d6f2bf30081d5814bdf006cafd1e9cbbeada9
+```
+
+若使用不同镜像，可在安装时覆盖：
 
 ```bash
-export GSIDE_SOURMASH_SIG_SHA256=<gtdb-rs226-reps.k31.sig.zip 的 sha256>
+export GSIDE_SOURMASH_SIG_SHA256=<你的 zip 的 sha256>
 gside db setup --tier sourmash
 ```
 

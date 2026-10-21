@@ -24,6 +24,9 @@ UNKNOWN = "Unknown"
 
 _RANK_PREFIXES = ("d__", "p__", "c__", "o__", "f__", "g__", "s__")
 _TOKEN_RE = re.compile(r"[^._\s/]+")
+# sourmash names look like "GCF_001457695.1 Campylobacter jejuni".
+_ACCESSION_PREFIX_RE = re.compile(r"^GC[AF]_\d+(?:\.\d+)?\s+")
+_BARE_ACCESSION_RE = re.compile(r"GC[AF]_\d+(?:\.\d+)?")
 
 # Empty / placeholder verdicts belong to no species.
 _PLACEHOLDERS = frozenset(
@@ -44,6 +47,9 @@ _PLACEHOLDERS = frozenset(
 
 # `Campylobacter sp.`, `Listeria spp.`, `Uncultured bacterium` are not species.
 _NON_SPECIES_TOKENS = frozenset({"sp", "spp", "species", "bacterium", "uncultured", "cf"})
+_NON_SPECIES_RE = re.compile(r"sp\d+")
+# GTDB disambiguation suffixes: "Campylobacter_D jejuni", "Vibrio_A cholerae".
+_GTDB_SUFFIX_RE = re.compile(r"[A-Z]")
 
 
 @dataclass(frozen=True)
@@ -80,21 +86,30 @@ def parse_species_name(raw: str) -> SpeciesName:
         if lineage_species is None:
             return _UNKNOWN_NAME
         text = lineage_species
-    text = _strip_rank(text)
-    if text.lower() in _PLACEHOLDERS:
+    text = _strip_rank(_ACCESSION_PREFIX_RE.sub("", text))
+    if text.lower() in _PLACEHOLDERS or _BARE_ACCESSION_RE.fullmatch(text):
         return _UNKNOWN_NAME
 
     matches = list(_TOKEN_RE.finditer(text))
     if not matches:
         return _UNKNOWN_NAME
     tokens = [m.group(0) for m in matches]
-    if len(tokens) >= 2 and tokens[1].lower() in _NON_SPECIES_TOKENS:
+    keep = list(range(len(tokens)))
+    # Drop a GTDB single-letter suffix on the genus or the species epithet.
+    if len(keep) >= 3 and _GTDB_SUFFIX_RE.fullmatch(tokens[keep[1]]):
+        keep.pop(1)
+    if len(keep) >= 3 and _GTDB_SUFFIX_RE.fullmatch(tokens[keep[2]]):
+        keep.pop(2)
+    kept = [tokens[i] for i in keep]
+
+    second = kept[1].lower() if len(kept) >= 2 else ""
+    if second in _NON_SPECIES_TOKENS or _NON_SPECIES_RE.fullmatch(second):
         return _UNKNOWN_NAME
 
-    strain = text[matches[2].start() :].strip(" ._/-") if len(matches) > 2 else ""
+    strain = text[matches[keep[2]].start() :].strip(" ._/-") if len(keep) > 2 else ""
     return SpeciesName(
-        label="_".join(tokens[:2]),
-        display=" ".join(tokens[:2]),
+        label="_".join(kept[:2]),
+        display=" ".join(kept[:2]),
         strain=strain,
     )
 

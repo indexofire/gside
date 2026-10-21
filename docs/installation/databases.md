@@ -101,13 +101,20 @@ missing tier on first use (progress on stderr) and retries the method once.
 |---|---|---|
 | panel | SHA256 (`PANEL_SHA256`) | GitHub release asset |
 | mash | MD5 (`MASH_MD5`) | Zenodo publishes MD5 only |
-| sourmash | SHA256 (`SOURMASH_LINEAGES_SHA256`) + optional signature SHA256 | see below |
+| sourmash | SHA256 for lineages + signature (`SOURMASH_SIG_SHA256`) | signature pinned from a verified download |
 
-The sourmash signature zip (~3.9GB) has no upstream digest. Set one yourself
-to enforce verification; without it the download is accepted with a warning:
+The sourmash signature zip (~3.9GB) has no upstream digest. gside pins one
+recorded after a locally verified download (complete size, zip integrity,
+143,385 k=31 DNA signatures, CC0):
+
+```
+SOURMASH_SIG_SHA256 = 6f3cc74f0bdcf6f84466ba91f87d6f2bf30081d5814bdf006cafd1e9cbbeada9
+```
+
+Override it at setup time if you mirror a different build:
 
 ```bash
-export GSIDE_SOURMASH_SIG_SHA256=<sha256-of-gtdb-rs226-reps.k31.sig.zip>
+export GSIDE_SOURMASH_SIG_SHA256=<sha256-of-your-zip>
 gside db setup --tier sourmash
 ```
 

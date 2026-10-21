@@ -68,6 +68,20 @@ class TestMarkerRegistryLabels:
         assert display_name("Shigella_EIEC") == "Shigella EIEC"
 
 
+class TestSourmashNames:
+    def test_accession_prefix_is_stripped(self):
+        parsed = parse_species_name("GCF_001457695.1 Campylobacter jejuni")
+        assert parsed.label == "Campylobacter_jejuni"
+        assert parsed.display == "Campylobacter jejuni"
+        assert parsed.strain == ""
+
+    def test_gca_accession_prefix_is_stripped(self):
+        assert canonical_species("GCA_014305285.1 Campylobacter jejuni") == ("Campylobacter_jejuni")
+
+    def test_bare_accession_is_unknown(self):
+        assert canonical_species("GCF_001457695.1") == "Unknown"
+
+
 class TestGtdbNames:
     def test_species_rank_prefix_stripped(self):
         assert canonical_species("s__Vibrio parahaemolyticus") == "Vibrio_parahaemolyticus"
@@ -140,3 +154,23 @@ class TestApplySpeciesName:
     def test_unknown_keeps_single_field(self):
         result = apply_species_name({"confidence": "low"}, "Unknown")
         assert result == {"confidence": "low", "species": "Unknown"}
+
+
+class TestGtdbDisambiguationSuffix:
+    def test_genus_suffix_is_dropped(self):
+        parsed = parse_species_name("s__Campylobacter_D jejuni")
+        assert parsed.label == "Campylobacter_jejuni"
+        assert parsed.display == "Campylobacter jejuni"
+
+    def test_species_suffix_is_dropped(self):
+        assert canonical_species("Campylobacter jejuni_D") == "Campylobacter_jejuni"
+
+    def test_abbreviated_genus_suffix(self):
+        assert canonical_species("s__Vibrio_A cholerae") == "Vibrio_cholerae"
+
+    def test_gtdb_placeholder_species_is_unknown(self):
+        assert canonical_species("s__Dongia_A sp036004205") == "Unknown"
+
+    def test_strain_tokens_are_preserved(self):
+        assert parse_species_name("Vibrio cholerae O1").strain == "O1"
+        assert parse_species_name("Escherichia coli K12").strain == "K12"
