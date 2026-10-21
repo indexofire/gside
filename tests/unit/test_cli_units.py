@@ -935,8 +935,8 @@ class TestGtdbtkMode:
         assert verdict["species"] == "G"
 
     def test_help_lists_gtdbtk_choice_and_auto_setup(self):
-        result = CliRunner().invoke(main, ["species", "-h"])
+        result = CliRunner().invoke(main, ["scan", "-h"])
         assert result.exit_code == 0
         assert "gtdbtk" in result.output
         assert "--auto-setup" in result.output
-        assert "Automatically install missing database tiers" in result.output
+        assert "Install a missing database tier" in result.output

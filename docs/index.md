@@ -42,16 +42,16 @@ pixi install
 pip install -e .
 
 # Species identification (marker mode works out of the box)
-gside species contigs.fna
+gside scan contigs.fna
 
 # Multi-method identification with auto-setup
-gside species contigs.fna --mode all --auto-setup
+gside scan contigs.fna --mode all --auto-setup
 
 # Parallel batch processing
-gside species *.fna --mode all -j 8 -t 4 -o results.tsv
+gside scan *.fna --mode all -j 8 -t 4 -o results.tsv
 
 # Metagenomic profiling
-gside meta reads_R1.fq reads_R2.fq --mode all
+gside scan --meta reads_R1.fq reads_R2.fq --mode all
 
 # Database management
 gside db status

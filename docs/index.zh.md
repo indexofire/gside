@@ -42,16 +42,16 @@ pixi install
 pip install -e .
 
 # 物种鉴定（marker 模式开箱即用）
-gside species contigs.fna
+gside scan contigs.fna
 
 # 多方法鉴定 + 自动安装
-gside species contigs.fna --mode all --auto-setup
+gside scan contigs.fna --mode all --auto-setup
 
 # 并行批量处理
-gside species *.fna --mode all -j 8 -t 4 -o results.tsv
+gside scan *.fna --mode all -j 8 -t 4 -o results.tsv
 
 # 宏基因组
-gside meta reads_R1.fq reads_R2.fq --mode all
+gside scan --meta reads_R1.fq reads_R2.fq --mode all
 
 # 数据库管理
 gside db status

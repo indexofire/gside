@@ -170,7 +170,7 @@ L3（gtdbtk）优先于 L2（panel/mash_refseq/sourmash）优先于 L1（marker�
 指定 `-m` 跳过。
 
 ```bash
-gside species contigs.fna --mode all
+gside scan contigs.fna --mode all
 ```
 
 输出包含所有方法结果 + 最终 verdict：
@@ -213,9 +213,9 @@ gside species contigs.fna --mode all
 | 综合判定 | `all` | 多法互补 + 仲裁 |
 | 近缘种区分 | `panel` 或 `all` | marker 可能交叉反应 |
 
-## 宏基因组谱分析（`gside meta`）
+## 宏基因组谱分析（`gside scan --meta`）
 
-混合群落样本可使用 `gside meta` 做分类学谱分析。详见
+混合群落样本可使用 `gside scan --meta` 做分类学谱分析。详见
 [宏基因组谱分析](meta.zh.md)。
 
 | 模式 | 引擎 | 输入 | 置信度依据 |

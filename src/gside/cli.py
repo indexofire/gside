@@ -110,55 +110,281 @@ def main(ctx: click.Context, version: bool, version_json: bool, verbose: bool, q
         click.echo(ctx.get_help())
 
 
-@main.command("species", context_settings=HELP_SETTINGS)
-@click.argument("contigs", nargs=-1, required=True, type=click.Path(dir_okay=False))
-@click.option(
-    "-m",
-    "--mode",
-    type=click.Choice(MODES),
-    default="marker",
-    show_default=True,
-    help="Identification method (all runs every method, then arbitrates).",
-)
-@_db_dir_option
-@_format_option(["json", "tsv", "md"], "Output format (tsv/md render one row per input file).")
-@click.option(
-    "-o",
-    "--output",
-    type=click.Path(dir_okay=False),
-    default=None,
-    help=(
-        "Write the report to PATH instead of stdout (truncates; tsv/md rows"
-        " stream to the file as each input completes; json is written once"
-        " at the end; stdout then carries no data)"
-    ),
-)
-@click.option(
-    "-j",
-    "--jobs",
-    type=click.IntRange(min=1),
-    default=1,
-    show_default=True,
-    help="Number of input files to identify concurrently (output order is always input order).",
-)
-@_threads_option("Threads per aligner invocation (blastn -num_threads / skani -t / mash -p).")
-@click.option(
-    "-n",
-    "--no-header",
-    is_flag=True,
-    default=False,
-    help="Suppress the TSV header row (tsv only; md/json keep their structure).",
-)
-@click.option(
-    "-a",
-    "--auto-setup",
-    is_flag=True,
-    default=False,
-    help="Automatically install missing database tiers before identification (progress on stderr).",
-)
-def species_cmd(
-    contigs: tuple[str, ...],
-    mode: str,
+# --------------------------------------------------------------- scan modes
+
+_FASTA_SUFFIXES = (".fna", ".fa", ".fasta", ".faa", ".ffn", ".frn")
+_FASTQ_SUFFIXES = (".fq", ".fastq")
+
+# Which input kinds each mode can consume. `all` in isolate context means
+# every species tier, so it needs FASTA; in meta context it is kraken2+sylph.
+_MODE_INPUTS: dict[str, frozenset[str]] = {
+    "marker": frozenset({"fasta", "fastq"}),
+    "panel": frozenset({"fasta"}),
+    "mash_refseq": frozenset({"fasta"}),
+    "sourmash": frozenset({"fasta"}),
+    "gtdbtk": frozenset({"fasta"}),
+}
+_META_MODE_INPUTS: dict[str, frozenset[str]] = {
+    "kraken2": frozenset({"fasta", "fastq"}),
+    "sylph": frozenset({"fastq"}),
+    "all": frozenset({"fasta", "fastq"}),
+}
+_ISOLATE_ALL_INPUTS = frozenset({"fasta"})
+SCAN_MODES = ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk", "kraken2", "sylph", "all"]
+
+
+def _input_kind(path: str) -> str:
+    """'fasta' / 'fastq' / 'unknown' from the extension (``.gz`` aware)."""
+    name = path.lower()
+    for suffix in (".gz", ".bz2"):
+        if name.endswith(suffix):
+            name = name[: -len(suffix)]
+    if name.endswith(_FASTA_SUFFIXES):
+        return "fasta"
+    if name.endswith(_FASTQ_SUFFIXES):
+        return "fastq"
+    return "unknown"
+
+
+def _supported_inputs(mode: str, meta: bool) -> frozenset[str]:
+    if meta:
+        return _META_MODE_INPUTS[mode]
+    return _ISOLATE_ALL_INPUTS if mode == "all" else _MODE_INPUTS[mode]
+
+
+def _validate_scan(files: list[str], mode: str, meta: bool) -> None:
+    """Reject mode/flag and mode/input mismatches before any tool runs."""
+    allowed_modes = META_MODES if meta else MODES
+    if mode not in allowed_modes:
+        hint = "drop --meta" if mode in MODES else "add --meta"
+        raise click.UsageError(
+            f"mode {mode!r} is not available {'with' if meta else 'without'} --meta"
+            f" ({hint}); allowed: {', '.join(allowed_modes)}"
+        )
+
+    kinds = {_input_kind(f) for f in files}
+    if "unknown" in kinds:
+        bad = next(f for f in files if _input_kind(f) == "unknown")
+        raise click.UsageError(
+            f"cannot infer input type from {bad!r}; "
+            "expected FASTA (.fna/.fa/.fasta) or FASTQ (.fq/.fastq)"
+        )
+    if meta and len(files) == 2 and kinds != {"fastq"}:
+        raise click.UsageError("paired input must be two FASTQ files")
+
+    allowed = _supported_inputs(mode, meta)
+    unsupported = kinds - allowed
+    if unsupported:
+        kind = sorted(unsupported)[0]
+        extra = "; for reads use --meta -m kraken2" if not meta and kind == "fastq" else ""
+        raise click.UsageError(
+            f"mode {mode!r} does not accept {kind.upper()} input"
+            f" (supported: {', '.join(sorted(k.upper() for k in allowed))}){extra}"
+        )
+
+
+def _scan_dispatch(
+    files: tuple[str, ...],
+    mode: str | None,
+    meta: bool,
+    db_dir: str | None,
+    output_format: str,
+    output: str | None,
+    jobs: int,
+    threads: int,
+    no_header: bool,
+    auto_setup: bool,
+    samples: str | None = None,
+) -> None:
+    paths = list(files)
+    resolved = mode or ("all" if meta else "marker")
+
+    if not meta:
+        if samples:
+            raise click.UsageError("--samples is only available with --meta")
+        if not paths:
+            raise click.UsageError("missing input: pass one or more FASTA/FASTQ files")
+        _validate_scan(paths, resolved, meta=False)
+        sys.exit(
+            _run_species(
+                paths,
+                resolved,
+                db_dir,
+                output_format,
+                output,
+                jobs,
+                threads,
+                no_header,
+                auto_setup,
+            )
+        )
+
+    if samples and paths:
+        raise click.UsageError("pass either FILES or --samples, not both")
+    if not samples and not paths:
+        raise click.UsageError("missing input: pass reads, contigs, or --samples")
+    if not samples and len(paths) > 2:
+        raise click.UsageError("at most 2 files per sample; use --samples for batches")
+    if not samples and jobs != 1:
+        raise click.UsageError("--jobs requires --samples in --meta mode")
+
+    if samples:
+        try:
+            manifest = _read_samples(samples)
+        except ValueError as exc:
+            raise click.UsageError(str(exc)) from exc
+        for sample in manifest:
+            _validate_scan(sample["files"], resolved, meta=True)
+        sys.exit(
+            _run_meta_samples(
+                manifest,
+                resolved,
+                db_dir,
+                output_format=output_format,
+                output=output,
+                threads=threads,
+                jobs=jobs,
+                no_header=no_header,
+                auto_setup=auto_setup,
+            )
+        )
+
+    _validate_scan(paths, resolved, meta=True)
+    sys.exit(
+        _run_meta(
+            paths,
+            resolved,
+            db_dir,
+            output_format=output_format,
+            output=output,
+            threads=threads,
+            no_header=no_header,
+            auto_setup=auto_setup,
+        )
+    )
+
+
+def _scan_options(*, meta_preset: bool | None, with_samples: bool, modes: list[str]) -> Any:
+    """Shared option set for ``scan`` and its compatibility aliases."""
+
+    def decorate(func: Any) -> Any:
+        decorators: list[Any] = [
+            click.argument("files", nargs=-1, required=False, type=click.Path(dir_okay=False)),
+            click.option(
+                "-m",
+                "--mode",
+                type=click.Choice(modes),
+                default=None,
+                help="Identification method (default: marker; all with --meta).",
+            ),
+        ]
+        if meta_preset is None:
+            decorators.append(
+                click.option(
+                    "--meta",
+                    is_flag=True,
+                    default=False,
+                    help=(
+                        "Input is a metagenomic community: only kraken2/sylph/all are"
+                        " allowed (FASTA via kraken2, FASTQ via both)."
+                    ),
+                )
+            )
+        decorators += [
+            _db_dir_option,
+            _format_option(["json", "tsv", "md", "csv"], "Output format (rows for tsv/md/csv)."),
+            click.option(
+                "-o",
+                "--output",
+                type=click.Path(dir_okay=False),
+                default=None,
+                help=(
+                    "Write the report to PATH instead of stdout (truncates; row formats"
+                    " stream as inputs complete; json is written once at the end)"
+                ),
+            ),
+            click.option(
+                "-j",
+                "--jobs",
+                type=click.IntRange(min=1),
+                default=1,
+                show_default=True,
+                help="Concurrent inputs (isolate batches) or samples (--meta --samples).",
+            ),
+            _threads_option("Threads per tool invocation."),
+            click.option(
+                "-n",
+                "--no-header",
+                is_flag=True,
+                default=False,
+                help="Suppress the header row (tsv/csv/md).",
+            ),
+            click.option(
+                "-a",
+                "--auto-setup",
+                is_flag=True,
+                default=False,
+                help="Install a missing database tier, then retry that method once.",
+            ),
+        ]
+        if with_samples:
+            decorators.append(
+                click.option(
+                    "-s",
+                    "--samples",
+                    type=click.Path(dir_okay=False),
+                    default=None,
+                    help="Batch manifest: sample_id<TAB>reads [<TAB>reads2] per line.",
+                )
+            )
+        for decorator in reversed(decorators):
+            func = decorator(func)
+        return func
+
+    return decorate
+
+
+@main.command("scan", context_settings=HELP_SETTINGS)
+@_scan_options(meta_preset=None, with_samples=True, modes=SCAN_MODES)
+def scan_cmd(
+    files: tuple[str, ...],
+    mode: str | None,
+    meta: bool,
+    db_dir: str | None,
+    output_format: str,
+    output: str | None,
+    jobs: int,
+    threads: int,
+    no_header: bool,
+    auto_setup: bool,
+    samples: str | None,
+) -> None:
+    """Identify species in one genome, or profile a metagenomic community.
+
+    The input type is inferred from the extension and must match the mode
+    (FASTA: marker/panel/mash_refseq/sourmash/gtdbtk/kraken2; FASTQ: marker/
+    kraken2/sylph). Add --meta for community/reads profiling.
+    """
+    _scan_dispatch(
+        files,
+        mode,
+        meta,
+        db_dir,
+        output_format,
+        output,
+        jobs,
+        threads,
+        no_header,
+        auto_setup,
+        samples,
+    )
+
+
+@main.command("species", hidden=True, context_settings=HELP_SETTINGS)
+@_scan_options(meta_preset=False, with_samples=False, modes=MODES)
+def species_alias(
+    files: tuple[str, ...],
+    mode: str | None,
     db_dir: str | None,
     output_format: str,
     output: str | None,
@@ -167,11 +393,39 @@ def species_cmd(
     no_header: bool,
     auto_setup: bool,
 ) -> None:
-    """Identify species from assembled contigs FASTA (accepts multiple files)."""
-    sys.exit(
-        _run_species(
-            list(contigs), mode, db_dir, output_format, output, jobs, threads, no_header, auto_setup
-        )
+    """Compatibility alias for ``gside scan`` without --meta (single organism)."""
+    _scan_dispatch(
+        files, mode, False, db_dir, output_format, output, jobs, threads, no_header, auto_setup
+    )
+
+
+@main.command("meta", hidden=True, context_settings=HELP_SETTINGS)
+@_scan_options(meta_preset=True, with_samples=True, modes=META_MODES)
+def meta_alias(
+    files: tuple[str, ...],
+    mode: str | None,
+    db_dir: str | None,
+    output_format: str,
+    output: str | None,
+    jobs: int,
+    threads: int,
+    no_header: bool,
+    auto_setup: bool,
+    samples: str | None,
+) -> None:
+    """Compatibility alias for ``gside scan --meta`` (metagenomic community)."""
+    _scan_dispatch(
+        files,
+        mode,
+        True,
+        db_dir,
+        output_format,
+        output,
+        jobs,
+        threads,
+        no_header,
+        auto_setup,
+        samples,
     )
 
 
@@ -288,117 +542,12 @@ def validate_cmd(contigs: str, mode: str, output_dir: str | None) -> None:
     print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
 
 
-@main.command("meta", context_settings=HELP_SETTINGS)
-@click.argument("reads", nargs=-1, required=False, type=click.Path(dir_okay=False))
-@click.option(
-    "-m",
-    "--mode",
-    type=click.Choice(META_MODES),
-    default="all",
-    show_default=True,
-    help="Profiling method (all runs kraken2 + sylph, then merges).",
-)
-@_db_dir_option
-@_format_option(["json", "tsv", "csv"], "Output format (tsv/csv render one row per species).")
-@click.option(
-    "-o",
-    "--output",
-    type=click.Path(dir_okay=False),
-    default=None,
-    help=(
-        "Write the report to PATH instead of stdout (truncates; json is written"
-        " once at the end; stdout then carries no data)"
-    ),
-)
-@click.option(
-    "-s",
-    "--samples",
-    type=click.Path(dir_okay=False),
-    default=None,
-    help=(
-        "Batch manifest: sample_id<TAB>reads [<TAB>reads2] per line (header optional)."
-        " Output is one JSON object per sample, in manifest order."
-    ),
-)
-@click.option(
-    "-j",
-    "--jobs",
-    type=click.IntRange(min=1),
-    default=1,
-    show_default=True,
-    help="Number of manifest samples to profile concurrently (order is always preserved).",
-)
-@click.option(
-    "-n",
-    "--no-header",
-    is_flag=True,
-    default=False,
-    help="Suppress the TSV/CSV header row (json keeps its structure).",
-)
-@click.option(
-    "-a",
-    "--auto-setup",
-    is_flag=True,
-    default=False,
-    help="Install missing database tiers before profiling (progress on stderr).",
-)
-@_threads_option("Threads per tool invocation (kraken2 --threads / sylph sketch -t).")
-def meta_cmd(
-    reads: tuple[str, ...],
-    mode: str,
-    db_dir: str | None,
-    output_format: str,
-    output: str | None,
-    samples: str | None,
-    jobs: int,
-    no_header: bool,
-    auto_setup: bool,
-    threads: int,
-) -> None:
-    """Metagenomic species profiling from FASTQ reads, contigs, or a samples manifest."""
-    if samples and reads:
-        raise click.UsageError("pass either READS or --samples, not both")
-    if not samples and not reads:
-        raise click.UsageError("missing input: pass READS or --samples")
-    if samples:
-        try:
-            manifest = _read_samples(samples)
-        except ValueError as exc:
-            raise click.UsageError(str(exc)) from exc
-        sys.exit(
-            _run_meta_samples(
-                manifest,
-                mode,
-                db_dir,
-                output_format=output_format,
-                output=output,
-                threads=threads,
-                jobs=jobs,
-                no_header=no_header,
-                auto_setup=auto_setup,
-            )
-        )
-    if jobs != 1:
-        raise click.UsageError("--jobs only applies to --samples batches")
-    sys.exit(
-        _run_meta(
-            list(reads),
-            mode,
-            db_dir,
-            output_format=output_format,
-            output=output,
-            threads=threads,
-            no_header=no_header,
-            auto_setup=auto_setup,
-        )
-    )
-
-
 # Register commands
-main.add_command(species_cmd, name="species")
+main.add_command(scan_cmd, name="scan")
+main.add_command(species_alias, name="species")
+main.add_command(meta_alias, name="meta")
 main.add_command(db_group, name="db")
 main.add_command(validate_cmd, name="validate")
-main.add_command(meta_cmd, name="meta")
 
 # Imported here, not at the top: gside.mcp pulls in mcp_schemas, which reads
 # MODES/TIERS from this module, so they must already exist when it loads
@@ -499,6 +648,28 @@ def _tracked(source: Iterator[dict[str, Any]], bar: Any) -> Iterator[dict[str, A
         bar.advance()
 
 
+def _emit_chunks(chunks: Iterator[str], output: str | None) -> int:
+    """Stream rendered chunks to stdout (flushed per row) or to ``-o``."""
+    if output is None:
+        for chunk in chunks:
+            print(chunk, end="", flush=True)
+        return 0
+    writer = _OutputFileWriter(Path(output))
+    try:
+        for chunk in chunks:
+            writer(chunk)
+    finally:
+        writer.close()
+    print(f"Results written to {output}", file=sys.stderr)
+    return 0
+
+
+def _csv_line(cells: list[str]) -> str:
+    buf = io.StringIO()
+    csv.writer(buf, lineterminator="\n").writerow(cells)
+    return buf.getvalue()
+
+
 def _emit_species(
     payload_source: Iterator[dict[str, Any]],
     n_inputs: int,
@@ -512,26 +683,21 @@ def _emit_species(
         return _write_json_document(report, output)
 
     markdown = output_format == "md"
+    is_csv = output_format == "csv"
 
     def chunks() -> Iterator[str]:
         if not (no_header and not markdown):
-            yield _table_header(markdown) + "\n"
+            if is_csv:
+                yield _csv_line(TABLE_COLUMNS)
+            else:
+                yield _table_header(markdown) + "\n"
         for payload in payload_source:
-            yield _render_row(payload, markdown) + "\n"
+            if is_csv:
+                yield _csv_line(_render_row(payload, markdown=False).split("\t"))
+            else:
+                yield _render_row(payload, markdown) + "\n"
 
-    if output is None:
-        for chunk in chunks():
-            print(chunk, end="", flush=True)
-        return 0
-
-    writer = _OutputFileWriter(Path(output))
-    try:
-        for chunk in chunks():
-            writer(chunk)
-    finally:
-        writer.close()
-    print(f"Results written to {output}", file=sys.stderr)
-    return 0
+    return _emit_chunks(chunks(), output)
 
 
 TABLE_COLUMNS = [
@@ -911,6 +1077,21 @@ def _render_meta_table(
             for cells in _meta_row_cells(payload):
                 writer.writerow(prefix + cells)
         return out.getvalue()
+
+    if fmt == "md":
+        lines: list[str] = []
+        if not no_header:
+            lines.append("| " + " | ".join(header) + " |")
+            lines.append("|" + "|".join(["---"] * len(header)) + "|")
+        for payload in payloads:
+            prefix = [payload.get("sample", "")] if with_sample else []
+            for cells in _meta_row_cells(payload):
+                clean = [
+                    str(c).replace("|", "/").replace("\n", " ").replace("\r", " ")
+                    for c in prefix + cells
+                ]
+                lines.append("| " + " | ".join(clean) + " |")
+        return "\n".join(lines) + "\n"
 
     lines = [] if no_header else ["\t".join(header)]
     for payload in payloads:

@@ -740,10 +740,10 @@ class TestMetaCliCommand:
         assert payload["input"]["type"] == "fastq_paired"
 
     def test_help_text(self):
-        result = CliRunner().invoke(main, ["meta", "--help"])
+        result = CliRunner().invoke(main, ["scan", "--help"])
         assert result.exit_code == 0
-        assert "Metagenomic species profiling" in result.output
-        for flag in ("-m", "-D", "-f", "-o", "-t"):
+        assert "metagenomic community" in result.output
+        for flag in ("-m", "-D", "-f", "-o", "-t", "-n", "-a", "-s"):
             assert flag in result.output
 
     def test_invalid_mode_rejected(self):
@@ -858,7 +858,7 @@ class TestSampleManifest:
     def test_jobs_without_samples_is_a_usage_error(self):
         result = CliRunner().invoke(main, ["meta", "r.fq", "-j", "2"])
         assert result.exit_code == 2
-        assert "--jobs only applies" in result.output
+        assert "--jobs requires --samples" in result.output
 
     def test_reads_and_samples_are_exclusive(self, tmp_path):
         path = tmp_path / "s.tsv"
@@ -1054,3 +1054,19 @@ class TestMetaAutoSetupEdges:
         assert cli._run_meta_samples(samples, "sylph", None, auto_setup=True, jobs=1) == 0
         payload = json.loads(capsys.readouterr().out)
         assert [p["sample"] for p in payload] == ["A", "B"]
+
+
+class TestMetaMarkdown:
+    def test_md_table_rendering(self, monkeypatch, capsys):
+        _stub_both(monkeypatch)
+        assert _run_meta(["r1.fq", "r2.fq"], "all", None, output_format="md") == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert lines[0] == "| method | name | abundance | confidence | ani |"
+        assert lines[1] == "|---|---|---|---|---|"
+        assert lines[2].startswith("| sylph | Escherichia_coli | 0.8 | high | 97.5 |")
+
+    def test_md_no_header(self, monkeypatch, capsys):
+        _stub_both(monkeypatch)
+        assert _run_meta(["r.fq"], "kraken2", None, output_format="md", no_header=True) == 0
+        first = capsys.readouterr().out.splitlines()[0]
+        assert first.startswith("| kraken2 |")

@@ -178,7 +178,7 @@ within the same layer, high confidence beats lower confidence.
 explicit `-m` to skip it when speed matters.
 
 ```bash
-gside species contigs.fna --mode all
+gside scan contigs.fna --mode all
 ```
 
 Output includes all method results plus final verdict:
@@ -222,9 +222,9 @@ Output includes all method results plus final verdict:
 | Comprehensive | `all` | Multi-method complementary + arbitration |
 | Near-relative discrimination | `panel` or `all` | marker may cross-react |
 
-## Metagenomic Profiling (`gside meta`)
+## Metagenomic Profiling (`gside scan --meta`)
 
-For mixed-community samples, `gside meta` provides taxonomic profiling using
+For mixed-community samples, `gside scan --meta` provides taxonomic profiling using
 two complementary classifiers. See [Metagenomic Profiling](meta.md) for details.
 
 | Mode | Engine | Input | Confidence basis |

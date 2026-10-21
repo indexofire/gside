@@ -1,9 +1,9 @@
 # 宏分类学分析（metagenomic profiling）
 
-`gside meta` 对宏基因组样本——FASTQ 测序数据或组装 contigs——进行物种
-组成分析，报告样本中存在的物种、丰度以及各方法的置信度。它与
-`gside species` 互补：后者从 contigs 鉴定**单一**物种，而 `meta`
-回答"样本里有什么、各占多少"。
+`gside scan --meta` 对宏基因组样本——FASTQ 测序数据或组装 contigs——进行物种
+组成分析，报告样本中存在的物种、丰度以及各方法的置信度。它对应
+`gside scan` 的群落工作流（加 `--meta`）；单菌株工作流回答"这是什么物种"，
+`--meta` 回答"样本里有什么、各占多少"。
 
 可用两种方法：
 
@@ -19,7 +19,7 @@
 ## 用法
 
 ```bash
-gside meta <reads.fastq> [reads_2.fastq] [选项]
+gside scan --meta <reads.fastq> [reads_2.fastq] [选项]
 ```
 
 | 选项 | 默认 | 说明 |
@@ -40,7 +40,7 @@ gside meta <reads.fastq> [reads_2.fastq] [选项]
 多样本时改用清单文件而不是位置参数：
 
 ```bash
-gside meta --samples samples.tsv -j 4 -f tsv -o profiles.tsv
+gside scan --meta --samples samples.tsv -j 4 -f tsv -o profiles.tsv
 ```
 
 `samples.tsv` 为制表符分隔，每行一个样本（表头可省略）：
@@ -63,7 +63,7 @@ sampleB	sampleB.fq
 - **kraken2**：每物种 `fraction_total_reads` ≥ 0.10 → `high`，≥ 0.01 →
   `medium`，否则 `low`（Bracken 重估读段数）。
 - **sylph**：校正 containment ANI ≥ 95 → `high`，≥ 93 → `medium`，否则
-  `low`（与 `gside species` 的 panel ANI 层同阈值）。
+  `low`（与 `gside scan` 的 panel ANI 层同阈值）。
 
 ## 输出
 
@@ -105,7 +105,7 @@ sylph	Escherichia_coli	0.7812	high	97.53
 kraken2	Salmonella_enterica	0.20	medium	
 ```
 
-与 `gside species` 一致，`gside meta` 始终以 0 退出：某方法失败时错误
+与 `gside scan` 一致，`gside scan --meta` 始终以 0 退出：某方法失败时错误
 记录在 `methods.<mode>.error`，其余方法继续。FASTA 输入会被 `sylph`
 拒绝（其仅接受读段），并给出指向 `--mode kraken2` 的结构化错误。
 
@@ -113,19 +113,19 @@ kraken2	Salmonella_enterica	0.20	medium
 
 ```bash
 # 双端读段，两种方法（默认）
-gside meta sample_1.fastq sample_2.fastq
+gside scan --meta sample_1.fastq sample_2.fastq
 
 # 仅 kraken2，TSV 写入文件
-gside meta sample_1.fastq sample_2.fastq -m kraken2 -f tsv -o profile.tsv
+gside scan --meta sample_1.fastq sample_2.fastq -m kraken2 -f tsv -o profile.tsv
 
 # contigs / 组装 FASTA（kraken2 支持 FASTA，sylph 报结构化错误）
-gside meta contigs.fna
+gside scan --meta contigs.fna
 
 # 单端读段 sylph ANI 分析
-gside meta reads.fastq -m sylph
+gside scan --meta reads.fastq -m sylph
 
 # 自定义数据库根目录
-gside meta reads.fastq -D /path/to/db
+gside scan --meta reads.fastq -D /path/to/db
 ```
 
 ## 数据库

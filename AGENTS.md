@@ -96,8 +96,8 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-10-21): **572 tests**, total coverage **98.9%**
-— all modules 100% except: ani 93%, multigene 99%, sourmash 99%,
+Baseline (2026-10-21): **620 tests**, total coverage **98.9%**
+— all modules 100% except: ani 93%, multigene 98%, sourmash 99%,
 taxonomic 93% (quarantined), db 99%, kraken2 99%, progress 97%.
 Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
 raise it every time coverage climbs.
@@ -179,12 +179,14 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 
 ### CLI Patterns
 - Click group style (mirrors gmlst/gapit family): `HELP_SETTINGS` (`-h`/`--help`), bare invocation prints help and exits 2 (`no_args_is_help`), `-v`/`-q` mutually exclusive (UsageError), thin commands registered via `add_command`
-- Every option carries a short flag: species `-m/--mode -f/--format -D/--db-dir -o/--output -j/--jobs -t/--threads -n/--no-header -a/--auto-setup`; meta `-m/--mode -f/--format -D/--db-dir -o/--output -s/--samples -j/--jobs -t/--threads -n/--no-header -a/--auto-setup`; db `-t/--tier -s/--source -f/--format`
+- One command, `scan`, for both workflows; `-m/--mode` picks the method, `--meta` selects the community workflow. Every option carries a short flag: `-m/--mode -f/--format -D/--db-dir -o/--output -j/--jobs -t/--threads -n/--no-header -a/--auto-setup` (+ `-s/--samples` with `--meta`); db `-t/--tier -s/--source -f/--format`
 - `-D/--db-dir`, `-f/--format` and `-t/--threads` are built by the shared factories `_db_dir_option` / `_format_option` / `_threads_option` in `cli.py` — add new commands through them so flags never drift
-- Agent-friendly outputs: species defaults to JSON on stdout; `-o` writes the payload to a file with gapit-style streaming (tsv/md rows flushed per input as they complete — a mid-batch failure persists the prefix; json single document at the end; stdout stays empty, notice on stderr); `db status|list` accept `--format table|tsv|json`; `db setup` accepts `--format text|json` (json routes progress to stderr); `-V -J` prints version as JSON
-- Subcommands: `species` / `meta` / `db` group (`status|setup|list`) / `validate` / `mcp` (MCP stdio server) / `--version`; entry `gside.cli:main`
-- `meta` batch mode: `-s/--samples sample_id<TAB>r1[<TAB>r2]` + `-j/--jobs` (order preserved); JSON becomes an array with a `sample` key, tsv/csv gain a leading `sample` column. `--samples` and positional reads are mutually exclusive (UsageError)
-- `species --mode` choices are exactly `marker|panel|mash_refseq|sourmash|gtdbtk|all`; `meta --mode` choices are exactly `kraken2|sylph|all` — do not invent modes
+- Agent-friendly outputs: `scan` defaults to JSON on stdout and supports `-f json|tsv|md|csv`; `-o` writes the payload to a file (row formats flushed per row as inputs complete — a mid-batch failure persists the prefix; json single document at the end; stdout stays empty, notice on stderr); `db status|list` accept `--format table|tsv|json`; `db setup` accepts `--format text|json` (json routes progress to stderr); `-V -J` prints version as JSON
+- Subcommands: `scan` / `db` group (`status|setup|list`) / `validate` / `mcp` (MCP stdio server) / `--version`; entry `gside.cli:main`
+- `species` and `meta` are **hidden compatibility aliases** (preset `meta=False/True`) for `scan`; bacmap still calls `gside species`, so keep them until that pin moves
+- `--meta` batch mode: `-s/--samples sample_id<TAB>r1[<TAB>r2]` + `-j/--jobs` (order preserved); JSON becomes an array with a `sample` key, tsv/csv/md gain a leading `sample` column. `--samples` and positional reads are mutually exclusive (UsageError); `-j` without `--samples` is rejected
+- Mode choices: isolate `marker|panel|mash_refseq|sourmash|gtdbtk|all`; meta `kraken2|sylph|all` — do not invent modes. `scan -m` accepts the union and `_validate_scan` enforces the context
+- Input kinds are inferred from the extension (`.fna/.fa/.fasta` vs `.fq/.fastq`, `.gz` stripped) and validated **before** any tool runs: `_MODE_INPUTS` / `_META_MODE_INPUTS` in `cli.py` define the matrix (marker accepts both; panel/mash/sourmash/gtdbtk isolate are FASTA-only; kraken2 both; sylph FASTQ-only; isolate `all` FASTA-only). Update the matrix and docs together when adding a mode
 - `--db-dir` overrides the database root for one invocation
 - `verdict` shape is shared by single-mode and `all`: `species` (canonical), `display_name`, `strain`, `confidence`, `basis` (winner only), `supporting`, `agreement`
 
@@ -270,6 +272,7 @@ testpaths = ["tests"]
 
 - **Binary discovery**: `GSIDE_PIXI_BIN` env → repo `.pixi/envs/default/bin` → `~/.pixi/envs/default/bin` → `PATH` (`config.py`). There is no machine-specific path in the package; point `GSIDE_PIXI_BIN` at a conda env when the tools live elsewhere.
 - **`gside species` never fails loud**: check `methods.<mode>.error` in JSON, not the exit code.
+- **Marker on FASTQ**: `multigene_identifier._as_fasta` converts FASTQ (plain or `.gz`) to a temporary FASTA so blastn can read it; reads are treated as plain sequences, so only long reads that cover >=60% of a marker gene can satisfy a rule. Illumina 150bp reads therefore return `Unknown` — that is expected, use `--meta -m kraken2` for short-read data.
 - **Marker thresholds**: global `_MIN_IDENTITY=85.0` / `_MIN_COVERAGE=60.0` / `_HIGH_CONF=90.0` gate `detected_markers` and `exclude_genes`. Rule matching uses each rule's own `min_identity`/`min_coverage` (defaults 90/60) against every raw hit of the gene, so the two *Campylobacter* rules with `min_coverage: 50` really do accept 50-60% coverage. `priority_over` is supported (priority species suppress non-priority ones) but no shipped rule uses it.
 - **Panel thresholds**: ANI ≥ 95 + AF ≥ 0.65 → high; 93–95 → medium. Mash identity ≥ 0.97 → high, 0.90–0.97 → medium.
 - **Arbitration is layer-first**: `(layer, confidence-rank)` tuple — gtdbtk=3 beats any L2 hit, any L2 hit beats any L1 hit, and within a layer `medium` now beats `low` (`cli.py:_arbitrate`). `verdict.basis` stays the single winning method (bacmap maps it to a validated `method`); `verdict.supporting` + `verdict.agreement` expose cross-method corroboration (exact label match — `DEC` vs `Escherichia_coli` is intentionally a non-match; do not alias them).

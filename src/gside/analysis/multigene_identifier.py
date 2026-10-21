@@ -6,8 +6,12 @@ marker_rules.yaml for gene combination logic and scoring.
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -207,8 +211,55 @@ def _pick_rule(
     return best_species, best_conf, best_rule
 
 
+_FASTQ_SUFFIXES = (".fq", ".fastq")
+
+
+def _looks_like_fastq(path: str | Path) -> bool:
+    name = str(path).lower()
+    if name.endswith(".gz"):
+        name = name[:-3]
+    return name.endswith(_FASTQ_SUFFIXES)
+
+
+def _iter_fastq(path: str | Path) -> Iterator[tuple[str, str]]:
+    """Minimal 4-line FASTQ reader (plain or gzip)."""
+    opener = gzip.open if str(path).lower().endswith(".gz") else open
+    with opener(path, "rt") as fh:
+        while True:
+            header = fh.readline()
+            if not header:
+                return
+            if not header.startswith("@"):
+                continue
+            seq = fh.readline().strip()
+            fh.readline()  # plus line
+            fh.readline()  # quality
+            yield header[1:].strip(), seq
+
+
+@contextmanager
+def _as_fasta(path: str | Path) -> Iterator[str]:
+    """Yield a FASTA path; FASTQ inputs are converted into a temporary FASTA.
+
+    blastn cannot read FASTQ. Reads become plain sequences, so only reads long
+    enough to cover a marker gene (see the 60% coverage gate) can satisfy a
+    rule — short Illumina reads will not.
+    """
+    if not _looks_like_fastq(path):
+        yield str(path)
+        return
+    with tempfile.TemporaryDirectory(prefix="gside-marker-") as tmp:
+        out = Path(tmp) / "query.fasta"
+        with out.open("w", encoding="utf-8") as dst:
+            for name, seq in _iter_fastq(path):
+                if seq:
+                    dst.write(f">{name}\n{seq}\n")
+        yield str(out)
+
+
 def identify_multigene(contigs_fasta: str, threads: int = 4) -> MultiGeneResult:
-    raw_hits = _blast_contigs(contigs_fasta, threads)
+    with _as_fasta(contigs_fasta) as query:
+        raw_hits = _blast_contigs(query, threads)
     rules = _load_rules()
     significant = _best_per_gene(raw_hits, _MIN_IDENTITY, _MIN_COVERAGE)
 

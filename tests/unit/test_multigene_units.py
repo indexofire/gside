@@ -273,3 +273,65 @@ class TestGeneAlsoExcluded:
         from gside.analysis.multigene_identifier import identify_multigene
 
         assert identify_multigene("x.fna").to_dict()["species"] == "Unknown"
+
+
+class TestFastqInput:
+    def _rules(self, monkeypatch):
+        monkeypatch.setattr(
+            mg,
+            "_load_rules",
+            lambda: [{"species": "Salmonella", "genes": ["inva"], "min_hits": 1}],
+        )
+
+    def test_fastq_is_converted_for_blast(self, monkeypatch, tmp_path):
+        seen: dict[str, str] = {}
+
+        def fake_blast(path, threads=4):
+            seen["text"] = Path(path).read_text()
+            seen["path"] = str(path)
+            return [{"gene": "inva", "identity": 99.0, "coverage": 100.0}]
+
+        self._rules(monkeypatch)
+        monkeypatch.setattr(mg, "_blast_contigs", fake_blast)
+        fq = tmp_path / "reads.fq"
+        fq.write_text("@r1\nACGT\n+\nIIII\n@r2\nTTTT\n+\nIIII\n")
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        assert identify_multigene(str(fq)).to_dict()["species"] == "Salmonella"
+        assert seen["text"] == ">r1\nACGT\n>r2\nTTTT\n"
+        assert not Path(seen["path"]).exists(), "converted FASTA must live in a temp dir"
+
+    def test_gzipped_fastq_is_supported(self, monkeypatch, tmp_path):
+        import gzip
+
+        captured: dict[str, str] = {}
+
+        def fake_blast(path, threads=4):
+            captured["text"] = Path(path).read_text()
+            return []
+
+        self._rules(monkeypatch)
+        monkeypatch.setattr(mg, "_blast_contigs", fake_blast)
+        fq = tmp_path / "reads.fastq.gz"
+        with gzip.open(fq, "wt") as fh:
+            fh.write("@r1\nACGT\n+\nIIII\n")
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        identify_multigene(str(fq))
+        assert captured["text"] == ">r1\nACGT\n"
+
+    def test_fasta_is_passed_through(self, monkeypatch, tmp_path):
+        captured: dict[str, str] = {}
+
+        def fake_blast(path, threads=4):
+            captured["path"] = str(path)
+            return []
+
+        self._rules(monkeypatch)
+        monkeypatch.setattr(mg, "_blast_contigs", fake_blast)
+        genome = tmp_path / "g.fna"
+        genome.write_text(">c1\nACGT\n")
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        identify_multigene(str(genome))
+        assert captured["path"] == str(genome)

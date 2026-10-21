@@ -1,89 +1,72 @@
 # CLI 参考
 
-## gside species
+## gside scan
 
-物种鉴定主命令。
+两种工作流的统一入口：默认识别单基因组物种，加 `--meta` 分析宏基因组群落。
 
 ### 用法
 
 ```bash
-gside species <contigs.fasta> [选项]
+gside scan <files...> [选项]
+gside scan --meta <reads...> [选项]
+gside scan --meta --samples samples.tsv [选项]
 ```
+
+### 模式与输入矩阵
+
+| 模式 | `--meta` | FASTA | FASTQ | 说明 |
+|---|---|---|---|---|
+| `marker` | 否 | ✅ | ✅ | FASTQ 按序列读取；只有长度足以覆盖标记基因的读段才能通过 60% 覆盖门槛 |
+| `panel` | 否 | ✅ | ❌ | skani ANI |
+| `mash_refseq` | 否 | ✅ | ❌ | MinHash 距离 |
+| `sourmash` | 否 | ✅ | ❌ | GTDB gather（containment ANI） |
+| `gtdbtk` | 否 | ✅ | ❌ | 系统发育 placement |
+| `all` | 否 | ✅ | ❌ | 全部物种层 + 仲裁 |
+| `kraken2` | 是 | ✅ | ✅ | 读段或 contigs |
+| `sylph` | 是 | ❌ | ✅ | 仅读段 |
+| `all` | 是 | ✅ | ✅ | kraken2（FASTQ 时加 sylph） |
+
+输入类型由扩展名推断（`.fna/.fa/.fasta` 与 `.fq/.fastq`，支持 `.gz`），并在
+**任何工具启动前**校验：不匹配时退出码 2 并列出支持的类型。`--meta` 同样拒绝
+单菌株模式，单菌株模式也拒绝 `kraken2`/`sylph`。
 
 ### 参数
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| `contigs` | 位置参数 | 无 | 组装后的 contigs FASTA 文件 |
-| `-m`，`--mode` | 选项 | `marker` | 鉴定模式（见下） |
+| `files` | 位置参数 | — | 一个或多个 FASTA/FASTQ（单菌株：批量；`--meta`：单个样本 1–2 个文件） |
+| `-m`，`--mode` | 选项 | `marker` / `all` | 方法（默认 `marker`，`--meta` 时默认 `all`） |
+| `--meta` | 开关 | 关 | 输入视为宏基因组群落 |
 | `-D`，`--db-dir` | 选项 | 自动 | 数据库根目录 |
-| `-f`，`--format` | 选项 | `json` | 输出格式：`json` / `tsv` / `md` |
-| `-n`，`--no-header` | 选项 | 关 | 隐藏 TSV 表头行（仅 tsv；md/json 保持结构） |
-| `-a`，`--auto-setup` | 选项 | 关 | 鉴定前自动安装缺失的数据库 tier（进度走 stderr） |
-| `-j`，`--jobs N` | 选项 | `1` | 并发鉴定的输入文件数（输出顺序恒为输入顺序） |
-| `-t`，`--threads N` | 选项 | `4` | 每次比对调用的线程数（blastn `-num_threads` / skani `-t` / mash `-p`） |
-| `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH 而非 stdout（截断写入；tsv/md 逐输入流式落盘、逐行 flush——批次中途失败已写前缀仍保留；json 为单文档收尾一次写入；stdout 不再输出数据，提示信息走 stderr） |
-
-### 鉴定模式
-
-共 6 种模式，默认 `marker`：
-
-| Mode | 说明 | 数据库需求 |
-|---|---|---|
-| `marker` | 靶基因组合规则（blastn） | mini（内置） |
-| `panel` | ANI 比对精选面板（skani） | panel tier |
-| `mash_refseq` | MinHash 距离（mash） | mash tier |
-| `sourmash` | sourmash GTDB gather | sourmash GTDB 库 |
-| `gtdbtk` | GTDB-Tk 系统发育 placement（classify_wf） | 外部安装的 GTDB-Tk（`GTDBTK_DATA_PATH`） |
-| `all` | 运行全部 5 种方法 + 仲裁 | 按需 |
-
-注意 `gtdbtk` 较慢（每基因组分钟级）；`all` 模式也会运行它——如需跳过请显式指定 `-m`。
-
-### 结构化错误字段（面向 agent）
-
-当某方法因数据库 tier 缺失而失败时，该方法的 JSON 条目在 `error` 字符串
-之外还携带结构化字段，无需正则解析：
-
-```json
-{
-  "method": "sourmash",
-  "error": "sourmash GTDB database not found in ... (run: gside db setup --tier sourmash)",
-  "suggested_command": "gside db setup --tier sourmash",
-  "missing_tier": "sourmash",
-  "estimated_size": "~3.9GB"
-}
-```
-
-加上 `--auto-setup` 后，gside 会自行执行 `suggested_command`（进度走
-stderr），对该方法重试一次，并重算 verdict。
+| `-f`，`--format` | 选项 | `json` | `json` / `tsv` / `md` / `csv` |
+| `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH（行式格式随输入完成流式写入；json 最后一次性写入） |
+| `-j`，`--jobs N` | 选项 | `1` | 单菌株并发输入数，或 `--meta --samples` 的并发样本数 |
+| `-t`，`--threads N` | 选项 | `4` | 每次工具调用的线程数 |
+| `-n`，`--no-header` | 选项 | 关 | 隐藏表头行（tsv/csv/md） |
+| `-a`，`--auto-setup` | 选项 | 关 | 自动安装缺失档位并重试该方法一次 |
+| `-s`，`--samples PATH` | 选项 | — | `--meta` 批量清单：`sample_id<TAB>reads [<TAB>reads2]` |
 
 ### 示例
 
 ```bash
-# 靶基因鉴定（最快，无需额外数据库）
-gside species contigs.fna --mode marker
+# 单基因组（isolate 或 MAG）
+gside scan contigs.fna                      # marker
+gside scan contigs.fna -m panel -f csv
+gside scan *.fna -m marker -j 8 -o results.tsv
 
-# ANI 鉴定（精确）
-gside species contigs.fna --mode panel
+# 长读长单菌株（marker 把读段当序列比对）
+gside scan ont_reads.fastq -m marker
 
-# sourmash GTDB gather
-gside species contigs.fna --mode sourmash
-
-# GTDB-Tk 系统发育 placement（慢，需外部 gtdbtk + GTDBTK_DATA_PATH）
-gside species contigs.fna --mode gtdbtk
-
-# 多法仲裁（marker + panel + mash_refseq + sourmash + gtdbtk）
-gside species contigs.fna --mode all
-
-# 指定数据库目录
-gside species contigs.fna --mode panel --db-dir /path/to/dbs
-
-# 自动安装缺失数据库 tier 后鉴定
-gside species contigs.fna --mode all --auto-setup
-
-# 报告写入文件（stdout 保持为空，提示信息走 stderr）
-gside species contigs.fna -m all -o report.json
+# 宏基因组群落
+gside scan reads_R1.fq reads_R2.fq --meta                 # kraken2 + sylph
+gside scan contigs.fna --meta -m kraken2 -f md
+gside scan --meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 ```
+
+## gside species（别名）
+
+`gside species <files...>` 是 `gside scan`（不带 `--meta`）的隐藏兼容别名：
+选项与输出完全一致，模式限定为 `marker|panel|mash_refseq|sourmash|gtdbtk|all`。
 
 ## gside db
 
@@ -159,41 +142,10 @@ gside validate contigs.fna --mode simple
 gside validate contigs.fna --mode standard --output-dir ./taxonomy
 ```
 
-## gside meta
+## gside meta（别名）
 
-宏基因组物种分析（Kraken2+Bracken 与 sylph），输入 FASTQ 读段或组装
-contigs。详见[宏分类学分析](meta.zh.md)。
-
-### 用法
-
-```bash
-gside meta <reads.fastq> [reads_2.fastq] [选项]
-```
-
-### 参数
-
-| 参数 | 类型 | 默认 | 说明 |
-|---|---|---|---|
-| `reads` | 位置参数 | — | 1 个文件 = 单端读段或 contigs FASTA；2 个文件 = 双端 FASTQ |
-| `-m`，`--mode` | 选项 | `all` | 分析方法：`kraken2` / `sylph` / `all`（all 合并两份物种列表） |
-| `-D`，`--db-dir` | 选项 | 自动 | 数据库根目录（`$GSIDE_DB_DIR` 或 `data/db`） |
-| `-f`，`--format` | 选项 | `json` | 输出格式：`json` / `tsv` / `csv` |
-| `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH 而非 stdout（json 为单文档收尾一次写入；stdout 不再输出数据，提示信息走 stderr） |
-| `-s`，`--samples PATH` | 选项 | — | 批量清单 `sample_id<TAB>reads[<TAB>reads2]`（表头可省略） |
-| `-j`，`--jobs N` | 选项 | `1` | 并发处理的清单样本数（输出顺序保持不变） |
-| `-n`，`--no-header` | 选项 | 关 | 隐藏 TSV/CSV 表头行（json 保持结构） |
-| `-a`，`--auto-setup` | 选项 | 关 | 自动安装缺失档位并重试该方法一次 |
-| `-t`，`--threads N` | 选项 | `4` | 每次工具调用的线程数 |
-
-### 示例
-
-```bash
-gside meta sample_1.fastq sample_2.fastq
-gside meta sample_1.fastq sample_2.fastq -m kraken2 -f tsv -o profile.tsv
-gside meta contigs.fna          # 仅 kraken2（sylph 只接受读段）
-gside meta reads.fastq -m sylph
-gside meta --samples samples.tsv -j 4 -f csv -o profiles.csv
-```
+`gside meta <reads...>` 是 `gside scan --meta` 的隐藏兼容别名：选项（含
+`--samples`）与输出一致，模式为 `kraken2|sylph|all`。
 
 ## gside --version
 

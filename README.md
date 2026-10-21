@@ -10,11 +10,16 @@ A standalone CLI for multi-layer species identification from assembled contigs a
 pip install gside
 
 # Single-genome species identification
-gside species contigs.fna --mode all
+gside scan contigs.fna --mode all
 
 # Metagenomic profiling
-gside meta reads_R1.fq reads_R2.fq --mode all
+gside scan --meta reads_R1.fq reads_R2.fq --mode all
 ```
+
+`scan` infers FASTA vs FASTQ from the extension and rejects a mode that cannot
+consume that input (e.g. `-m panel` on reads) before any tool runs. `--meta`
+selects the community workflow and restricts modes to `kraken2`/`sylph`/`all`.
+The old `gside species` and `gside meta` commands remain as hidden aliases.
 
 `pip install` ships the Python package and the bundled marker database, but the
 aligners (`blastn`, `skani`, `mash`, `sourmash`, `kraken2`, `bracken`, `sylph`)
@@ -26,7 +31,7 @@ export GSIDE_PIXI_BIN=/path/to/conda/env/bin
 gside db status          # shows which tiers are ready
 ```
 
-## Species Identification (`gside species`)
+## Species Identification (`gside scan`)
 
 | Mode | Engine | Method | Database |
 |---|---|---|---|
@@ -53,19 +58,19 @@ Higher layers always outrank lower ones; within a layer, higher confidence wins.
 pixi install && pip install -e .
 
 # Identify species (marker mode works out of the box)
-gside species contigs.fna
+gside scan contigs.fna
 
 # Install reference databases
 gside db setup --tier panel
 
 # Multi-method identification
-gside species contigs.fna --mode all
+gside scan contigs.fna --mode all
 
 # Parallel batch processing with streaming output
-gside species *.fna --mode all -j 8 -t 4 -o results.tsv
+gside scan *.fna --mode all -j 8 -t 4 -o results.tsv
 ```
 
-## Metagenomic Profiling (`gside meta`)
+## Metagenomic Profiling (`gside scan --meta`)
 
 | Mode | Engine | Input | Best for |
 |---|---|---|---|
@@ -74,8 +79,8 @@ gside species *.fna --mode all -j 8 -t 4 -o results.tsv
 | `all` | Both | FASTQ (both) / FASTA (kraken2) | Merged profile |
 
 ```bash
-gside meta reads_R1.fq reads_R2.fq --mode all
-gside meta contigs.fna --mode kraken2
+gside scan --meta reads_R1.fq reads_R2.fq --mode all
+gside scan --meta contigs.fna --mode kraken2
 ```
 
 ## Agent-Friendly Design
@@ -84,7 +89,7 @@ gside is built for AI agents as much as humans:
 
 ```bash
 # JSON on stdout (always exit 0; errors in methods.<mode>.error)
-gside species genome.fna --mode all
+gside scan genome.fna --mode all
 
 # Structured missing-database errors
 # → methods.panel.suggested_command = "gside db setup --tier panel"
@@ -92,7 +97,7 @@ gside species genome.fna --mode all
 # → methods.panel.estimated_size = "~130MB sketch / ~1GB genomes"
 
 # Auto-install missing databases
-gside species genome.fna --mode panel --auto-setup
+gside scan genome.fna --mode panel --auto-setup
 
 # Machine-readable database status
 gside db status -f json
@@ -120,7 +125,7 @@ Exposes `species`, `db_status`, `db_list`, `db_setup` as MCP tools for Claude De
 ## CLI Reference
 
 ```
-gside species <contigs.fna> [options]
+gside scan <contigs.fna> [options]
   -m, --mode         marker|panel|mash_refseq|sourmash|gtdbtk|all
   -D, --db-dir       Database root
   -f, --format       json|tsv|md
@@ -130,7 +135,7 @@ gside species <contigs.fna> [options]
   -a, --auto-setup   Install missing databases automatically
   -n, --no-header    Suppress TSV header row
 
-gside meta <reads/files> [options]
+gside scan --meta <reads/files> [options]
   -m, --mode         kraken2|sylph|all
   -D, --db-dir       Database root
   -f, --format       json|tsv

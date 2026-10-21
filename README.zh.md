@@ -10,13 +10,17 @@
 pip install gside
 
 # 单基因组物种鉴定
-gside species contigs.fna --mode all
+gside scan contigs.fna --mode all
 
 # 宏基因组谱分析
-gside meta reads_R1.fq reads_R2.fq --mode all
+gside scan --meta reads_R1.fq reads_R2.fq --mode all
 ```
 
-## 物种鉴定（`gside species`）
+`scan` 由扩展名推断 FASTA/FASTQ，并在任何工具启动前拒绝不匹配的模式
+（例如对 reads 用 `-m panel`）。`--meta` 切换到群落工作流，模式限定为
+`kraken2`/`sylph`/`all`。旧的 `gside species` 与 `gside meta` 保留为隐藏别名。
+
+## 物种鉴定（`gside scan`）
 
 | 模式 | 引擎 | 原理 | 数据库 |
 |---|---|---|---|
@@ -43,19 +47,19 @@ gside meta reads_R1.fq reads_R2.fq --mode all
 pixi install && pip install -e .
 
 # 物种鉴定（marker 模式开箱即用）
-gside species contigs.fna
+gside scan contigs.fna
 
 # 安装参考数据库
 gside db setup --tier panel
 
 # 多方法鉴定
-gside species contigs.fna --mode all
+gside scan contigs.fna --mode all
 
 # 并行批量处理 + 流式输出
-gside species *.fna --mode all -j 8 -t 4 -o results.tsv
+gside scan *.fna --mode all -j 8 -t 4 -o results.tsv
 ```
 
-## 宏基因组谱分析（`gside meta`）
+## 宏基因组谱分析（`gside scan --meta`）
 
 | 模式 | 引擎 | 输入 | 适用 |
 |---|---|---|---|
@@ -64,8 +68,8 @@ gside species *.fna --mode all -j 8 -t 4 -o results.tsv
 | `all` | 双引擎 | FASTQ（双）/ FASTA（kraken2） | 合并谱 |
 
 ```bash
-gside meta reads_R1.fq reads_R2.fq --mode all
-gside meta contigs.fna --mode kraken2
+gside scan --meta reads_R1.fq reads_R2.fq --mode all
+gside scan --meta contigs.fna --mode kraken2
 ```
 
 ## 智能体友好设计
@@ -74,7 +78,7 @@ gside 为 AI 智能体和人类用户同等设计：
 
 ```bash
 # stdout 纯 JSON（恒 exit 0；错误在 methods.<mode>.error）
-gside species genome.fna --mode all
+gside scan genome.fna --mode all
 
 # 结构化缺库错误
 # → methods.panel.suggested_command = "gside db setup --tier panel"
@@ -82,7 +86,7 @@ gside species genome.fna --mode all
 # → methods.panel.estimated_size = "~130MB sketch / ~1GB genomes"
 
 # 自动安装缺失数据库
-gside species genome.fna --mode panel --auto-setup
+gside scan genome.fna --mode panel --auto-setup
 
 # 机器可读数据库状态
 gside db status -f json
@@ -110,7 +114,7 @@ gside mcp    # 或: gside-mcp
 ## CLI 参考
 
 ```
-gside species <contigs.fna> [options]
+gside scan <contigs.fna> [options]
   -m, --mode         marker|panel|mash_refseq|sourmash|gtdbtk|all
   -D, --db-dir       数据库根目录
   -f, --format       json|tsv|md
@@ -120,7 +124,7 @@ gside species <contigs.fna> [options]
   -a, --auto-setup   自动安装缺失数据库
   -n, --no-header    隐藏 TSV 表头
 
-gside meta <reads/files> [options]
+gside scan --meta <reads/files> [options]
   -m, --mode         kraken2|sylph|all
   -D, --db-dir       数据库根目录
   -f, --format       json|tsv

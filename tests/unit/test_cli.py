@@ -132,3 +132,21 @@ class TestSingleModeVerdict:
         assert verdict["strain"] == "K12"
         assert verdict["supporting"] == []
         assert verdict["agreement"] == "1/1"
+
+
+class TestCsvRendering:
+    def test_species_csv_header_and_row(self, capsys):
+        from gside.cli import _emit_species
+
+        assert _emit_species(iter([_payload()]), 1, "csv", None) == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert lines[0].startswith("contigs,verdict_species,")
+        assert lines[1].startswith("a.fna,Salmonella,high,marker,")
+
+    def test_species_csv_no_header(self, capsys):
+        from gside.cli import _emit_species
+
+        assert _emit_species(iter([_payload()]), 1, "csv", None, no_header=True) == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert len(lines) == 1
+        assert lines[0].startswith("a.fna,")

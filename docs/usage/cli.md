@@ -1,98 +1,75 @@
 # CLI Reference
 
-## gside species
+## gside scan
 
-Main species identification command.
+Single entry point for both workflows: identify the species in one genome
+(default) or profile a metagenomic community (`--meta`).
 
 ### Usage
 
 ```bash
-gside species <contigs.fasta> [options]
+gside scan <files...> [options]
+gside scan --meta <reads...> [options]
+gside scan --meta --samples samples.tsv [options]
 ```
+
+### Mode / input matrix
+
+| Mode | `--meta` | FASTA | FASTQ | Notes |
+|---|---|---|---|---|
+| `marker` | no | ✅ | ✅ | FASTQ is read as sequences; only reads long enough to cover a marker gene pass the 60% coverage gate |
+| `panel` | no | ✅ | ❌ | skani ANI |
+| `mash_refseq` | no | ✅ | ❌ | MinHash distance |
+| `sourmash` | no | ✅ | ❌ | GTDB gather (containment ANI) |
+| `gtdbtk` | no | ✅ | ❌ | phylogenetic placement |
+| `all` | no | ✅ | ❌ | every species tier + arbitration |
+| `kraken2` | yes | ✅ | ✅ | reads or contigs |
+| `sylph` | yes | ❌ | ✅ | reads only |
+| `all` | yes | ✅ | ✅ | kraken2 (+ sylph when FASTQ) |
+
+The input type is inferred from the extension (`.fna/.fa/.fasta` vs
+`.fq/.fastq`, `.gz` allowed) and validated **before** any tool runs: a
+mismatch exits 2 and lists the supported types. `--meta` likewise rejects
+isolate modes, and isolate mode rejects `kraken2`/`sylph`.
 
 ### Arguments
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `contigs` | positional | — | Assembled contigs FASTA file |
-| `-m`, `--mode` | option | `marker` | Identification mode (see below) |
+| `files` | positional | — | One or more FASTA/FASTQ files (isolate: a batch; `--meta`: one sample of 1-2 files) |
+| `-m`, `--mode` | option | `marker` / `all` | Method (defaults to `marker`, or `all` with `--meta`) |
+| `--meta` | flag | off | Treat the input as a metagenomic community |
 | `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
-| `-f`, `--format` | option | `json` | Output format: `json` / `tsv` / `md` |
-| `-n`, `--no-header` | option | off | Suppress the TSV header row (tsv only; md/json keep their structure) |
-| `-a`, `--auto-setup` | option | off | Automatically install missing database tiers before identification (progress on stderr) |
-| `-j`, `--jobs N` | option | `1` | Number of input files to identify concurrently (output order is always input order) |
-| `-t`, `--threads N` | option | `4` | Threads per aligner invocation (blastn `-num_threads` / skani `-t` / mash `-p`) |
-| `-o`, `--output PATH` | option | stdout | Write the report to PATH instead of stdout (truncates; tsv/md rows stream to the file as each input completes, flushed per row — a mid-batch failure still persists the prefix; json is written once at the end; stdout then carries no data, a notice goes to stderr) |
-
-### Identification Modes
-
-Six modes are available. `marker` is the default.
-
-| Mode | Description | Database Required |
-|------|-------------|-------------------|
-| `marker` | Target gene combination rules (blastn) | mini (bundled) |
-| `panel` | ANI against curated panel (skani) | panel tier |
-| `mash_refseq` | MinHash distance (mash) | mash tier |
-| `sourmash` | sourmash GTDB gather | sourmash GTDB db |
-| `gtdbtk` | GTDB-Tk phylogenetic placement (classify_wf) | external GTDB-Tk install (`GTDBTK_DATA_PATH`) |
-| `all` | Run all available methods + arbitrate | as needed |
-
-Progress bar: multi-file runs show an stderr progress bar (spinner, M/N, elapsed) when stderr is a TTY; suppressed under `--quiet`, single-file, or piped stderr.
-
-In `all` mode a failure in one method does not abort the run: the error is
-recorded in that method's JSON entry and the remaining methods continue.
-Note that `gtdbtk` is slow (minutes per genome); in `all` mode it runs too —
-use an explicit `-m` if you want to skip it.
-
-### Structured error fields (agent-friendly)
-
-When a method fails because its database tier is missing, that method's JSON
-entry carries structured fields alongside the `error` string — no regex
-parsing needed:
-
-```json
-{
-  "method": "sourmash",
-  "error": "sourmash GTDB database not found in ... (run: gside db setup --tier sourmash)",
-  "suggested_command": "gside db setup --tier sourmash",
-  "missing_tier": "sourmash",
-  "estimated_size": "~3.9GB"
-}
-```
-
-With `--auto-setup`, gside runs `suggested_command` itself (progress on
-stderr), retries that single method once, and recomputes the verdict.
+| `-f`, `--format` | option | `json` | `json` / `tsv` / `md` / `csv` |
+| `-o`, `--output PATH` | option | stdout | Write the report to PATH (row formats stream as inputs complete; json once at the end) |
+| `-j`, `--jobs N` | option | `1` | Concurrent isolate inputs, or manifest samples with `--meta --samples` |
+| `-t`, `--threads N` | option | `4` | Threads per tool invocation |
+| `-n`, `--no-header` | option | off | Suppress the header row (tsv/csv/md) |
+| `-a`, `--auto-setup` | option | off | Install a missing database tier, then retry that method once |
+| `-s`, `--samples PATH` | option | — | `--meta` batch manifest: `sample_id<TAB>reads [<TAB>reads2]` |
 
 ### Examples
 
 ```bash
-# Target gene identification (fastest, no extra database needed)
-gside species contigs.fna --mode marker
+# One genome (isolate or MAG)
+gside scan contigs.fna                      # marker
+gside scan contigs.fna -m panel -f csv
+gside scan *.fna -m marker -j 8 -o results.tsv
 
-# ANI identification (precise)
-gside species contigs.fna --mode panel
+# Long-read isolate data (marker treats reads as sequences)
+gside scan ont_reads.fastq -m marker
 
-# MinHash distance against RefSeq
-gside species contigs.fna --mode mash_refseq
-
-# GTDB gather classification
-gside species contigs.fna --mode sourmash
-
-# GTDB-Tk phylogenetic placement (slow, needs external gtdbtk + GTDBTK_DATA_PATH)
-gside species contigs.fna --mode gtdbtk
-
-# Multi-method arbitration
-gside species contigs.fna --mode all
-
-# Specify database directory
-gside species contigs.fna --mode panel --db-dir /path/to/dbs
-
-# Auto-install missing database tiers, then identify
-gside species contigs.fna --mode all --auto-setup
-
-# Write the report to a file (stdout stays empty; notice goes to stderr)
-gside species contigs.fna -m all -o report.json
+# Metagenomic community
+gside scan reads_R1.fq reads_R2.fq --meta                 # kraken2 + sylph
+gside scan contigs.fna --meta -m kraken2 -f md
+gside scan --meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 ```
+
+## gside species (alias)
+
+`gside species <files...>` is a hidden compatibility alias for `gside scan`
+without `--meta`: same options and output, with mode choices limited to
+`marker|panel|mash_refseq|sourmash|gtdbtk|all`.
 
 ## gside db
 
@@ -169,41 +146,11 @@ gside validate contigs.fna --mode simple
 gside validate contigs.fna --mode standard --output-dir ./taxonomy
 ```
 
-## gside meta
+## gside meta (alias)
 
-Metagenomic species profiling from FASTQ reads or assembled contigs
-(Kraken2+Bracken and sylph). See [Metagenomic Profiling](meta.md).
-
-### Usage
-
-```bash
-gside meta <reads.fastq> [reads_2.fastq] [options]
-```
-
-### Arguments
-
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `reads` | positional | — | 1 file = single-end reads or contigs FASTA; 2 files = paired FASTQ |
-| `-m`, `--mode` | option | `all` | Profiling method: `kraken2` / `sylph` / `all` (all merges the species lists) |
-| `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
-| `-f`, `--format` | option | `json` | Output format: `json` / `tsv` / `csv` |
-| `-o`, `--output PATH` | option | stdout | Write the report to PATH instead of stdout (json written once at the end; stdout then carries no data, a notice goes to stderr) |
-| `-s`, `--samples PATH` | option | — | Batch manifest `sample_id<TAB>reads[<TAB>reads2]` (header optional) |
-| `-j`, `--jobs N` | option | `1` | Concurrent manifest samples (output order is preserved) |
-| `-n`, `--no-header` | option | off | Suppress the TSV/CSV header row (json keeps its structure) |
-| `-a`, `--auto-setup` | option | off | Install a missing database tier, then retry that method once |
-| `-t`, `--threads N` | option | `4` | Threads per tool invocation |
-
-### Examples
-
-```bash
-gside meta sample_1.fastq sample_2.fastq
-gside meta sample_1.fastq sample_2.fastq -m kraken2 -f tsv -o profile.tsv
-gside meta contigs.fna          # kraken2 only (sylph requires reads)
-gside meta reads.fastq -m sylph
-gside meta --samples samples.tsv -j 4 -f csv -o profiles.csv
-```
+`gside meta <reads...>` is a hidden compatibility alias for
+`gside scan --meta`: same options (including `--samples`), with mode choices
+`kraken2|sylph|all`.
 
 ## gside --version
 

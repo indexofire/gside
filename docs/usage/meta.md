@@ -1,10 +1,11 @@
 # Metagenomic Profiling
 
-`gside meta` profiles a metagenomic sample — FASTQ reads or assembled
+`gside scan --meta` profiles a metagenomic sample — FASTQ reads or assembled
 contigs — reporting the species present, their abundances, and per-method
-confidence. It complements `gside species`, which identifies a **single**
-organism from contigs; `meta` answers "what is in this sample, and how much
-of each?".
+confidence. It is the community workflow of `gside scan` (add `--meta`); the
+isolate workflow identifies a **single** organism and answers "which species
+is this?", while `--meta` answers "what is in this sample, and how much of
+each?".
 
 Two methods are available:
 
@@ -20,7 +21,7 @@ lists: duplicates keep the row from the higher-confidence method (sylph ANI
 ## Usage
 
 ```bash
-gside meta <reads.fastq> [reads_2.fastq] [options]
+gside scan --meta <reads.fastq> [reads_2.fastq] [options]
 ```
 
 | Option | Default | Description |
@@ -41,7 +42,7 @@ gside meta <reads.fastq> [reads_2.fastq] [options]
 For multiple samples, pass a manifest instead of positional reads:
 
 ```bash
-gside meta --samples samples.tsv -j 4 -f tsv -o profiles.tsv
+gside scan --meta --samples samples.tsv -j 4 -f tsv -o profiles.tsv
 ```
 
 `samples.tsv` is tab-separated, one sample per line (header optional):
@@ -66,7 +67,7 @@ single-end FASTQ.
 - **kraken2**: per-species `fraction_total_reads` ≥ 0.10 → `high`, ≥ 0.01 →
   `medium`, else `low` (Bracken re-estimated reads).
 - **sylph**: adjusted containment ANI ≥ 95 → `high`, ≥ 93 → `medium`, else
-  `low` (same thresholds as the panel ANI layer of `gside species`).
+  `low` (same thresholds as the panel ANI layer of `gside scan`).
 
 ## Output
 
@@ -102,7 +103,7 @@ JSON (default) — a single document:
 
 `abundance` is always a **fraction (0-1)** for both engines (sylph's percentage
 is normalised at parse time), and `name` is the same canonical `Genus_species`
-label used by `gside species`; strain detail moves to `strain`, and the raw
+label used by `gside scan`; strain detail moves to `strain`, and the raw
 tool string to `species_raw`. Species-group placeholders (`Campylobacter sp.`)
 are dropped from the merged verdict.
 
@@ -114,7 +115,7 @@ sylph	Escherichia_coli	0.7812	high	97.53
 kraken2	Salmonella_enterica	0.20	medium	
 ```
 
-Like `gside species`, `gside meta` always exits 0: a failing method records
+Like the isolate workflow, `gside scan --meta` always exits 0: a failing method records
 its error under `methods.<mode>.error` and the remaining methods continue.
 FASTA input is rejected by `sylph` (it requires reads) with a structured
 error pointing at `--mode kraken2`.
@@ -123,19 +124,19 @@ error pointing at `--mode kraken2`.
 
 ```bash
 # Paired-end reads, both methods (default)
-gside meta sample_1.fastq sample_2.fastq
+gside scan --meta sample_1.fastq sample_2.fastq
 
 # Kraken2 only, TSV to a file
-gside meta sample_1.fastq sample_2.fastq -m kraken2 -f tsv -o profile.tsv
+gside scan --meta sample_1.fastq sample_2.fastq -m kraken2 -f tsv -o profile.tsv
 
 # Contigs / assembled FASTA (kraken2 handles FASTA, sylph reports the structured error)
-gside meta contigs.fna
+gside scan --meta contigs.fna
 
 # Single-end reads with sylph ANI profiling
-gside meta reads.fastq -m sylph
+gside scan --meta reads.fastq -m sylph
 
 # Custom database root
-gside meta reads.fastq -D /path/to/db
+gside scan --meta reads.fastq -D /path/to/db
 ```
 
 ## Databases
