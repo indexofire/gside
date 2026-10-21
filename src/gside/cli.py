@@ -558,6 +558,7 @@ def db_list_cmd(output_format: str) -> None:
 @main.command("validate", context_settings=HELP_SETTINGS)
 @click.argument("contigs", type=click.Path(dir_okay=False))
 @click.option(
+    "-m",
     "--mode",
     type=click.Choice(["simple", "standard"]),
     default="simple",
@@ -565,6 +566,7 @@ def db_list_cmd(output_format: str) -> None:
     help="Validation depth (standard adds CheckM2 + GTDB-Tk).",
 )
 @click.option(
+    "-o",
     "--output-dir",
     type=click.Path(file_okay=False),
     default=None,

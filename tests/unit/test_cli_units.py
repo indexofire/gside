@@ -997,3 +997,29 @@ class TestCompositeUnknownMode:
     def test_identify_one_rejects_unknown_mode(self):
         with pytest.raises(ValueError, match="unsupported isolate mode"):
             _identify_one("g.fna", "bogus", None)
+
+
+class TestValidateShortFlags:
+    def test_help_lists_short_flags(self):
+        result = CliRunner().invoke(main, ["validate", "-h"])
+        assert result.exit_code == 0
+        assert "-m, --mode" in result.output
+        assert "-o, --output-dir" in result.output
+
+    def test_short_flags_run(self, monkeypatch, tmp_path):
+        import gside.analysis.taxonomic_validator as tv
+
+        seen: dict[str, object] = {}
+
+        def fake_validate(contigs, mode="simple", output_dir=None):
+            seen.update(contigs=contigs, mode=mode, output_dir=output_dir)
+            return tv.TaxonomyResult(mode=mode, marker_gene_species="Salmonella")
+
+        monkeypatch.setattr(tv, "validate_genome", fake_validate)
+        result = CliRunner().invoke(
+            main,
+            ["validate", "g.fna", "-m", "standard", "-o", str(tmp_path / "tax")],
+        )
+        assert result.exit_code == 0, result.output
+        assert seen["mode"] == "standard"
+        assert str(seen["output_dir"]).endswith("tax")

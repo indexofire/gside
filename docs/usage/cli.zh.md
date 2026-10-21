@@ -133,8 +133,8 @@ gside validate <contigs.fasta> [选项]
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `contigs` | 位置参数 | — | 组装后的 contigs FASTA 文件 |
-| `--mode` | 选项 | `simple` | 验证深度：`simple`（标记基因）或 `standard`（叠加 CheckM2 + GTDB-Tk） |
-| `--output-dir` | 选项 | 自动 | `validation.json` 输出目录 |
+| `-m`，`--mode` | 选项 | `simple` | 验证深度：`simple`（标记基因）或 `standard`（叠加 CheckM2 + GTDB-Tk） |
+| `-o`，`--output-dir` | 选项 | 自动 | `validation.json` 输出目录（注意：是目录，不同于 `scan -o` 的文件） |
 
 `standard` 模式优雅降级：缺 CheckM2/GTDB-Tk 数据库或二进制时只告警并返回
 部分结果，不崩溃。通过 `CHECKM2DB` / `GTDBTK_DATA_PATH`（或 `GTDBDB`）

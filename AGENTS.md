@@ -179,7 +179,7 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 
 ### CLI Patterns
 - Click group style (mirrors gmlst/gapit family): `HELP_SETTINGS` (`-h`/`--help`), bare invocation prints help and exits 2 (`no_args_is_help`), `-v`/`-q` mutually exclusive (UsageError), thin commands registered via `add_command`
-- One command, `scan`, for both workflows; `-m/--mode` picks the method, `--meta` selects the community workflow. Every option carries a short flag: `-m/--mode -f/--format -D/--db-dir -o/--output -j/--jobs -t/--threads -n/--no-header -a/--auto-setup` (+ `-s/--samples` with `--meta`); db `-t/--tier -s/--source -f/--format`
+- One command, `scan`, for both workflows; `-m/--mode` picks the method, `--meta` selects the community workflow. Every option carries a short flag: `-m/--mode -f/--format -D/--db-dir -o/--output -j/--jobs -t/--threads -n/--no-header -a/--auto-setup` (+ `-s/--samples` with `--meta`); validate `-m/--mode -o/--output-dir`; db `-t/--tier -s/--source -f/--format`
 - `-D/--db-dir`, `-f/--format` and `-t/--threads` are built by the shared factories `_db_dir_option` / `_format_option` / `_threads_option` in `cli.py` — add new commands through them so flags never drift
 - Agent-friendly outputs: `scan` defaults to JSON on stdout and supports `-f json|tsv|md|csv`; `-o` writes the payload to a file (row formats flushed per row as inputs complete — a mid-batch failure persists the prefix; json single document at the end; stdout stays empty, notice on stderr); `db status|list` accept `--format table|tsv|json`; `db setup` accepts `--format text|json` (json routes progress to stderr); `-V -J` prints version as JSON
 - Subcommands: `scan` / `db` group (`status|setup|list`) / `validate` / `mcp` (MCP stdio server) / `--version`; entry `gside.cli:main`
@@ -188,6 +188,7 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 - Mode choices: isolate `marker|panel|mash_refseq|sourmash|gtdbtk|all`; meta `kraken2|sylph|all` — do not invent modes. `-m` also accepts `+` combinations (`marker+sourmash`): `_split_modes` dedupes in order, `all` cannot be combined, and `_validate_scan` checks **every** component against the context and input kind
 - Input kinds are inferred from the extension (`.fna/.fa/.fasta` vs `.fq/.fastq`, `.gz` stripped) and validated **before** any tool runs: `_MODE_INPUTS` / `_META_MODE_INPUTS` in `cli.py` define the matrix (marker/mash_refseq/sourmash accept both; panel/gtdbtk are FASTA-only — skani and GTDB-Tk need assemblies; kraken2 both; sylph FASTQ-only). `all` expands to the context's full list (`_ISOLATE_MODES` / `_META_METHODS`) and is validated component-by-component, so isolate `all` needs FASTA and meta `all` needs FASTQ. Update the matrix and docs together when adding a mode
 - `--db-dir` overrides the database root for one invocation
+- `validate` is a separate QC command (marker + optional CheckM2/GTDB-Tk), not a scan mode: `-m` there means validation depth (`simple|standard`) and `-o` takes a **directory**, unlike `scan -o` (a file)
 - `verdict` shape is shared by single-mode and `all`: `species` (canonical), `display_name`, `strain`, `confidence`, `basis` (winner only), `supporting`, `agreement`
 
 ### File & Module Organization

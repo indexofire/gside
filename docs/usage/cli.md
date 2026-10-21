@@ -138,8 +138,8 @@ gside validate <contigs.fasta> [options]
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `contigs` | positional | — | Assembled contigs FASTA file |
-| `--mode` | option | `simple` | Validation depth: `simple` (marker genes) or `standard` (adds CheckM2 + GTDB-Tk) |
-| `--output-dir` | option | auto | Directory for `validation.json` |
+| `-m`, `--mode` | option | `simple` | Validation depth: `simple` (marker genes) or `standard` (adds CheckM2 + GTDB-Tk) |
+| `-o`, `--output-dir` | option | auto | Directory for `validation.json` (note: a directory, unlike `scan -o` which takes a file) |
 
 `standard` mode degrades gracefully: missing CheckM2/GTDB-Tk databases or
 binaries produce warnings and partial results, never a crash. Configure via
