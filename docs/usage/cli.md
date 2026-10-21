@@ -20,7 +20,7 @@ gside scan --meta --samples samples.tsv [options]
 | `marker` | no | ✅ | ✅ | FASTQ: reads mapped with minimap2 (`sr`/`map-ont`); per-gene breadth is the union of read alignments — ~1x genome coverage suffices |
 | `panel` | no | ✅ | ❌ | skani ANI |
 | `mash_refseq` | no | ✅ | ✅ | reads are sketched with `mash sketch -m 2 -r`; species-level at >=10x, strain calls unreliable |
-| `sourmash` | no | ✅ | ✅ | gather on read sketches (slow: minutes); containment-ANI based |
+| `sourmash` | no | ✅ | ✅ | gather on read sketches (~4 min for a 10x 1.6Mb set); containment-ANI based |
 | `gtdbtk` | no | ✅ | ❌ | phylogenetic placement |
 | `all` | no | ✅ | ❌ | every species tier + arbitration (panel/gtdbtk are assembly-only) |
 | `kraken2` | yes | ✅ | ✅ | reads or contigs |

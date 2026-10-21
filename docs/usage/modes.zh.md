@@ -109,7 +109,8 @@ mash 对 contigs 与 RefSeq 全库 sketch（mash.msh，~179MB）做 MinHash 距�
 未组装"读段都可用（sourmash 文档；Irber et al. 2022）。在读段上它是
 **containment 谱**：最佳参考覆盖了多大比例的读段 k-mer，而不是组装对组装的
 ANI。覆盖空缺与测序错误会降低灵敏度，短读段不会被逐条分类（推荐 gather 后
-再回贴读段）。10× 读段通常需要分钟级时间，而非秒级。
+再回贴读段）。实测：1.65Mb 基因组的 10× 150bp 读段约需 **4 分钟**（组装约
+40 秒），但给出的判定与 ANI 与组装一致（containment ANI 98.2%）。
 
 ### 原理
 

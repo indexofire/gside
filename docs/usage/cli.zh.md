@@ -19,7 +19,7 @@ gside scan --meta --samples samples.tsv [选项]
 | `marker` | 否 | ✅ | ✅ | FASTQ：minimap2（`sr`/`map-ont`）比对，基因 breadth 取所有读段比对区间的并集——约 1× 基因组覆盖即可 |
 | `panel` | 否 | ✅ | ❌ | skani ANI |
 | `mash_refseq` | 否 | ✅ | ✅ | 读段先 `mash sketch -m 2 -r`；≥10× 可做种级判定，菌株级不可靠 |
-| `sourmash` | 否 | ✅ | ✅ | 对读段签名做 gather（较慢，分钟级）；基于 containment ANI |
+| `sourmash` | 否 | ✅ | ✅ | 对读段签名做 gather（1.6Mb 的 10× 数据约 4 分钟）；基于 containment ANI |
 | `gtdbtk` | 否 | ✅ | ❌ | 系统发育 placement |
 | `all` | 否 | ✅ | ❌ | 全部物种层 + 仲裁（panel/gtdbtk 仅接受组装） |
 | `kraken2` | 是 | ✅ | ✅ | 读段或 contigs |
