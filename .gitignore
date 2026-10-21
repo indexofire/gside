@@ -7,6 +7,8 @@ data/db/D2_ani/*
 !data/db/D2_ani/manifests/
 data/db/D3_mash/
 data/db/D4_sourmash/
+data/db/D5_kraken2/
+data/db/D6_sylph/
 site/
 
 # Python
