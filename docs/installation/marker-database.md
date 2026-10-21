@@ -1,7 +1,7 @@
 # Marker Gene Database
 
 The marker database (`data/db/D1_marker/`, the bundled **mini** tier) powers the
-default `--mode marker` identification: `blastn` maps query contigs against
+default `-m marker` identification: `blastn` maps query contigs against
 80 curated reference sequences, and 38 species rules turn the hits into a
 verdict. gside is a species-identification engine: every reference is anchored
 to a verifiable NCBI/RefSeq accession and was validated by blast against the
@@ -9,6 +9,12 @@ to a verifiable NCBI/RefSeq accession and was validated by blast against the
 O1/O139 serogroup database lives there (`gapit screen --db vc_serogroup`).
 
 ## How marker identification works
+
+**FASTA**: the path below. **FASTQ**: minimap2 maps reads to the same
+`markers.fasta` (`-x sr` for short reads, `-x map-ont` for long), per-gene
+breadth is the union of the covered reference intervals, and the identity and
+rule thresholds are identical. Reads only need ~1x genome coverage; see
+[Identification Modes](../usage/modes.md#l1-marker-target-gene-combination).
 
 1. `blastn` aligns contigs against the pre-built `markers_blastdb`
    (evalue 1e-10, word size 11).

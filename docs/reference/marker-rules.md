@@ -127,4 +127,4 @@ Then:
    (format: `>markers~~~mpb64~~~ACCESSION description [species] role=primary`)
 2. Rebuild BLAST database:
    `makeblastdb -in markers.fasta -dbtype nucl -out markers_blastdb`
-3. Run `gside scan test.fna --mode marker` to verify
+3. Run `gside scan test.fna -m marker` to verify

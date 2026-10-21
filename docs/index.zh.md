@@ -34,6 +34,18 @@ gside            物种鉴定引擎 + 宏基因组谱分析
 | `sylph` | sylph | 仅 FASTQ | ANI 精度、种级判定 |
 | `all` | 双引擎 | FASTQ / FASTA | 合并谱 |
 
+## 基因组质量（`gside validate`）
+
+CheckM2（完整度/污染度）+ GTDB-Tk（分类），写入 `validation.json`，含工具版本、
+参数与逐工具状态：
+
+```bash
+gside validate contigs.fna -o taxonomy
+```
+
+两个数据库均为外部依赖（CheckM2 约 1.7GB；GTDB-Tk 下载约 57GB，细菌运行约
+140GB 内存）。见[数据库](installation/databases.md)。
+
 ## 快速开始
 
 ```bash
@@ -45,13 +57,13 @@ pip install -e .
 gside scan contigs.fna
 
 # 多方法鉴定 + 自动安装
-gside scan contigs.fna --mode all --auto-setup
+gside scan contigs.fna -m all --auto-setup
 
 # 并行批量处理
-gside scan *.fna --mode all -j 8 -t 4 -o results.tsv
+gside scan *.fna -m all -j 8 -t 4 -o results.tsv
 
 # 宏基因组
-gside scan --meta reads_R1.fq reads_R2.fq --mode all
+gside scan --meta reads_R1.fq reads_R2.fq
 
 # 数据库管理
 gside db status

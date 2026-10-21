@@ -5,7 +5,7 @@
 `marker` 方法的结果为扁平结构（无 `result` 包装）；`panel`、`mash_refseq`、
 `sourmash` 的结果嵌套在 `result` 字段内。
 
-## 单方法输出（--mode marker）
+## 单方法输出（-m marker）
 
 ```json
 {
@@ -46,7 +46,7 @@
 }
 ```
 
-## 多方法仲裁输出（--mode all）
+## 多方法仲裁输出（-m all）
 
 ```json
 {
@@ -122,7 +122,7 @@
 | `methods.<mode>.suggested_command` | str | 缺库时的修复命令 |
 | `methods.<mode>.missing_tier` | str | 需要安装的档位（`panel` / `mash` / `sourmash` / `meta` / `meta_sylph`） |
 | `methods.<mode>.estimated_size` | str | 该档位的近似下载体积 |
-| `methods.<mode>.help_url` | str | 仅能手动安装档位（`meta` / `meta_sylph`）的上游页面 |
+| `methods.<mode>.help_url` | str | 可下载档位（`meta` / `meta_sylph`）的上游页面 |
 | `verdict.species` | str | 最终仲裁判定（规范名 `Genus_species`） |
 | `verdict.display_name` | str | 同一判定的可读形式（空格分隔，如 `Escherichia coli`） |
 | `verdict.strain` | str \| null | 胜出方法给出的菌株信息 |
@@ -174,6 +174,85 @@ DEC 折叠成 `Escherichia_coli`——这个区分正是下游致病型分型的
 置信度按 containment ANI 的 95/93 分界（与 panel 一致）；若 gather CSV 无 ANI
 列，则回退到哈希比例 0.90/0.70。
 
+## 宏基因组输出（`gside scan --meta`）
+
+```json
+{
+  "analysis_type": "metagenomic_profiling",
+  "tool": "gside",
+  "version": "0.1.5",
+  "input": {"files": ["reads_R1.fq", "reads_R2.fq"], "type": "fastq_paired"},
+  "methods": {
+    "kraken2": {"method": "kraken2_bracken", "database": {"name": "D5_kraken2", "path": "..."},
+      "result": {"top_species": [{"name": "Escherichia coli", "taxid": 562, "reads": 850,
+        "fraction": 0.85, "confidence": "high"}], "total_reads": 10000,
+        "classified_reads": 9870, "n_species": 4}},
+    "sylph": {"method": "sylph_ani", "database": {"name": "D6_sylph", "path": "..."},
+      "result": {"species": [{"name": "Escherichia coli str. K-12", "ani": 99.9,
+        "abundance": 0.86, "coverage": 120.0, "confidence": "high"}], "n_species": 1}}
+  },
+  "verdict": {
+    "top_species": [{"name": "Escherichia_coli", "display_name": "Escherichia coli",
+      "strain": "str. K-12", "method": "sylph", "abundance": 0.86,
+      "confidence": "high", "ani": 99.9, "species_raw": "Escherichia coli str. K-12"}],
+    "richness": 1,
+    "basis": ["kraken2", "sylph"]
+  }
+}
+```
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `input.files` / `input.type` | list / str | 输入与识别类型（`fastq_paired`、`fastq_single`、`fasta`） |
+| `methods.<mode>.result` | dict | 各方法结果（kraken2 为 `top_species`，sylph 为 `species`） |
+| `verdict.top_species[].name` | str | 规范 `Genus_species`（与 `scan` 同一契约） |
+| `verdict.top_species[].display_name` | str | 空格形式 |
+| `verdict.top_species[].strain` | str \| null | 胜出方法给出的菌株信息 |
+| `verdict.top_species[].method` | str | `kraken2` 或 `sylph`（置信度高者优先，同置信 sylph 胜） |
+| `verdict.top_species[].abundance` | float | 分数 0-1（sylph 的百分比已归一化） |
+| `verdict.top_species[].confidence` | str | high / medium / low |
+| `verdict.top_species[].ani` | float \| null | sylph 的 ANI（若有） |
+| `verdict.top_species[].species_raw` | str | 原始工具标签，仅在与规范名不同时出现 |
+| `verdict.richness` | int | 合并后的物种数 |
+| `verdict.basis` | list[str] | 参与合并的方法 |
+
+批量（`--samples manifest.tsv`）输出 **JSON 数组**，每个对象带 `sample` 键；
+`tsv`/`csv`/`md` 每行前置一列 `sample`。
+
+## 基因组质量输出（`gside validate`）
+
+```json
+{
+  "schema": "gside.validate/1",
+  "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
+  "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
+  "software": {"gside": "0.1.5", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "tools": {"checkm2": "ok", "gtdbtk": "ok"},
+  "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
+  "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},
+  "status": "ok",
+  "errors": [],
+  "interpretation": "Genome quality: PASS (...); GTDB-Tk: ...",
+  "created_at": "2026-10-21T14:30:00+00:00"
+}
+```
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `schema` | str | `gside.validate/1` |
+| `genome` | dict | `name`（文件名主干）与绝对 `path` |
+| `parameters` | dict | 本次运行的 `threads`、`checkm2_db`、`gtdbtk_db` |
+| `software` | dict | `gside`、`checkm2`、`gtdbtk` 版本（不可用时为 `""`） |
+| `tools` | dict | 逐工具状态：`ok` / `missing` / `failed` |
+| `quality` | dict | CheckM2 的 `completeness`、`contamination`、`verdict`（`PASS`/`CHECK`/`WARNING`/`UNKNOWN`） |
+| `taxonomy` | dict | GTDB-Tk 的 `classification`（完整 lineage）与 `note` |
+| `status` | str | `ok`（两工具）/ `partial`（其一）/ `error`（都无） |
+| `errors` | list[str] | 缺失/失败的工具信息 |
+| `created_at` | str | UTC ISO-8601 时间戳 |
+
+同一份文档会写入 `<output-dir>/validation.json`。仅当 `status == "ok"` 时退出
+0；质量结论为低质量仍退出 0。
+
 ## 消费输出
 
 用 subprocess 调用 gside，再用标准库 json 解析 stdout：
@@ -182,7 +261,7 @@ DEC 折叠成 `Escherichia_coli`——这个区分正是下游致病型分型的
 import json, subprocess
 
 result = subprocess.run(
-    ["gside", "species", "contigs.fna", "--mode", "all"],
+    ["gside", "scan", "contigs.fna", "-m", "all"],
     capture_output=True, text=True,
 )
 payload = json.loads(result.stdout)

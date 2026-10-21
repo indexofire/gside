@@ -11,12 +11,39 @@ L2  panel (skani) / mash_refseq (mash) / sourmash (GTDB gather)   [authority=2]
 L1  marker target gene combination rules                          [authority=1]
 ```
 
+## Combining modes
+
+`-m` accepts one mode or a `+`-joined combination; `all` expands to every
+mode for the current context. `--meta` switches to the community set
+(`kraken2`/`sylph`), where `all` means both.
+
+```bash
+gside scan contigs.fna -m marker+sourmash     # just those two, arbitrated
+gside scan contigs.fna -m all                 # every genome tier
+gside scan reads.fq --meta -m kraken2+sylph   # both community methods
+```
+
+| Mode | FASTA | FASTQ | Database |
+|---|---|---|---|
+| `marker` | ✅ | ✅ | mini (bundled) |
+| `panel` | ✅ | ❌ | panel (~130MB sketch) |
+| `mash_refseq` | ✅ | ✅ | mash (~179MB) |
+| `sourmash` | ✅ | ✅ | sourmash (~3.9GB) |
+| `gtdbtk` | ✅ | ❌ | external GTDB-Tk DB |
+| `all` (isolate) | ✅ | ❌ | every genome tier |
+| `kraken2` (`--meta`) | ✅ | ✅ | meta (~5.5GB) |
+| `sylph` (`--meta`) | ❌ | ✅ | meta_sylph (~14GB) |
+| `all` (`--meta`) | ❌ | ✅ | kraken2+sylph |
+
+`all` includes `panel`/`gtdbtk` (assembly-only), so a read set needs an
+explicit combination such as `-m marker+sourmash` or `--meta`.
+
 ## L1: marker (Target Gene Combination)
 
 ### Principle
 
 **FASTA**: one BLAST scan of the contigs against the markers database
-(81 sequences). **FASTQ**: reads are mapped with minimap2 (`-x sr` for short
+(80 sequences). **FASTQ**: reads are mapped with minimap2 (`-x sr` for short
 reads, `-x map-ont` for long) and each gene's breadth is the union of the
 reference intervals covered by its primary alignments, divided by gene
 length (the same aggregate-breadth recipe as gapit's reads mode). Detected
@@ -97,8 +124,8 @@ Containment screening of reads is `mash screen`, a different tool.
 
 ### Principle
 
-mash computes MinHash distance between contigs and the entire RefSeq sketch
-(~179MB).
+mash computes MinHash distance between the query (assembly, or a read sketch
+for FASTQ) and the entire RefSeq sketch (~179MB).
 
 ### Thresholds
 
@@ -130,8 +157,8 @@ assembly (98.2% containment ANI).
 
 ### Principle
 
-sourmash gather performs LCA classification based on the GTDB taxonomic
-framework.
+sourmash gather builds a minimum set cover (containment) over the GTDB
+taxonomic framework.
 
 ### Thresholds
 
@@ -203,14 +230,14 @@ fields (`missing_tier`, `suggested_command`, `estimated_size`); with
 
 ```
 Layer 3 (gtdbtk) beats layer 2 (panel/mash_refseq/sourmash) beats layer 1 (marker);
-within the same layer, high confidence beats lower confidence.
+within the same layer, high > medium > low confidence.
 ```
 
 `gtdbtk` is included in `all` but is slow (minutes per genome) — use an
 explicit `-m` to skip it when speed matters.
 
 ```bash
-gside scan contigs.fna --mode all
+gside scan contigs.fna -m all
 ```
 
 Output includes all method results plus final verdict:
@@ -249,7 +276,7 @@ Output includes all method results plus final verdict:
 | Rapid screening | `marker` | Seconds, zero external dependencies |
 | Precise identification | `panel` | ANI gold standard |
 | Broad-spectrum scan | `mash_refseq` | Covers all RefSeq |
-| GTDB-aligned call | `sourmash` | LCA classification under GTDB |
+| GTDB-aligned call | `sourmash` | gather/containment under GTDB |
 | Authoritative placement | `gtdbtk` | Phylogenetic placement in the GTDB tree (slow) |
 | Comprehensive | `all` | Multi-method complementary + arbitration |
 | Near-relative discrimination | `panel` or `all` | marker may cross-react |
@@ -263,4 +290,4 @@ two complementary classifiers. See [Metagenomic Profiling](meta.md) for details.
 |------|--------|-------|-----------------|
 | `kraken2` | Kraken2 + Bracken | FASTQ / FASTA | Bracken fraction (≥10% high, ≥1% medium) |
 | `sylph` | sylph | FASTQ reads only | Adjusted ANI (≥95 high, ≥93 medium) |
-| `all` | Both | FASTQ (both) / FASTA (kraken2) | Merged profile |
+| `all` | Both | FASTQ only (use `-m kraken2` for FASTA) | Merged profile |

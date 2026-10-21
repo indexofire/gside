@@ -10,10 +10,10 @@ A standalone CLI for multi-layer species identification from assembled contigs a
 pip install gside
 
 # Single-genome species identification
-gside scan contigs.fna --mode all
+gside scan contigs.fna -m all
 
 # Metagenomic profiling
-gside scan --meta reads_R1.fq reads_R2.fq --mode all
+gside scan --meta reads_R1.fq reads_R2.fq -m all
 ```
 
 `scan` infers FASTA vs FASTQ from the extension and rejects a mode that cannot
@@ -42,6 +42,10 @@ gside db status          # shows which tiers are ready
 | `gtdbtk` | GTDB-Tk | Phylogenetic placement | External |
 | `all` | All above | Sequential execution + layered arbitration | As needed |
 
+`-m` accepts `+` combinations (`marker+sourmash`); `all` runs every genome
+tier. Inputs: `marker`, `mash_refseq` and `sourmash` accept FASTA or FASTQ;
+`panel`/`gtdbtk` require assemblies.
+
 ### Layered arbitration
 
 | Layer | Methods | Rationale |
@@ -57,17 +61,22 @@ Higher layers always outrank lower ones; within a layer, higher confidence wins.
 ```bash
 pixi install && pip install -e .
 
-# Identify species (marker mode works out of the box)
+# One genome (marker works out of the box)
 gside scan contigs.fna
+gside scan contigs.fna -m marker+sourmash
+gside scan contigs.fna -m all --auto-setup
 
-# Install reference databases
-gside db setup --tier panel
+# Isolate sequencing reads
+gside scan reads.fq -m marker
 
-# Multi-method identification
-gside scan contigs.fna --mode all
+# Metagenomic community
+gside scan reads_R1.fq reads_R2.fq --meta
 
-# Parallel batch processing with streaming output
-gside scan *.fna --mode all -j 8 -t 4 -o results.tsv
+# Genome quality (CheckM2 + GTDB-Tk)
+gside validate contigs.fna -o taxonomy
+
+# Batch + streaming output
+gside scan *.fna -m all -j 8 -t 4 -o results.tsv
 ```
 
 ## Metagenomic Profiling (`gside scan --meta`)
@@ -76,12 +85,27 @@ gside scan *.fna --mode all -j 8 -t 4 -o results.tsv
 |---|---|---|---|
 | `kraken2` | Kraken2 + Bracken | FASTQ / FASTA | Fast screening, contig support, abundance |
 | `sylph` | sylph | FASTQ only | ANI-anchored precision, species-level calls |
-| `all` | Both | FASTQ (both) / FASTA (kraken2) | Merged profile |
+| `all` | Both | FASTQ only (use `-m kraken2` for FASTA) | Merged profile |
 
 ```bash
-gside scan --meta reads_R1.fq reads_R2.fq --mode all
-gside scan --meta contigs.fna --mode kraken2
+gside scan --meta reads_R1.fq reads_R2.fq            # kraken2 + sylph
+gside scan --meta reads_R1.fq reads_R2.fq -m kraken2
+gside scan --meta contigs.fna -m kraken2
 ```
+
+## Genome Quality (`gside validate`)
+
+`validate` answers a different question from `scan`: **is the assembly good?**
+It runs CheckM2 (completeness/contamination) + GTDB-Tk (classification) and
+writes `validation.json` with tool versions, parameters, per-tool status and a
+quality verdict. Output directory is required:
+
+```bash
+gside validate contigs.fna -o taxonomy
+```
+
+CheckM2 (~1.7GB) and GTDB-Tk (~57GB download, ~140GB RAM for bacteria) are
+external databases — see [Databases](docs/installation/databases.md).
 
 ## Agent-Friendly Design
 
@@ -89,7 +113,7 @@ gside is built for AI agents as much as humans:
 
 ```bash
 # JSON on stdout (always exit 0; errors in methods.<mode>.error)
-gside scan genome.fna --mode all
+gside scan genome.fna -m all
 
 # Structured missing-database errors
 # → methods.panel.suggested_command = "gside db setup --tier panel"
@@ -97,7 +121,7 @@ gside scan genome.fna --mode all
 # → methods.panel.estimated_size = "~130MB sketch / ~1GB genomes"
 
 # Auto-install missing databases
-gside scan genome.fna --mode panel --auto-setup
+gside scan genome.fna -m panel --auto-setup
 
 # Machine-readable database status
 gside db status -f json
@@ -112,7 +136,7 @@ gside includes an MCP (Model Context Protocol) stdio server:
 gside mcp    # or: gside-mcp
 ```
 
-Exposes `species`, `db_status`, `db_list`, `db_setup` as MCP tools for Claude Desktop or any MCP client.
+Exposes `species`, `meta`, `db_status`, `db_list`, `db_setup` as MCP tools for Claude Desktop or any MCP client.
 
 ```json
 {
@@ -124,32 +148,28 @@ Exposes `species`, `db_status`, `db_list`, `db_setup` as MCP tools for Claude De
 
 ## CLI Reference
 
-```
-gside scan <contigs.fna> [options]
-  -m, --mode         marker|panel|mash_refseq|sourmash|gtdbtk|all
+```bash
+gside scan <files...> [options]
+  -m, --mode         marker|panel|mash_refseq|sourmash|gtdbtk|kraken2|sylph|all
+                     (+ combinations: marker+sourmash)
+  --meta             Community workflow (kraken2|sylph|all)
   -D, --db-dir       Database root
-  -f, --format       json|tsv|md
-  -o, --output       Write to file (tsv/md stream per input)
-  -j, --jobs         Parallel input files
-  -t, --threads      Threads per aligner
-  -a, --auto-setup   Install missing databases automatically
-  -n, --no-header    Suppress TSV header row
-
-gside scan --meta <reads/files> [options]
-  -m, --mode         kraken2|sylph|all
-  -D, --db-dir       Database root
-  -f, --format       json|tsv
-  -o, --output       Write to file
+  -f, --format       json|tsv|md|csv
+  -o, --output       Write to file (row formats stream)
+  -j, --jobs         Parallel inputs, or manifest samples with --samples
   -t, --threads      Threads per tool
+  -n, --no-header    Suppress the header row
+  -a, --auto-setup   Install missing databases, retry once
+  -s, --samples      --meta batch manifest
+
+gside validate <contigs.fna> -o <dir> [options]
+  -o, --output-dir   Required; writes validation.json (directory)
+  -t, --threads      CheckM2 + GTDB-Tk threads
 
 gside db <subcommand>
-  status             Show database readiness (--format table|tsv|csv|json)
-  setup              Install databases (--tier mini|panel|mash|sourmash|all)
-  list               List tiers with readiness (--format table|tsv|csv|json)
-
-gside validate <contigs.fna> -o <dir>
-  -o, --output-dir   Required; writes validation.json
-  -t, --threads      CheckM2 + GTDB-Tk threads
+  status             Readiness (--format table|tsv|csv|json)
+  setup              Install a tier (--tier mini|panel|mash|sourmash|meta|meta_sylph|all)
+  list               Tiers + readiness (--format table|tsv|csv|json)
 
 gside mcp            MCP stdio server
 gside --version      Version info
@@ -164,10 +184,11 @@ gside -V -J          Version as JSON
 | panel | ~130 MB | skani | Downloadable |
 | mash | ~179 MB | mash | Downloadable |
 | sourmash | ~3.9 GB | sourmash | Downloadable |
-| meta | ~5.5 GB | kraken2 | Manual setup |
-| meta_sylph | ~14 GB | sylph | Manual setup |
+| meta | ~5.5 GB | kraken2 | Auto-download |
+| meta_sylph | ~14 GB | sylph | Auto-download |
 
-GTDB-Tk manages its own external database (`GTDBTK_DATA_PATH`).
+`gside validate` additionally needs CheckM2 (~1.7GB) and GTDB-Tk
+(`GTDBTK_DATA_PATH`, ~57GB download) — see the docs.
 
 ## Installation
 

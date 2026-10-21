@@ -10,11 +10,37 @@ L2  panel skani / mash_refseq / sourmash    [layer=2]
 L1  marker 靶基因组合规则                    [layer=1]
 ```
 
+## 模式组合
+
+`-m` 支持单个模式或 `+` 组合；`all` 展开为当前上下文的全部模式。加 `--meta`
+切换到群落方法集（`kraken2`/`sylph`），此时 `all` 表示两者。
+
+```bash
+gside scan contigs.fna -m marker+sourmash     # 仅这两法并仲裁
+gside scan contigs.fna -m all                 # 全部基因组层
+gside scan reads.fq --meta -m kraken2+sylph   # 两种群落方法
+```
+
+| 模式 | FASTA | FASTQ | 数据库 |
+|---|---|---|---|
+| `marker` | ✅ | ✅ | mini（随包） |
+| `panel` | ✅ | ❌ | panel（约 130MB sketch） |
+| `mash_refseq` | ✅ | ✅ | mash（约 179MB） |
+| `sourmash` | ✅ | ✅ | sourmash（约 3.9GB） |
+| `gtdbtk` | ✅ | ❌ | 外部 GTDB-Tk 库 |
+| `all`（单菌株） | ✅ | ❌ | 全部基因组层 |
+| `kraken2`（`--meta`） | ✅ | ✅ | meta（约 5.5GB） |
+| `sylph`（`--meta`） | ❌ | ✅ | meta_sylph（约 14GB） |
+| `all`（`--meta`） | ❌ | ✅ | kraken2+sylph |
+
+`all` 含 `panel`/`gtdbtk`（仅组装），读段请显式组合（如
+`-m marker+sourmash`）或使用 `--meta`。
+
 ## L1: marker（靶基因组合）
 
 ### 原理
 
-**FASTA**：对 contigs 执行一次 BLAST（vs markers 库，81 条序列）。
+**FASTA**：对 contigs 执行一次 BLAST（vs markers 库，80 条序列）。
 **FASTQ**：用 minimap2 比对读段（短读 `-x sr`，长读 `-x map-ont`），每个基因的
 breadth = 所有 primary 比对的参考区间并集 / 基因长度（与 gapit reads 模式相同的
 聚合算法）。随后把检出基因与 38 条组合规则匹配（数据驱动，`marker_rules.yaml`）。
@@ -114,7 +140,7 @@ ANI。覆盖空缺与测序错误会降低灵敏度，短读段不会被逐条�
 
 ### 原理
 
-sourmash gather 对 contigs 做 LCA 分类，基于 GTDB 分类框架。
+sourmash gather 对查询做最小集合覆盖（containment），基于 GTDB 分类框架。
 
 ### 判定阈值
 
@@ -193,7 +219,7 @@ L3（gtdbtk）优先于 L2（panel/mash_refseq/sourmash）优先于 L1（marker�
 指定 `-m` 跳过。
 
 ```bash
-gside scan contigs.fna --mode all
+gside scan contigs.fna -m all
 ```
 
 输出包含所有方法结果 + 最终 verdict：
@@ -231,7 +257,7 @@ gside scan contigs.fna --mode all
 | 快速初筛 | `marker` | 最快，零外部依赖 |
 | 精确鉴定 | `panel` | ANI 金标准 |
 | 广谱筛查 | `mash_refseq` | 覆盖全 RefSeq |
-| GTDB 体系对齐 | `sourmash` | LCA 分类，可提示混合样本 |
+| GTDB 体系对齐 | `sourmash` | gather/containment，可提示混合样本 |
 | 权威 placement | `gtdbtk` | GTDB 树系统发育 placement（慢） |
 | 综合判定 | `all` | 多法互补 + 仲裁 |
 | 近缘种区分 | `panel` 或 `all` | marker 可能交叉反应 |

@@ -1,13 +1,18 @@
 # 标记基因数据库
 
 标记基因数据库（`data/db/D1_marker/`，随仓库分发的 **mini** 层）驱动默认的
-`--mode marker` 鉴定：`blastn` 将查询 contigs 比对到 81 条精选参考序列，
+`-m marker` 鉴定：`blastn` 将查询 contigs 比对到 80 条精选参考序列，
 再由 38 条物种规则把命中转化为判定。gside 是物种鉴定引擎：每条参考均
 锚定可核查的 NCBI/RefSeq accession，并经 291 基因组面板 blast 验证。
 种下分型是 gapit 的职责——霍乱弧菌 O1/O139 血清群库已移交该处
 （`gapit screen --db vc_serogroup`）。
 
 ## marker 鉴定流程
+
+**FASTA**：见下述流程。**FASTQ**：用 minimap2 将读段比对到同一份
+`markers.fasta`（短读 `-x sr`，长读 `-x map-ont`），每个基因的 breadth 取
+覆盖到的参考区间并集，identity 与规则阈值完全相同。读段只需约 1× 基因组
+覆盖；详见[鉴定模式](../usage/modes.md)。
 
 1. `blastn` 将 contigs 比对到预建的 `markers_blastdb`（evalue 1e-10，词长 11）。
 2. 命中需通过全局阈值：identity >= 85% 且 coverage >= 60%；逐基因最佳命中

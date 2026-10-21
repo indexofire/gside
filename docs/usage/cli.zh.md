@@ -34,6 +34,32 @@ gside scan --meta --samples samples.tsv [选项]
 单菌株模式，单菌株模式也拒绝 `kraken2`/`sylph`。由于 `all` 含 sylph，
 `--meta -m all` 需要 FASTQ；contigs 请用 `-m kraken2`。
 
+### 解读 verdict
+
+```json
+"verdict": {
+  "species": "Campylobacter_jejuni",
+  "display_name": "Campylobacter jejuni",
+  "strain": "subsp. jejuni NCTC 11168",
+  "confidence": "high",
+  "basis": ["panel"],
+  "supporting": ["marker", "sourmash"],
+  "agreement": "3/3"
+}
+```
+
+| 字段 | 含义 |
+|---|---|
+| `species` | 规范 `Genus_species`（机器契约） |
+| `display_name` / `strain` | 可读名与胜出方法给出的菌株信息 |
+| `confidence` | high / medium / low（按方法阈值） |
+| `basis` | 产生判定的单个方法（仅胜出者） |
+| `supporting` | 其他成功且与 `species` 一致的方法 |
+| `agreement` | `一致数/成功数`——`2/3` 表示有一层不一致或失败 |
+
+`methods.<mode>.error` 说明失败的方法；没有任何判定时 `species` 为
+`Unknown`。逐字段说明见 [JSON 输出契约](../reference/json-contract.md)。
+
 ### 参数
 
 | 参数 | 类型 | 默认 | 说明 |
@@ -68,54 +94,58 @@ gside scan contigs.fna --meta -m kraken2 -f md
 gside scan --meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 ```
 
-## gside species（别名）
-
-`gside species <files...>` 是 `gside scan`（不带 `--meta`）的隐藏兼容别名：
-选项与输出完全一致，模式限定为 `marker|panel|mash_refseq|sourmash|gtdbtk|all`。
-
 ## gside db
 
-数据库管理子命令。
+数据库管理。
 
-### 子命令
-
-| 子命令 | 说明 |
+| 子命令 | 用途 |
 |---|---|
-| `status` | 显示数据库就绪状态 |
-| `list` | 列出可用 tier |
-| `setup` | 安装/更新数据库 |
+| `status` | 每个组件的就绪状态（名称、tier、路径） |
+| `list` | tier 列表（就绪、大小、说明） |
+| `setup` | 安装/更新单个 tier |
 
-`status` 与 `list` 支持 `-f`/`--format [table|tsv|json]`（默认 `table`）。
-`tsv` 与 `json` 为机器可读格式（如 `db status --format tsv` 输出
-`COMPONENT\tREADY\tTIER\tPATH` 表，READY 列为 `ready`/`missing`）。
+三者都接受 `-f/--format table|tsv|csv|json`（默认 `table`）。
 
-### setup 选项
-
-| 选项 | 默认 | 说明 |
-|---|---|---|
-| `-t`，`--tier` | `panel` | mini / panel / mash / sourmash / meta / meta_sylph / all |
-| `-s`，`--source` | 无 | 从本地已有数据目录复制 |
-| `-f`，`--format` | `text` | 输出格式：`text` / `json`（json 模式下进度信息走 stderr，结果字典以单个 JSON 文档输出到 stdout；退出码契约不变） |
-
-`all` **仅安装 panel + mash**（约 310MB）。sourmash GTDB 库（约 3.9GB）不含
-在 `all` 内，需单独安装：
-
-```bash
-gside db setup --tier sourmash
-```
-
-宏基因组 tier `meta`（Kraken2 索引，约 5.5GB）与 `meta_sylph`（sylph GTDB
-库，约 14GB）需**手动安装**——`db setup` 只打印上游下载指引而不下载。
-放置方法见[宏分类学分析](meta.zh.md)。
-
-### 示例
+### status
 
 ```bash
 gside db status
-gside db status --format tsv    # 机器可读
+# gside database status
+# ✅ D1_marker   tier=mini        path=data/db/D1_marker
+# ✅ D2_ani      tier=panel       path=data/db/D2_ani
+# ❌ D4_sourmash tier=sourmash    path=data/db/D4_sourmash
+
+gside db status -f json    # {component: {ready, path, tier}}
+gside db status -f csv     # COMPONENT,READY,TIER,PATH
+```
+
+### list
+
+```bash
+gside db list              # tier 表格
+gside db list -f tsv       # NAME	READY	SIZE	DESCRIPTION
+```
+
+### setup
+
+| 选项 | 默认 | 说明 |
+|---|---|---|
+| `-t`，`--tier` | `panel` | `mini|panel|mash|sourmash|meta|meta_sylph|all` |
+| `-s`，`--source` | — | 从本地已有数据库目录复制，而不是下载 |
+| `-f`，`--format` | `text` | `text` / `json`（json 把进度写到 stderr） |
+
+- `mini` 随包分发（始终就绪）
+- `all` = **panel + mash**；`sourmash` 需单独安装（约 3.9GB）
+- `meta`（Kraken2 Standard-8 + Bracken，约 5.5GB）与 `meta_sylph`
+  （GTDB r226 `.syl2db`，约 14GB）会自动下载并校验
+- CheckM2 与 GTDB-Tk **不是** tier；见
+  [数据库](../installation/databases.md)
+
+```bash
+gside db setup --tier panel
 gside db setup --tier all
-gside db setup --tier sourmash   # 不含在 --tier all 内（~3.9GB）
-gside db setup --tier panel --source /path/to/existing/db
+gside db setup --tier sourmash
+gside db setup --tier panel --source /path/to/existing/data/db
 ```
 
 ## gside validate
@@ -128,6 +158,32 @@ gside db setup --tier panel --source /path/to/existing/db
 ```bash
 gside validate <contigs.fasta> -o <输出目录> [选项]
 ```
+
+### 解读 verdict
+
+```json
+"verdict": {
+  "species": "Campylobacter_jejuni",
+  "display_name": "Campylobacter jejuni",
+  "strain": "subsp. jejuni NCTC 11168",
+  "confidence": "high",
+  "basis": ["panel"],
+  "supporting": ["marker", "sourmash"],
+  "agreement": "3/3"
+}
+```
+
+| 字段 | 含义 |
+|---|---|
+| `species` | 规范 `Genus_species`（机器契约） |
+| `display_name` / `strain` | 可读名与胜出方法给出的菌株信息 |
+| `confidence` | high / medium / low（按方法阈值） |
+| `basis` | 产生判定的单个方法（仅胜出者） |
+| `supporting` | 其他成功且与 `species` 一致的方法 |
+| `agreement` | `一致数/成功数`——`2/3` 表示有一层不一致或失败 |
+
+`methods.<mode>.error` 说明失败的方法；没有任何判定时 `species` 为
+`Unknown`。逐字段说明见 [JSON 输出契约](../reference/json-contract.md)。
 
 ### 参数
 
@@ -146,7 +202,8 @@ gside validate <contigs.fasta> -o <输出目录> [选项]
 | `error` | 两个都未成功 | 1 |
 
 低质量（如 `WARNING`）是**结果**而非命令失败：只要两工具跑通仍退出 0。
-通过 `CHECKM2DB` 与 `GTDBTK_DATA_PATH`（或 `GTDBDB`）配置。
+通过 `CHECKM2DB` 与 `GTDBTK_DATA_PATH`（或 `GTDBDB`）配置；安装命令见
+[数据库](../installation/databases.md)。
 
 ### `validation.json`
 
@@ -173,10 +230,58 @@ gside validate contigs.fna -o ./taxonomy
 gside validate contigs.fna -o ./taxonomy -t 8
 ```
 
-## gside meta（别名）
+## gside mcp
 
-`gside meta <reads...>` 是 `gside scan --meta` 的隐藏兼容别名：选项（含
-`--samples`）与输出一致，模式为 `kraken2|sylph|all`。
+MCP（Model Context Protocol）stdio 服务器：把 gside 作为工具提供给 agent。
+stdin/stdout 上走 JSON-RPC 2.0；stdout 只输出协议帧（进度与提示走 stderr）。
+
+```bash
+gside mcp        # 或控制台脚本：gside-mcp
+```
+
+工具：`species`、`meta`、`db_status`、`db_list`、`db_setup`。每个都镜像对应
+CLI 命令并返回同样的 JSON 文本；失败返回 `isError` 包络，不会让服务器崩溃。
+
+## gside species / gside meta（别名）
+
+隐藏兼容别名：`gside species` = 不带 `--meta` 的 `gside scan`；
+`gside meta` = `gside scan --meta`。模式选择仍按上下文（单菌株/宏数据）限定。
+新脚本请使用 `scan`。
+
+## 环境变量
+
+| 变量 | 使用者 | 含义 |
+|---|---|---|
+| `GSIDE_DATA_DIR` | 全部 | 数据根目录（默认 `<repo>/data`，否则用包内数据） |
+| `GSIDE_DB_DIR` | 全部 | 数据库根目录（默认 `<data>/db`） |
+| `GSIDE_PIXI_BIN` | 全部 | 额外 `bin/`（`blastn`/`minimap2`/`skani`/`mash`…） |
+| `GSIDE_SOURMASH_SIG_SHA256` | `db setup` | 覆盖 sourmash 签名摘要 |
+| `CHECKM2DB` | `validate` | CheckM2 的 `uniref100.KO.1.dmnd` 路径 |
+| `GTDBTK_DATA_PATH` / `GTDBDB` | `validate`、`scan -m gtdbtk` | GTDB-Tk 数据库目录 |
+
+## 退出码
+
+| 命令 | 退出码 | 含义 |
+|---|---|---|
+| `scan` | 0 | 始终为 0；单方法失败写入 `methods.<mode>.error` |
+| `scan` | 2 | 用法错误（未知模式、输入不匹配、参数错误） |
+| `validate` | 0 | CheckM2 与 GTDB-Tk 都运行（质量结论不影响退出码） |
+| `validate` | 1 | `partial` 或 `error`（工具/数据库缺失） |
+| `db setup` | 0 / 1 | 仅当结果消息以 `ERROR` 开头时为 1 |
+| `db status` / `db list` / `--version` | 0 | 信息性输出 |
+
+## 从 0.1.4 升级
+
+- `gside species` / `gside meta` 仍作为 `gside scan`（不带/带 `--meta`）的
+  隐藏别名可用。
+- 物种标签改为规范 `Genus_species`（`verdict.species`、
+  `methods.<mode>.species`）；展示名移到 `verdict.display_name`，菌株移到
+  `verdict.strain`。verdict 新增 `supporting` 与 `agreement`。
+- 宏基因组行使用同一规范 `name`，并带 `display_name`/`strain` 与分数
+  （0-1）形式的 `abundance`。
+- `validate` 不再有 `-m/--mode`；`-o/--output-dir` 为必填，`validation.json`
+  新增 schema/genome/parameters/software/tools/status/errors/created_at。
+- `--meta -m all` 需要 FASTQ（含 sylph）；contigs 请用 `-m kraken2`。
 
 ## gside --version
 

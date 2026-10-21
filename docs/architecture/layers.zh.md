@@ -41,14 +41,37 @@ gside/
 │       ├── D2_ani/         skani sketch + 基因组（gitignored）+ manifests/（跟踪的配方）
 │       ├── D3_mash/        mash sketch（gitignored）
 │       ├── D4_sourmash/    GTDB reps k=31 + lineages（db setup 安装）
-│       ├── D5_kraken2/     Kraken2 Standard-8 索引（手动/gitignored）
-│       └── D6_sylph/       sylph GTDB-r226 .syldb（手动/gitignored）
+│       ├── D5_kraken2/     Kraken2 Standard-8 索引（自动下载/gitignored）
+│       └── D6_sylph/       sylph GTDB-r226 .syl2db（自动下载/gitignored）
 └── tests/
 ```
 
 注：`taxonomic_validator.py` 由 `gside validate` 驱动，做 CheckM2 + GTDB-Tk
-组装质控（需 `CHECKM2DB` 与 `GTDBTK_DATA_PATH` 环境）。当前 `species` 命令提供
-marker / panel / mash_refseq / sourmash / gtdbtk / all 六种模式。
+组装质控（需 `CHECKM2DB` 与 `GTDBTK_DATA_PATH` 环境）。`gside scan` 提供
+marker / panel / mash_refseq / sourmash / gtdbtk / all 六种单菌株模式，
+`--meta` 时提供 kraken2 / sylph / all。
+
+## 请求流程
+
+`gside scan files...`
+
+1. 解析 `-m`（单模式、`a+b`、`all`），按扩展名推断每个输入的 FASTA/FASTQ
+2. 校验模式/上下文/输入——不匹配时在**任何工具启动前**以退出码 2 结束
+3. 分发：marker → blastn（FASTA）或 minimap2 读段筛查（FASTQ）；panel →
+   skani；mash_refseq → mash；sourmash → gather；gtdbtk → GTDB-Tk；
+   `--meta` → kraken2/sylph
+4. 汇总各方法结果；失败写入 `methods.<mode>.error`（含结构化缺库字段），
+   不阻断其他方法
+5. 单菌株按层仲裁（L3 > L2 > L1，再按 high > medium > low）；`--meta`
+   合并物种列表
+6. 渲染 JSON / TSV / CSV / MD 到 stdout 或 `-o`
+
+`gside validate contigs.fna -o dir`
+
+1. 解析 CheckM2（`CHECKM2DB`）与 GTDB-Tk（`GTDBTK_DATA_PATH`）数据库
+2. 运行 CheckM2（完整度/污染度）与 GTDB-Tk（分类），逐工具记录状态而不崩溃
+3. 写入 `dir/validation.json`（基因组、参数、软件版本、质量结论、分类、
+   错误、UTC 时间戳）；仅当两工具都运行才退出 0
 
 ## 设计原则
 

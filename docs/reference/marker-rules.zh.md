@@ -117,4 +117,4 @@ rules:
    `>markers~~~mpb64~~~ACC 描述 [物种] role=primary`
 2. 重建 BLAST 库：
    `makeblastdb -in markers.fasta -dbtype nucl -out markers_blastdb`
-3. 运行 `gside scan test.fna --mode marker` 验证
+3. 运行 `gside scan test.fna -m marker` 验证

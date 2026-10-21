@@ -37,6 +37,33 @@ mismatch exits 2 and names the offending mode. `--meta` likewise rejects
 isolate modes, and isolate mode rejects `kraken2`/`sylph`. Because `all`
 includes sylph, `--meta -m all` needs FASTQ; use `-m kraken2` for contigs.
 
+### Reading the verdict
+
+```json
+"verdict": {
+  "species": "Campylobacter_jejuni",
+  "display_name": "Campylobacter jejuni",
+  "strain": "subsp. jejuni NCTC 11168",
+  "confidence": "high",
+  "basis": ["panel"],
+  "supporting": ["marker", "sourmash"],
+  "agreement": "3/3"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `species` | Canonical `Genus_species` (the machine contract) |
+| `display_name` / `strain` | Human form and strain detail from the winning method |
+| `confidence` | high / medium / low (per-method thresholds) |
+| `basis` | The single method that produced the call (winners only) |
+| `supporting` | Other successful methods that agree on `species` |
+| `agreement` | `agreeing/successful` — `2/3` means one tier disagreed or failed |
+
+`methods.<mode>.error` explains a failed method; `species`/`display_name` stay
+`Unknown` when nothing was called. Field-by-field details:
+[JSON Output Contract](../reference/json-contract.md).
+
 ### Arguments
 
 | Argument | Type | Default | Description |
@@ -71,55 +98,58 @@ gside scan contigs.fna --meta -m kraken2 -f md
 gside scan --meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 ```
 
-## gside species (alias)
-
-`gside species <files...>` is a hidden compatibility alias for `gside scan`
-without `--meta`: same options and output, with mode choices limited to
-`marker|panel|mash_refseq|sourmash|gtdbtk|all`.
-
 ## gside db
 
-Database management subcommand.
+Database management.
 
-### Subcommands
+| Subcommand | Purpose |
+|---|---|
+| `status` | Readiness of every component (name, tier, path) |
+| `list` | Tiers with readiness, size and description |
+| `setup` | Install or update one tier |
 
-| Subcommand | Description |
-|------------|-------------|
-| `status` | Show database readiness status |
-| `list` | List available tiers |
-| `setup` | Install/update databases |
+All three accept `-f/--format table|tsv|csv|json` (default `table`).
 
-`status` and `list` accept `-f`/`--format [table|tsv|json]` (default `table`).
-`tsv` and `json` are machine-readable (e.g. `db status --format tsv` emits a
-`COMPONENT\tREADY\tTIER\tPATH` table with `ready`/`missing` booleans).
-
-### setup Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `-t`, `--tier` | `panel` | mini / panel / mash / sourmash / meta / meta_sylph / all |
-| `-s`, `--source` | — | Copy from an existing local database directory instead of downloading |
-| `-f`, `--format` | `text` | Output format: `text` / `json` (json routes progress to stderr and prints the result dict as a single JSON document on stdout; exit-code contract unchanged) |
-
-`all` installs **panel + mash only** (~310MB). The sourmash GTDB database
-(~3.9GB) is never part of `all`; provision it separately:
-
-```bash
-gside db setup --tier sourmash
-```
-
-The metagenomic tiers `meta` (Kraken2 index, ~5.5GB) and `meta_sylph`
-(sylph GTDB database, ~14GB) are **manual setup** — `db setup` prints a
-pointer to the upstream downloads instead of fetching them. See
-[Metagenomic Profiling](meta.md) for placement instructions.
-
-### Examples
+### status
 
 ```bash
 gside db status
-gside db status --format tsv    # machine-readable
+# gside database status
+# ✅ D1_marker   tier=mini        path=data/db/D1_marker
+# ✅ D2_ani      tier=panel       path=data/db/D2_ani
+# ❌ D4_sourmash tier=sourmash    path=data/db/D4_sourmash
+
+gside db status -f json    # {component: {ready, path, tier}}
+gside db status -f csv     # COMPONENT,READY,TIER,PATH
+```
+
+### list
+
+```bash
+gside db list              # tier table
+gside db list -f tsv       # NAME	READY	SIZE	DESCRIPTION
+```
+
+### setup
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `-t`, `--tier` | `panel` | `mini|panel|mash|sourmash|meta|meta_sylph|all` |
+| `-s`, `--source` | — | Copy an existing local database directory instead of downloading |
+| `-f`, `--format` | `text` | `text` / `json` (json routes progress to stderr) |
+
+- `mini` ships with the package (always ready).
+- `all` = **panel + mash**; `sourmash` is separate (~3.9GB).
+- `meta` (Kraken2 Standard-8 + Bracken, ~5.5GB) and `meta_sylph`
+  (GTDB r226 `.syl2db`, ~14GB) download automatically with checksum
+  verification.
+- CheckM2 and GTDB-Tk are **not** tiers; see
+  [Databases](../installation/databases.md#genome-quality-databases).
+
+```bash
+gside db setup --tier panel
 gside db setup --tier all
-gside db setup --tier sourmash   # not included in --tier all (~3.9GB)
+gside db setup --tier sourmash
 gside db setup --tier panel --source /path/to/existing/data/db
 ```
 
@@ -134,6 +164,33 @@ identification.
 ```bash
 gside validate <contigs.fasta> -o <output-dir> [options]
 ```
+
+### Reading the verdict
+
+```json
+"verdict": {
+  "species": "Campylobacter_jejuni",
+  "display_name": "Campylobacter jejuni",
+  "strain": "subsp. jejuni NCTC 11168",
+  "confidence": "high",
+  "basis": ["panel"],
+  "supporting": ["marker", "sourmash"],
+  "agreement": "3/3"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `species` | Canonical `Genus_species` (the machine contract) |
+| `display_name` / `strain` | Human form and strain detail from the winning method |
+| `confidence` | high / medium / low (per-method thresholds) |
+| `basis` | The single method that produced the call (winners only) |
+| `supporting` | Other successful methods that agree on `species` |
+| `agreement` | `agreeing/successful` — `2/3` means one tier disagreed or failed |
+
+`methods.<mode>.error` explains a failed method; `species`/`display_name` stay
+`Unknown` when nothing was called. Field-by-field details:
+[JSON Output Contract](../reference/json-contract.md).
 
 ### Arguments
 
@@ -154,7 +211,8 @@ recorded per tool instead of crashing:
 
 A low-quality genome (e.g. `WARNING`) is a **result**, not a command failure:
 it still exits 0 when both tools ran. Configure the tools with `CHECKM2DB` and
-`GTDBTK_DATA_PATH` (or `GTDBDB`).
+`GTDBTK_DATA_PATH` (or `GTDBDB`); install commands are in
+[Databases](../installation/databases.md#genome-quality-databases).
 
 ### `validation.json`
 
@@ -181,11 +239,62 @@ gside validate contigs.fna -o ./taxonomy
 gside validate contigs.fna -o ./taxonomy -t 8
 ```
 
-## gside meta (alias)
+## gside mcp
 
-`gside meta <reads...>` is a hidden compatibility alias for
-`gside scan --meta`: same options (including `--samples`), with mode choices
-`kraken2|sylph|all`.
+MCP (Model Context Protocol) stdio server: exposes gside as a tool provider
+for agents. JSON-RPC 2.0 over stdin/stdout; stdout carries protocol frames
+only (progress and notices go to stderr).
+
+```bash
+gside mcp        # or the console script: gside-mcp
+```
+
+Tools: `species`, `meta`, `db_status`, `db_list`, `db_setup`. Each mirrors its
+CLI twin and returns the same JSON text; failures become `isError` envelopes
+instead of crashing the server.
+
+## gside species / gside meta (aliases)
+
+Hidden compatibility aliases: `gside species` = `gside scan` without `--meta`;
+`gside meta` = `gside scan --meta`. Mode choices stay context-scoped
+(isolate / meta). New scripts should use `scan`.
+
+## Environment variables
+
+| Variable | Used by | Meaning |
+|---|---|---|
+| `GSIDE_DATA_DIR` | all | Data root (default `<repo>/data`, else bundled package data) |
+| `GSIDE_DB_DIR` | all | Database root (default `<data>/db`) |
+| `GSIDE_PIXI_BIN` | all | Extra `bin/` for `blastn`/`minimap2`/`skani`/`mash`/… |
+| `GSIDE_SOURMASH_SIG_SHA256` | `db setup` | Override the pinned sourmash signature digest |
+| `CHECKM2DB` | `validate` | Path to CheckM2's `uniref100.KO.1.dmnd` |
+| `GTDBTK_DATA_PATH` / `GTDBDB` | `validate`, `scan -m gtdbtk` | GTDB-Tk database directory |
+
+## Exit codes
+
+| Command | Code | Meaning |
+|---|---|---|
+| `scan` | 0 | Always; per-method failures live in `methods.<mode>.error` |
+| `scan` | 2 | Usage error (unknown mode, incompatible input, bad flag) |
+| `validate` | 0 | Both CheckM2 and GTDB-Tk ran (quality verdict does not matter) |
+| `validate` | 1 | `partial` or `error` (a tool/database is missing) |
+| `db setup` | 0 / 1 | 1 only when a result message starts with `ERROR` |
+| `db status` / `db list` / `--version` | 0 | Informational |
+
+## Upgrading from 0.1.4
+
+- `gside species` and `gside meta` still work as hidden aliases for
+  `gside scan` (without / with `--meta`).
+- Species labels are now canonical `Genus_species` (`verdict.species`,
+  `methods.<mode>.species`); the display form moved to
+  `verdict.display_name`, strain detail to `verdict.strain`. The verdict also
+  gained `supporting` and `agreement`.
+- Meta rows use the same canonical `name`, with `display_name`/`strain` and a
+  fraction (0-1) `abundance`.
+- `validate` no longer has `-m/--mode`; `-o/--output-dir` is required and its
+  `validation.json` gained schema/genome/parameters/software/tools/status/
+  errors/created_at.
+- `--meta -m all` requires FASTQ (sylph); use `-m kraken2` for contigs.
 
 ## gside --version
 
