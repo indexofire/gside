@@ -187,9 +187,11 @@ gside meta <reads.fastq> [reads_2.fastq] [options]
 | `reads` | positional | — | 1 file = single-end reads or contigs FASTA; 2 files = paired FASTQ |
 | `-m`, `--mode` | option | `all` | Profiling method: `kraken2` / `sylph` / `all` (all merges the species lists) |
 | `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
-| `-f`, `--format` | option | `json` | Output format: `json` / `tsv` |
+| `-f`, `--format` | option | `json` | Output format: `json` / `tsv` / `csv` |
 | `-o`, `--output PATH` | option | stdout | Write the report to PATH instead of stdout (json written once at the end; stdout then carries no data, a notice goes to stderr) |
-| `-n`, `--no-header` | option | off | Suppress the TSV header row (tsv only; json keeps its structure) |
+| `-s`, `--samples PATH` | option | — | Batch manifest `sample_id<TAB>reads[<TAB>reads2]` (header optional) |
+| `-j`, `--jobs N` | option | `1` | Concurrent manifest samples (output order is preserved) |
+| `-n`, `--no-header` | option | off | Suppress the TSV/CSV header row (json keeps its structure) |
 | `-t`, `--threads N` | option | `4` | Threads per tool invocation |
 
 ### Examples
@@ -199,6 +201,7 @@ gside meta sample_1.fastq sample_2.fastq
 gside meta sample_1.fastq sample_2.fastq -m kraken2 -f tsv -o profile.tsv
 gside meta contigs.fna          # kraken2 only (sylph requires reads)
 gside meta reads.fastq -m sylph
+gside meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 ```
 
 ## gside --version

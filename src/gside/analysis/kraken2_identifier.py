@@ -14,7 +14,6 @@ from gside.engine._env import require_bin, run_checked
 
 _K2_HINT = "kraken2 not found — pixi add kraken2 bracken"
 _BRACKEN_HINT = "bracken not found — pixi add kraken2 bracken"
-_K2_INDEXES_URL = "https://benlangmead.github.io/aws-indexes/k2"
 
 _HIGH_FRACTION = 0.10
 _MEDIUM_FRACTION = 0.01
@@ -89,9 +88,7 @@ def _parse_kreport(path: Path) -> tuple[int, int]:
 def _resolve_db(db_dir: str | Path | None) -> Path:
     db = Path(db_dir) if db_dir else SPECIES_DB_DIR / "D5_kraken2"
     if not any(db.glob("*.k2d")):
-        raise RuntimeError(
-            f"Kraken2 database not found in {db} (download a prebuilt index: {_K2_INDEXES_URL})"
-        )
+        raise RuntimeError(f"Kraken2 database not found in {db} (run: gside db setup --tier meta)")
     return db
 
 

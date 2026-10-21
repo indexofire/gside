@@ -80,6 +80,32 @@ gside db setup --tier all            # panel + mash（不含 sourmash）
 # 放入 data/db/D6_sylph/
 ```
 
+### 校验策略
+
+`gside db setup` 对所有能固定的产物做摘要校验：
+
+| 档位 | 摘要 | 说明 |
+|---|---|---|
+| panel | SHA256（`PANEL_SHA256`） | GitHub Release 资产 |
+| mash | MD5（`MASH_MD5`） | 上游 Zenodo 仅提供 MD5 |
+| sourmash | SHA256（`SOURMASH_LINEAGES_SHA256`）+ 可选签名 SHA256 | 见下 |
+
+sourmash 签名 zip（约 3.9GB）上游没有摘要。可自行设置以下环境变量强制校验；
+未设置时只告警并继续：
+
+```bash
+export GSIDE_SOURMASH_SIG_SHA256=<gtdb-rs226-reps.k31.sig.zip 的 sha256>
+gside db setup --tier sourmash
+```
+
+### 从本地数据库目录复制
+
+若磁盘上已有现成数据库（例如另一台机器或旧 checkout），可跳过下载直接复制：
+
+```bash
+gside db setup --tier all --source /path/to/existing/data/db
+```
+
 这两个 tier 同样支持 `--source`，可直接从本地已有数据库目录复制。
 
 ### 查看可用 tier

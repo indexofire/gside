@@ -59,16 +59,14 @@ class BlastBackend:
                     return
             raise FileNotFoundError(f"No BLAST index or source FASTA for {db_prefix}")
 
-    def find(
+    def _find_command(
         self,
         query: Path,
         db_path: str,
-        min_identity: float = 0.0,
-        min_coverage: float = 0.0,
-        evalue: float = 1e-5,
-        max_targets: int = 500,
-        **kwargs: Any,
-    ) -> list[Hit]:
+        evalue: float,
+        max_targets: int,
+        kwargs: dict[str, Any],
+    ) -> list[str]:
         cmd = [
             self._bin,
             "-query",
@@ -84,7 +82,6 @@ class BlastBackend:
             "-num_threads",
             str(self.threads),
         ]
-
         for key, value in kwargs.items():
             if value is None or key in ("threads",):
                 continue
@@ -97,11 +94,11 @@ class BlastBackend:
                     cmd.append(f"-{mapped}")
             else:
                 cmd.extend([f"-{mapped}", str(value)])
+        return cmd
 
-        proc = run_checked(cmd, timeout=600, name=f"{self.tool} failed")
-
+    def _parse_hits(self, stdout: str, min_identity: float, min_coverage: float) -> list[Hit]:
         hits: list[Hit] = []
-        for line in proc.stdout.splitlines():
+        for line in stdout.splitlines():
             if not line.strip():
                 continue
             try:
@@ -110,5 +107,18 @@ class BlastBackend:
                 continue
             if hit.identity >= min_identity and hit.query_coverage >= min_coverage:
                 hits.append(hit)
-
         return hits
+
+    def find(
+        self,
+        query: Path,
+        db_path: str,
+        min_identity: float = 0.0,
+        min_coverage: float = 0.0,
+        evalue: float = 1e-5,
+        max_targets: int = 500,
+        **kwargs: Any,
+    ) -> list[Hit]:
+        cmd = self._find_command(query, db_path, evalue, max_targets, kwargs)
+        proc = run_checked(cmd, timeout=600, name=f"{self.tool} failed")
+        return self._parse_hits(proc.stdout, min_identity, min_coverage)

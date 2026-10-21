@@ -31,10 +31,11 @@ CHECKM2_DB = _env_path("CHECKM2DB")
 GTDB_DB = _env_path("GTDBTK_DATA_PATH", "GTDBDB")
 
 
+# Search order: GSIDE_PIXI_BIN, the repo's own pixi env, the user-level pixi
+# env, then PATH. Machine-specific tool dirs belong in GSIDE_PIXI_BIN.
 _KNOWN_PIXI_ROOTS = (
     PROJECT_ROOT / ".pixi/envs/default/bin",
     Path.home() / ".pixi/envs/default/bin",
-    Path("/home/mark/repos/github/hermes-bacmap/.pixi/envs/default/bin"),
 )
 
 

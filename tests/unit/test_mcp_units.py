@@ -89,10 +89,10 @@ class TestServeProtocol:
         )
         assert response["result"]["protocolVersion"] == "2025-06-18"
 
-    def test_tools_list_advertises_four_tools(self):
+    def test_tools_list_advertises_every_tool(self):
         (response,) = exchange({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         names = [tool["name"] for tool in response["result"]["tools"]]
-        assert names == ["species", "db_status", "db_list", "db_setup"]
+        assert names == ["species", "meta", "db_status", "db_list", "db_setup"]
 
     def test_unknown_tool_gets_32602(self):
         (response,) = exchange(_call("nope", {}))
@@ -355,3 +355,38 @@ class TestCliRegistration:
         response = json.loads(capsys.readouterr().out)
         assert response["id"] == 5
         assert response["result"]["tools"]
+
+
+class TestMetaTool:
+    def test_returns_meta_payload(self, monkeypatch):
+        seen: dict[str, Any] = {}
+
+        def fake_payload(reads, mode, db_dir, threads=4):
+            seen.update(reads=reads, mode=mode, db_dir=db_dir, threads=threads)
+            return {"analysis_type": "metagenomic_profiling", "verdict": {"richness": 0}}
+
+        monkeypatch.setattr(cli, "_meta_payload", fake_payload)
+        (response,) = exchange(_call("meta", {"reads": ["r1.fq", "r2.fq"], "mode": "sylph"}))
+        payload = json.loads(response["result"]["content"][0]["text"])
+        assert payload["analysis_type"] == "metagenomic_profiling"
+        assert seen == {"reads": ["r1.fq", "r2.fq"], "mode": "sylph", "db_dir": None, "threads": 4}
+
+    def test_rejects_unknown_mode(self):
+        (response,) = exchange(_call("meta", {"reads": ["r.fq"], "mode": "bogus"}))
+        assert response["result"]["isError"] is True
+        assert "kraken2, sylph, all" in response["result"]["content"][0]["text"]
+
+    def test_rejects_empty_reads(self):
+        (response,) = exchange(_call("meta", {"reads": []}))
+        assert response["result"]["isError"] is True
+
+    def test_rejects_more_than_two_reads(self):
+        (response,) = exchange(_call("meta", {"reads": ["a.fq", "b.fq", "c.fq"]}))
+        assert response["result"]["isError"] is True
+
+
+class TestMetaReadsValidation:
+    def test_reads_must_be_array(self):
+        (response,) = exchange(_call("meta", {"reads": "r.fq"}))
+        assert response["result"]["isError"] is True
+        assert "array of file path strings" in response["result"]["content"][0]["text"]

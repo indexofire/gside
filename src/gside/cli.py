@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import contextlib
+import csv
+import io
 import json
 import logging
 import sys
@@ -287,7 +289,7 @@ def validate_cmd(contigs: str, mode: str, output_dir: str | None) -> None:
 
 
 @main.command("meta", context_settings=HELP_SETTINGS)
-@click.argument("reads", nargs=-1, required=True, type=click.Path(dir_okay=False))
+@click.argument("reads", nargs=-1, required=False, type=click.Path(dir_okay=False))
 @click.option(
     "-m",
     "--mode",
@@ -297,7 +299,7 @@ def validate_cmd(contigs: str, mode: str, output_dir: str | None) -> None:
     help="Profiling method (all runs kraken2 + sylph, then merges).",
 )
 @_db_dir_option
-@_format_option(["json", "tsv"], "Output format (tsv renders one row per species).")
+@_format_option(["json", "tsv", "csv"], "Output format (tsv/csv render one row per species).")
 @click.option(
     "-o",
     "--output",
@@ -309,11 +311,29 @@ def validate_cmd(contigs: str, mode: str, output_dir: str | None) -> None:
     ),
 )
 @click.option(
+    "-s",
+    "--samples",
+    type=click.Path(dir_okay=False),
+    default=None,
+    help=(
+        "Batch manifest: sample_id<TAB>reads [<TAB>reads2] per line (header optional)."
+        " Output is one JSON object per sample, in manifest order."
+    ),
+)
+@click.option(
+    "-j",
+    "--jobs",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help="Number of manifest samples to profile concurrently (order is always preserved).",
+)
+@click.option(
     "-n",
     "--no-header",
     is_flag=True,
     default=False,
-    help="Suppress the TSV header row (tsv only; json keeps its structure).",
+    help="Suppress the TSV/CSV header row (json keeps its structure).",
 )
 @_threads_option("Threads per tool invocation (kraken2 --threads / sylph sketch -t).")
 def meta_cmd(
@@ -322,10 +342,28 @@ def meta_cmd(
     db_dir: str | None,
     output_format: str,
     output: str | None,
+    samples: str | None,
+    jobs: int,
     no_header: bool,
     threads: int,
 ) -> None:
-    """Metagenomic species profiling from FASTQ reads or assembled contigs."""
+    """Metagenomic species profiling from FASTQ reads, contigs, or a samples manifest."""
+    if samples and reads:
+        raise click.UsageError("pass either READS or --samples, not both")
+    if not samples and not reads:
+        raise click.UsageError("missing input: pass READS or --samples")
+    if samples:
+        try:
+            manifest = _read_samples(samples)
+        except ValueError as exc:
+            raise click.UsageError(str(exc)) from exc
+        sys.exit(
+            _run_meta_samples(
+                manifest, mode, db_dir, output_format, output, threads, jobs, no_header
+            )
+        )
+    if jobs != 1:
+        raise click.UsageError("--jobs only applies to --samples batches")
     sys.exit(_run_meta(list(reads), mode, db_dir, output_format, output, threads, no_header))
 
 
@@ -363,9 +401,8 @@ class _OutputFileWriter:
             self._handle.close()
 
 
-def _write_json_document(payload: Any, output: str | None) -> int:
-    """Emit one JSON document to stdout or to the ``-o`` file (truncating)."""
-    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+def _write_text_document(text: str, output: str | None) -> int:
+    """Emit rendered rows to stdout or to the ``-o`` file (truncating)."""
     if output is None:
         print(text, end="")
         return 0
@@ -376,6 +413,11 @@ def _write_json_document(payload: Any, output: str | None) -> int:
         writer.close()
     print(f"Results written to {output}", file=sys.stderr)
     return 0
+
+
+def _write_json_document(payload: Any, output: str | None) -> int:
+    """Emit one JSON document to stdout or to the ``-o`` file (truncating)."""
+    return _write_text_document(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", output)
 
 
 def _run_species(
@@ -545,9 +587,12 @@ def _structured_missing_db_fields(error: str) -> dict[str, str]:
         "suggested_command": f"gside db setup --tier {tier}",
         "missing_tier": tier,
     }
-    size = _TIERS.get(tier, {}).get("size")
+    info = _TIERS.get(tier, {})
+    size = info.get("size")
     if size:
         fields["estimated_size"] = str(size)
+    if info.get("help_url"):
+        fields["help_url"] = str(info["help_url"])
     return fields
 
 
@@ -733,7 +778,9 @@ def _run_meta_method(
 
         return identify_by_sylph(files, db_dir=db_dir, threads=threads).to_dict()
     except Exception as e:  # noqa: BLE001 — CLI boundary: method failure recorded, others continue
-        return {"method": mode, "error": str(e)[:300]}
+        entry = {"method": mode, "error": str(e)[:300]}
+        entry.update(_structured_missing_db_fields(entry["error"]))
+        return entry
 
 
 def _meta_verdict(methods: dict[str, Any]) -> dict[str, Any]:
@@ -783,6 +830,41 @@ def _meta_verdict(methods: dict[str, Any]) -> dict[str, Any]:
     return {"top_species": top, "richness": len(top), "basis": basis}
 
 
+_META_COLUMNS = ("method", "name", "abundance", "confidence", "ani")
+
+
+def _meta_row_cells(payload: dict[str, Any]) -> list[list[str]]:
+    """One row per merged species, values already stringified for tsv/csv."""
+    rows: list[list[str]] = []
+    for row in payload.get("verdict", {}).get("top_species", []):
+        ani = "" if row.get("ani") is None else str(row["ani"])
+        abundance = f"{row['abundance']:.6g}"
+        rows.append([row["method"], row["name"], abundance, row["confidence"], ani])
+    return rows
+
+
+def _render_meta_table(
+    payloads: list[dict[str, Any]], fmt: str, no_header: bool, with_sample: bool
+) -> str:
+    header = (["sample"] if with_sample else []) + list(_META_COLUMNS)
+    if fmt == "csv":
+        out = io.StringIO()
+        writer = csv.writer(out, lineterminator="\n")
+        if not no_header:
+            writer.writerow(header)
+        for payload in payloads:
+            prefix = [payload.get("sample", "")] if with_sample else []
+            for cells in _meta_row_cells(payload):
+                writer.writerow(prefix + cells)
+        return out.getvalue()
+
+    lines = [] if no_header else ["\t".join(header)]
+    for payload in payloads:
+        prefix = [payload.get("sample", "")] if with_sample else []
+        lines += ["\t".join(prefix + cells) for cells in _meta_row_cells(payload)]
+    return "\n".join(lines) + "\n"
+
+
 def _emit_meta(
     payload: dict[str, Any],
     output_format: str,
@@ -791,24 +873,40 @@ def _emit_meta(
 ) -> int:
     if output_format == "json":
         return _write_json_document(payload, output)
+    text = _render_meta_table([payload], output_format, no_header, with_sample=False)
+    return _write_text_document(text, output)
 
-    lines = [] if no_header else [_META_TSV_HEADER]
-    for row in payload.get("verdict", {}).get("top_species", []):
-        ani = "" if row.get("ani") is None else str(row["ani"])
-        lines.append(
-            f"{row['method']}\t{row['name']}\t{row['abundance']}\t{row['confidence']}\t{ani}"
-        )
-    text = "\n".join(lines) + "\n"
-    if output is None:
-        print(text, end="")
-        return 0
-    writer = _OutputFileWriter(Path(output))
-    try:
-        writer(text)
-    finally:
-        writer.close()
-    print(f"Results written to {output}", file=sys.stderr)
-    return 0
+
+def _emit_meta_batch(
+    payloads: list[dict[str, Any]],
+    output_format: str,
+    output: str | None,
+    no_header: bool = False,
+) -> int:
+    if output_format == "json":
+        return _write_json_document(payloads, output)
+    text = _render_meta_table(payloads, output_format, no_header, with_sample=True)
+    return _write_text_document(text, output)
+
+
+def _meta_payload(
+    files: list[str],
+    mode: str,
+    db_dir: str | None,
+    threads: int = 4,
+) -> dict[str, Any]:
+    """Profile one sample into the JSON payload (shared by CLI, MCP, batch)."""
+    input_type = _detect_meta_input(files)
+    modes = ["kraken2", "sylph"] if mode == "all" else [mode]
+    methods = {m: _run_meta_method(m, files, db_dir, threads, input_type) for m in modes}
+    return {
+        "analysis_type": "metagenomic_profiling",
+        "tool": "gside",
+        "version": __version__,
+        "input": {"files": files, "type": input_type},
+        "methods": methods,
+        "verdict": _meta_verdict(methods),
+    }
 
 
 def _run_meta(
@@ -820,18 +918,61 @@ def _run_meta(
     threads: int = 4,
     no_header: bool = False,
 ) -> int:
-    input_type = _detect_meta_input(files)
-    modes = ["kraken2", "sylph"] if mode == "all" else [mode]
-    methods = {m: _run_meta_method(m, files, db_dir, threads, input_type) for m in modes}
-    payload = {
-        "analysis_type": "metagenomic_profiling",
-        "tool": "gside",
-        "version": __version__,
-        "input": {"files": files, "type": input_type},
-        "methods": methods,
-        "verdict": _meta_verdict(methods),
-    }
+    payload = _meta_payload(files, mode, db_dir, threads)
     return _emit_meta(payload, output_format, output, no_header)
+
+
+def _read_samples(path: str) -> list[dict[str, Any]]:
+    """Parse a ``sample_id<TAB>r1[<TAB>r2]`` manifest (header optional)."""
+    manifest = Path(path)
+    if not manifest.is_file():
+        raise ValueError(f"samples manifest not found: {manifest}")
+    samples: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for lineno, line in enumerate(manifest.read_text().splitlines(), start=1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        cols = [c.strip() for c in line.split("\t")]
+        if lineno == 1 and cols[0].lower() in ("sample", "sample_id"):
+            continue
+        if len(cols) < 2 or not cols[0] or not cols[1]:
+            raise ValueError(f"{manifest}:{lineno}: expected sample_id<TAB>reads [<TAB>reads2]")
+        if len(cols) > 3:
+            raise ValueError(f"{manifest}:{lineno}: too many columns (max 3)")
+        sample_id = cols[0]
+        if sample_id in seen:
+            raise ValueError(f"{manifest}:{lineno}: duplicate sample id {sample_id!r}")
+        seen.add(sample_id)
+        samples.append({"id": sample_id, "files": [c for c in cols[1:] if c]})
+    if not samples:
+        raise ValueError(f"{manifest}: no samples found")
+    return samples
+
+
+def _run_meta_samples(
+    samples: list[dict[str, Any]],
+    mode: str,
+    db_dir: str | None,
+    output_format: str = "json",
+    output: str | None = None,
+    threads: int = 4,
+    jobs: int = 1,
+    no_header: bool = False,
+) -> int:
+    """Profile every manifest sample, preserving manifest order in the output."""
+
+    def identify(sample: dict[str, Any]) -> dict[str, Any]:
+        payload = _meta_payload(sample["files"], mode, db_dir, threads)
+        return {"sample": sample["id"], **payload}
+
+    if jobs > 1:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            payloads = list(pool.map(identify, samples))
+    else:
+        payloads = [identify(sample) for sample in samples]
+    return _emit_meta_batch(payloads, output_format, output, no_header)
 
 
 if __name__ == "__main__":

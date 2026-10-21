@@ -27,9 +27,32 @@ gside meta <reads.fastq> [reads_2.fastq] [选项]
 | `reads`（位置参数） | 无 | 1 个文件 = 单端读段或 contigs FASTA；2 个文件 = 双端 FASTQ |
 | `-m`，`--mode` | `all` | `kraken2` / `sylph` / `all` |
 | `-D`，`--db-dir` | 自动 | 数据库根目录（`$GSIDE_DB_DIR` 或 `data/db`） |
-| `-f`，`--format` | `json` | 输出格式：`json` / `tsv` |
+| `-f`，`--format` | `json` | 输出格式：`json` / `tsv` / `csv` |
 | `-o`，`--output PATH` | stdout | 报告写入 PATH 而非 stdout |
+| `-s`，`--samples PATH` | — | 批量清单（`sample_id<TAB>reads[<TAB>reads2]`） |
+| `-j`，`--jobs N` | `1` | 使用 `--samples` 时的并发样本数 |
+| `-n`，`--no-header` | 关 | 隐藏 TSV/CSV 表头 |
 | `-t`，`--threads N` | `4` | 每次工具调用的线程数 |
+
+## 批量样本
+
+多样本时改用清单文件而不是位置参数：
+
+```bash
+gside meta --samples samples.tsv -j 4 -f tsv -o profiles.tsv
+```
+
+`samples.tsv` 为制表符分隔，每行一个样本（表头可省略）：
+
+```
+sample_id	reads_1	reads_2
+sampleA	sampleA_R1.fq	sampleA_R2.fq
+sampleB	sampleB.fq
+```
+
+输出顺序始终与清单一致。`-j/--jobs` 控制并发处理的样本数（每个样本内部仍用
+`-t` 指定的线程数）。JSON 输出为数组，每个对象带 `sample` 键；`tsv`/`csv`
+每行前置一列 `sample`。
 
 输入类型自动检测：两个文件视为双端 FASTQ；单个 `.fna`/`.fa`/`.fasta`
 文件视为组装 contigs；其余视为单端 FASTQ。

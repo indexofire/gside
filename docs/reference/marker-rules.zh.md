@@ -19,7 +19,7 @@ rules:
       - <gene2>
     min_hits: <int>                 # 可选：最少命中数（默认 1）
     min_identity: <float>           # 可选：最低一致性 %（默认 90）
-    min_coverage: <float>           # 可选：最低覆盖率 %（当前被引擎忽略，生效全局 60）
+    min_coverage: <float>           # 可选：最低覆盖率 %（默认 60）
     exclude_genes:                  # 可选：排除守卫
       - <cross_reactive_gene>
     note: <str>                     # 可选：注释（文档性）
@@ -67,8 +67,12 @@ rules:
 
 ### min_coverage
 
-规则级最低覆盖率百分比。**当前引擎忽略该字段**：覆盖率门槛实际由全局
-`_MIN_COVERAGE`（60）生效，在规则中设置 min_coverage 不会改变判定。
+基因计入本规则所需的最低 query 覆盖率（默认 60，与全局门槛一致）。
+判定时逐条规则检查该基因的所有原始命中，因此"一致性稍低但覆盖率更高"
+的命中仍可满足规则。
+
+仅当规则确实接受部分基因匹配时才调低（例如 50）——两条
+*Campylobacter* 规则就是这样配置的。
 
 ### note 与 co_detect_note
 
@@ -85,8 +89,12 @@ rules:
 | `_MIN_COVERAGE` | 60.0 | 全局最低覆盖率（防短 HSP 误报） |
 | `_HIGH_CONF` | 90.0 | 高置信度分界 |
 
-规则中的 `min_identity` 可以覆盖全局值（但不会低于 85）。
-规则级 `min_coverage` 当前被忽略，实际生效全局 60。
+规则级 `min_identity` / `min_coverage` 作用于该基因的每条原始命中；
+未填写的规则使用 90 / 60。全局 `_MIN_IDENTITY`（85）与 `_MIN_COVERAGE`（60）
+仍用于 `detected_markers` 上报与 `exclude_genes` 排除守卫。
+
+`priority_over` 引擎支持（命中的 priority 物种会压制非 priority 物种），
+但当前没有规则使用它。
 
 ## 新增物种示例
 

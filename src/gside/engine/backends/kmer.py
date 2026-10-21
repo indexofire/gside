@@ -177,14 +177,8 @@ class SourmashBackend:
         subprocess.run(cmd, check=True, capture_output=True, timeout=600)
         return output
 
-    def distance(
-        self,
-        query_sig: Path,
-        reference_sig: Path,
-        threshold: float = 0.1,
-    ) -> list[KmerDistance]:
-        """Calculate containment/ANI distances between signatures."""
-        cmd = [
+    def _search_command(self, query_sig: Path, reference_sig: Path, threshold: float) -> list[str]:
+        return [
             self._bin,
             "search",
             str(query_sig),
@@ -196,13 +190,10 @@ class SourmashBackend:
             "--csv",
         ]
 
-        proc = run_checked(cmd, timeout=300, name="sourmash search failed")
-
+    def _parse_search_output(self, stdout: str) -> list[KmerDistance]:
         results: list[KmerDistance] = []
-        lines = proc.stdout.strip().splitlines()
-
         header_skipped = False
-        for line in lines:
+        for line in stdout.strip().splitlines():
             if not line.strip():
                 continue
             parts = line.split(",")
@@ -230,5 +221,15 @@ class SourmashBackend:
                 )
             except (ValueError, IndexError):
                 continue
-
         return results
+
+    def distance(
+        self,
+        query_sig: Path,
+        reference_sig: Path,
+        threshold: float = 0.1,
+    ) -> list[KmerDistance]:
+        """Calculate containment/ANI distances between signatures."""
+        cmd = self._search_command(query_sig, reference_sig, threshold)
+        proc = run_checked(cmd, timeout=300, name="sourmash search failed")
+        return self._parse_search_output(proc.stdout)

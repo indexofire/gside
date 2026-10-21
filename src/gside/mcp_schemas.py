@@ -8,7 +8,7 @@ the CLI surface.
 
 from __future__ import annotations
 
-from gside.cli import MODES, TIERS
+from gside.cli import META_MODES, MODES, TIERS
 
 _FILES: dict[str, object] = {"type": "array", "items": {"type": "string"}}
 _STR: dict[str, object] = {"type": "string"}
@@ -42,6 +42,18 @@ TOOLS: list[dict[str, object]] = [
             threads={"type": "integer", "minimum": 1, "default": 4},
         ),
         ["contigs"],
+    ),
+    _tool_entry(
+        "meta",
+        "Profile a metagenomic sample (kraken2 and/or sylph) into a JSON species"
+        " abundance verdict. Accepts FASTQ reads (single or paired) or contigs FASTA.",
+        dict(
+            reads=_FILES,
+            mode={"type": "string", "enum": list(META_MODES), "default": "all"},
+            db_dir=_STR,
+            threads={"type": "integer", "minimum": 1, "default": 4},
+        ),
+        ["reads"],
     ),
     _tool_entry(
         "db_status",

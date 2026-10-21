@@ -92,6 +92,24 @@ pointer and exit non-zero until the database is placed by hand:
 `--source` also works for these tiers, copying an existing local database
 directory into place.
 
+### Integrity checks
+
+`gside db setup` verifies digests for everything it can pin:
+
+| Tier | Digest | Notes |
+|---|---|---|
+| panel | SHA256 (`PANEL_SHA256`) | GitHub release asset |
+| mash | MD5 (`MASH_MD5`) | Zenodo publishes MD5 only |
+| sourmash | SHA256 (`SOURMASH_LINEAGES_SHA256`) + optional signature SHA256 | see below |
+
+The sourmash signature zip (~3.9GB) has no upstream digest. Set one yourself
+to enforce verification; without it the download is accepted with a warning:
+
+```bash
+export GSIDE_SOURMASH_SIG_SHA256=<sha256-of-gtdb-rs226-reps.k31.sig.zip>
+gside db setup --tier sourmash
+```
+
 ### Copy from an existing local database directory
 
 If you already have the databases on disk (for example from another machine

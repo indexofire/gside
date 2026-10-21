@@ -125,24 +125,51 @@ def _priority_species(rules: list[dict[str, Any]]) -> set[str]:
     return {rule["species"] for rule in rules if rule.get("priority_over")}
 
 
+def _hits_by_gene(hits: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """All hits grouped by gene, so each rule can apply its own thresholds."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for hit in hits:
+        grouped.setdefault(hit["gene"], []).append(hit)
+    return grouped
+
+
 def _rule_match(
-    rule: dict[str, Any], significant: dict[str, dict[str, Any]]
-) -> tuple[list[str], list[str]]:
-    """(matched genes passing the rule's min_identity, excluded genes present)."""
-    genes = [g.lower() for g in rule.get("genes", [])]
-    exclude = [g.lower() for g in rule.get("exclude_genes", [])]
+    rule: dict[str, Any],
+    by_gene: dict[str, list[dict[str, Any]]],
+    significant: dict[str, dict[str, Any]],
+) -> tuple[list[str], list[str], list[float]]:
+    """(matched genes, excluded genes present, identity per matched gene).
+
+    ``min_identity`` / ``min_coverage`` are per-rule (defaults: 90 / 60) and
+    are applied to every raw hit of the gene, so a lower-identity hit with
+    better coverage can still satisfy the rule.
+    """
     min_id = rule.get("min_identity", _HIGH_CONF)
-    matched = [
-        gene
-        for gene in genes
-        if gene in significant and significant[gene]["identity"] >= min_id and gene not in exclude
-    ]
+    min_cov = rule.get("min_coverage", _MIN_COVERAGE)
+    exclude = [g.lower() for g in rule.get("exclude_genes", [])]
+
+    matched: list[str] = []
+    identities: list[float] = []
+    for gene in (g.lower() for g in rule.get("genes", [])):
+        if gene in exclude:
+            continue
+        passing = [
+            hit
+            for hit in by_gene.get(gene, [])
+            if hit["identity"] >= min_id and hit["coverage"] >= min_cov
+        ]
+        if passing:
+            matched.append(gene)
+            identities.append(max(hit["identity"] for hit in passing))
+
+    # Exclusions keep the global detection threshold (identity + coverage).
     excluded_present = [g for g in exclude if g in significant]
-    return matched, excluded_present
+    return matched, excluded_present, identities
 
 
 def _pick_rule(
     rules: list[dict[str, Any]],
+    by_gene: dict[str, list[dict[str, Any]]],
     significant: dict[str, dict[str, Any]],
     priority_species: set[str],
 ) -> tuple[str, str, str]:
@@ -150,11 +177,11 @@ def _pick_rule(
     best_species, best_conf, best_score, best_rule = "Unknown", "low", 0, ""
     for rule in rules:
         min_hits = rule.get("min_hits", 1)
-        matched, excluded_present = _rule_match(rule, significant)
+        matched, excluded_present, identities = _rule_match(rule, by_gene, significant)
         if len(matched) < min_hits or excluded_present:
             continue
         score = len(matched)
-        avg_id = sum(significant[g]["identity"] for g in matched) / len(matched)
+        avg_id = sum(identities) / len(identities)
         conf = "high" if avg_id >= _HIGH_CONF else "medium"
         rule_str = f"{'+'.join(matched)} ({len(matched)}/{min_hits} required)"
 
@@ -188,7 +215,7 @@ def identify_multigene(contigs_fasta: str, threads: int = 4) -> MultiGeneResult:
     result = MultiGeneResult(database_version=_db_version())
     result.all_hits = list(_best_per_gene(raw_hits).values())
     result.species, result.confidence, result.matched_rule = _pick_rule(
-        rules, significant, _priority_species(rules)
+        rules, _hits_by_gene(raw_hits), significant, _priority_species(rules)
     )
 
     if significant:

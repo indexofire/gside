@@ -675,3 +675,24 @@ class TestMashStreamingMd5:
         assert msg == "downloaded from Zenodo (community sketch)"
         assert (dst / "mash.msh").read_bytes() == payload
         assert not (dst / "mash.msh.gz").exists()
+
+
+class TestSourmashChecksumOverride:
+    def test_env_override_rejects_wrong_digest(self, root, monkeypatch):
+        monkeypatch.setattr(
+            db, "_download_file", lambda url, dst: Path(dst).write_bytes(b"payload")
+        )
+        monkeypatch.setenv("GSIDE_SOURMASH_SIG_SHA256", "0" * 64)
+        msg = db_setup("sourmash")["D4_sourmash"]
+        assert msg.startswith("ERROR: SHA256 mismatch")
+
+    def test_env_override_accepts_matching_digest(self, root, monkeypatch):
+        monkeypatch.setattr(
+            db, "_download_file", lambda url, dst: Path(dst).write_bytes(b"payload")
+        )
+        import hashlib as _hashlib
+
+        monkeypatch.setenv("GSIDE_SOURMASH_SIG_SHA256", _hashlib.sha256(b"payload").hexdigest())
+        monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", _hashlib.sha256(b"payload").hexdigest())
+        msg = db_setup("sourmash")["D4_sourmash"]
+        assert msg.startswith("downloaded from farm.cse.ucdavis.edu")

@@ -19,6 +19,7 @@ import gzip
 import hashlib
 import io
 import json
+import os
 import shutil
 import subprocess
 import tarfile
@@ -73,11 +74,13 @@ _TIERS: dict[str, dict[str, Any]] = {
         "description": "Kraken2 Standard-8 prebuilt index (metagenomic profiling)",
         "size": "~5.5GB",
         "items": ["D5_kraken2"],
+        "help_url": K2_INDEXES_URL,
     },
     "meta_sylph": {
         "description": "sylph GTDB-r226 database (ANI-based metagenomic profiling)",
         "size": "~14GB",
         "items": ["D6_sylph"],
+        "help_url": SYLPH_DOCS_URL,
     },
     "all": {
         "description": "panel + mash",
@@ -214,8 +217,11 @@ def _download_sourmash_farm(dst: Path) -> str:
         _download_file(SOURMASH_LINEAGES_URL, lineages_csv)
     except Exception as e:
         return f"ERROR: farm download failed: {e}"
+    # Upstream publishes no digest for the 3.9GB signature zip; operators can
+    # pin one out-of-band without editing the package.
+    sig_expected = os.environ.get("GSIDE_SOURMASH_SIG_SHA256", SOURMASH_SIG_SHA256)
     for artifact, expected in (
-        (sig_zip, SOURMASH_SIG_SHA256),
+        (sig_zip, sig_expected),
         (lineages_csv, SOURMASH_LINEAGES_SHA256),
     ):
         if not _verify_sha256(artifact, expected):
@@ -446,10 +452,14 @@ def format_status(fmt: str) -> str:
             for name, info in status.items()
         ]
         return "\n".join(lines)
+    name_w = max((len(n) for n in status), default=8)
+    tier_w = max((len(i["tier"]) for i in status.values()), default=4)
     lines = ["gside database status", "─" * 55]
     for name, info in status.items():
         icon = "✅" if info["ready"] else "❌"
-        lines.append(f"  {icon} {name:16} tier={info['tier']:6} path={info['path']}")
+        lines.append(
+            f"  {icon} {name:<{name_w}}  tier={info['tier']:<{tier_w}}  path={info['path']}"
+        )
     lines += ["", "  Run 'gside db setup --tier <tier>' to provision"]
     return "\n".join(lines)
 

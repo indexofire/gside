@@ -133,7 +133,7 @@ class TestKraken2Unavailable:
         monkeypatch.setattr(k2, "which", lambda name: f"/bin/{name}")
         with pytest.raises(RuntimeError, match="Kraken2 database not found") as exc:
             k2.identify_by_kraken2(["r.fq"], db_dir=str(tmp_path / "empty"))
-        assert "https://benlangmead.github.io/aws-indexes/k2" in str(exc.value)
+        assert "gside db setup --tier meta" in str(exc.value)
 
     def test_missing_db_default_path(self, monkeypatch, tmp_path):
         monkeypatch.setattr(k2, "which", lambda name: f"/bin/{name}")
@@ -284,7 +284,7 @@ class TestSylphUnavailable:
         monkeypatch.setattr(sy, "which", lambda name: "/bin/sylph")
         with pytest.raises(RuntimeError, match="sylph database not found") as exc:
             sy.identify_by_sylph(["r.fq"], db_dir=str(tmp_path / "empty"))
-        assert "https://sylph-docs.github.io/" in str(exc.value)
+        assert "gside db setup --tier meta_sylph" in str(exc.value)
 
     def test_missing_db_default_path(self, monkeypatch, tmp_path):
         monkeypatch.setattr(sy, "which", lambda name: "/bin/sylph")
@@ -756,3 +756,149 @@ class TestMetaCliCommand:
         result = CliRunner().invoke(main, ["meta", "r.fq"])
         payload = json.loads(result.output)
         assert set(payload["methods"]) == {"kraken2", "sylph"}
+
+
+class TestMetaStructuredErrors:
+    def test_missing_db_error_carries_suggested_command(self, monkeypatch, capsys):
+        def boom(*args, **kwargs):
+            raise RuntimeError("Kraken2 database not found in /x (run: gside db setup --tier meta)")
+
+        monkeypatch.setattr(k2, "identify_by_kraken2", boom)
+        payload = _run_capture(monkeypatch, capsys, ["r.fq"], mode="kraken2")
+        entry = payload["methods"]["kraken2"]
+        assert entry["suggested_command"] == "gside db setup --tier meta"
+        assert entry["missing_tier"] == "meta"
+        assert entry["help_url"].startswith("https://benlangmead")
+        assert entry["estimated_size"] == "~5.5GB"
+
+
+class TestMetaCsv:
+    def test_header_and_rows(self, monkeypatch, capsys):
+        _stub_both(monkeypatch)
+        assert _run_meta(["r1.fq", "r2.fq"], "all", None, output_format="csv") == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert lines[0] == "method,name,abundance,confidence,ani"
+        assert lines[1] == "sylph,Escherichia_coli,0.8,high,97.5"
+        assert lines[2] == "kraken2,Salmonella_enterica,0.2,medium,"
+
+    def test_no_header(self, monkeypatch, capsys):
+        _stub_both(monkeypatch)
+        assert _run_meta(["r.fq"], "kraken2", None, output_format="csv", no_header=True) == 0
+        first = capsys.readouterr().out.splitlines()[0]
+        assert first.startswith("kraken2,Escherichia_coli,")
+
+
+class TestSampleManifest:
+    def test_header_is_optional(self, tmp_path):
+        path = tmp_path / "samples.tsv"
+        path.write_text("sample_id\tr1\tr2\nA\tA_1.fq\tA_2.fq\nB\tB.fq\n")
+        samples = cli._read_samples(str(path))
+        assert [s["id"] for s in samples] == ["A", "B"]
+        assert samples[0]["files"] == ["A_1.fq", "A_2.fq"]
+        assert samples[1]["files"] == ["B.fq"]
+
+    def test_comments_and_blank_lines_skipped(self, tmp_path):
+        path = tmp_path / "samples.tsv"
+        path.write_text("# comment\n\nA\ta.fq\n")
+        assert [s["id"] for s in cli._read_samples(str(path))] == ["A"]
+
+    def test_duplicate_id_rejected(self, tmp_path):
+        path = tmp_path / "samples.tsv"
+        path.write_text("A\ta.fq\nA\tb.fq\n")
+        with pytest.raises(ValueError, match="duplicate sample id"):
+            cli._read_samples(str(path))
+
+    def test_missing_file_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="manifest not found"):
+            cli._read_samples(str(tmp_path / "nope.tsv"))
+
+    def test_too_many_columns_rejected(self, tmp_path):
+        path = tmp_path / "samples.tsv"
+        path.write_text("A\ta.fq\tb.fq\tc.fq\n")
+        with pytest.raises(ValueError, match="too many columns"):
+            cli._read_samples(str(path))
+
+    def test_batch_preserves_manifest_order_with_jobs(self, monkeypatch, capsys):
+        def fake_payload(files, mode, db_dir, threads=4):
+            return {"input": {"files": files}, "methods": {}, "verdict": {"top_species": []}}
+
+        monkeypatch.setattr(cli, "_meta_payload", fake_payload)
+        samples = [{"id": n, "files": [f"{n}.fq"]} for n in ("a", "b", "c")]
+        assert cli._run_meta_samples(samples, "all", None, jobs=3) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert [p["sample"] for p in payload] == ["a", "b", "c"]
+
+    def test_batch_tsv_prefixes_sample_column(self, monkeypatch, capsys):
+        def fake_payload(files, mode, db_dir, threads=4):
+            return {
+                "methods": {},
+                "verdict": {
+                    "top_species": [
+                        {
+                            "method": "sylph",
+                            "name": "Escherichia_coli",
+                            "abundance": 0.5,
+                            "confidence": "high",
+                            "ani": 99.0,
+                        }
+                    ]
+                },
+            }
+
+        monkeypatch.setattr(cli, "_meta_payload", fake_payload)
+        samples = [{"id": "A", "files": ["a.fq"]}, {"id": "B", "files": ["b.fq"]}]
+        assert cli._run_meta_samples(samples, "sylph", None, output_format="tsv") == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert lines[0] == "sample\tmethod\tname\tabundance\tconfidence\tani"
+        assert lines[1] == "A\tsylph\tEscherichia_coli\t0.5\thigh\t99.0"
+        assert lines[2].startswith("B\tsylph\t")
+
+    def test_jobs_without_samples_is_a_usage_error(self):
+        result = CliRunner().invoke(main, ["meta", "r.fq", "-j", "2"])
+        assert result.exit_code == 2
+        assert "--jobs only applies" in result.output
+
+    def test_reads_and_samples_are_exclusive(self, tmp_path):
+        path = tmp_path / "s.tsv"
+        path.write_text("A\ta.fq\n")
+        result = CliRunner().invoke(main, ["meta", "r.fq", "--samples", str(path)])
+        assert result.exit_code == 2
+        assert "not both" in result.output
+
+    def test_missing_input_is_a_usage_error(self):
+        result = CliRunner().invoke(main, ["meta"])
+        assert result.exit_code == 2
+        assert "missing input" in result.output
+
+
+class TestSampleManifestCliDispatch:
+    def test_cli_runs_manifest_samples(self, monkeypatch, tmp_path, capsys):
+        def fake_payload(files, mode, db_dir, threads=4):
+            return {"input": {"files": files}, "methods": {}, "verdict": {"top_species": []}}
+
+        monkeypatch.setattr(cli, "_meta_payload", fake_payload)
+        manifest = tmp_path / "samples.tsv"
+        manifest.write_text("sample_id\tr1\tr2\nA\ta_1.fq\ta_2.fq\nB\tb.fq\n")
+        result = CliRunner().invoke(main, ["meta", "--samples", str(manifest), "-j", "2"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert [p["sample"] for p in payload] == ["A", "B"]
+
+    def test_row_missing_reads_column_rejected(self, tmp_path):
+        path = tmp_path / "samples.tsv"
+        path.write_text("A\n")
+        with pytest.raises(ValueError, match="expected sample_id"):
+            cli._read_samples(str(path))
+
+    def test_empty_manifest_rejected(self, tmp_path):
+        path = tmp_path / "samples.tsv"
+        path.write_text("# only comments\n\n")
+        with pytest.raises(ValueError, match="no samples found"):
+            cli._read_samples(str(path))
+
+    def test_cli_rejects_invalid_manifest(self, tmp_path):
+        path = tmp_path / "samples.tsv"
+        path.write_text("A\ta.fq\nA\tb.fq\n")
+        result = CliRunner().invoke(main, ["meta", "--samples", str(path)])
+        assert result.exit_code == 2
+        assert "duplicate sample id" in result.output

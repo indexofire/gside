@@ -28,9 +28,33 @@ gside meta <reads.fastq> [reads_2.fastq] [options]
 | `reads` (positional) | — | 1 file = single-end reads or contigs FASTA; 2 files = paired FASTQ |
 | `-m`, `--mode` | `all` | `kraken2` / `sylph` / `all` |
 | `-D`, `--db-dir` | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
-| `-f`, `--format` | `json` | Output format: `json` / `tsv` |
+| `-f`, `--format` | `json` | Output format: `json` / `tsv` / `csv` |
 | `-o`, `--output PATH` | stdout | Write the report to PATH instead of stdout |
+| `-s`, `--samples PATH` | — | Batch manifest (`sample_id<TAB>reads[<TAB>reads2]`) |
+| `-j`, `--jobs N` | `1` | Concurrent samples when using `--samples` |
+| `-n`, `--no-header` | off | Suppress the TSV/CSV header row |
 | `-t`, `--threads N` | `4` | Threads per tool invocation |
+
+## Batch samples
+
+For multiple samples, pass a manifest instead of positional reads:
+
+```bash
+gside meta --samples samples.tsv -j 4 -f tsv -o profiles.tsv
+```
+
+`samples.tsv` is tab-separated, one sample per line (header optional):
+
+```
+sample_id	reads_1	reads_2
+sampleA	sampleA_R1.fq	sampleA_R2.fq
+sampleB	sampleB.fq
+```
+
+Output order always follows the manifest. `-j/--jobs` sets how many samples
+are profiled concurrently (each one still uses `-t` threads internally).
+JSON output becomes an array, each object carrying a `sample` key; `tsv`/`csv`
+rows gain a leading `sample` column.
 
 Input type is detected automatically: two files are treated as paired FASTQ,
 a single `.fna`/`.fa`/`.fasta` file as assembled contigs, anything else as

@@ -177,9 +177,11 @@ gside meta <reads.fastq> [reads_2.fastq] [选项]
 | `reads` | 位置参数 | — | 1 个文件 = 单端读段或 contigs FASTA；2 个文件 = 双端 FASTQ |
 | `-m`，`--mode` | 选项 | `all` | 分析方法：`kraken2` / `sylph` / `all`（all 合并两份物种列表） |
 | `-D`，`--db-dir` | 选项 | 自动 | 数据库根目录（`$GSIDE_DB_DIR` 或 `data/db`） |
-| `-f`，`--format` | 选项 | `json` | 输出格式：`json` / `tsv` |
+| `-f`，`--format` | 选项 | `json` | 输出格式：`json` / `tsv` / `csv` |
 | `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH 而非 stdout（json 为单文档收尾一次写入；stdout 不再输出数据，提示信息走 stderr） |
-| `-n`，`--no-header` | 选项 | 关 | 隐藏 TSV 表头行（仅 tsv；json 保持结构） |
+| `-s`，`--samples PATH` | 选项 | — | 批量清单 `sample_id<TAB>reads[<TAB>reads2]`（表头可省略） |
+| `-j`，`--jobs N` | 选项 | `1` | 并发处理的清单样本数（输出顺序保持不变） |
+| `-n`，`--no-header` | 选项 | 关 | 隐藏 TSV/CSV 表头行（json 保持结构） |
 | `-t`，`--threads N` | 选项 | `4` | 每次工具调用的线程数 |
 
 ### 示例
@@ -189,6 +191,7 @@ gside meta sample_1.fastq sample_2.fastq
 gside meta sample_1.fastq sample_2.fastq -m kraken2 -f tsv -o profile.tsv
 gside meta contigs.fna          # 仅 kraken2（sylph 只接受读段）
 gside meta reads.fastq -m sylph
+gside meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 ```
 
 ## gside --version

@@ -119,6 +119,10 @@
 | `methods.<mode>.confidence` | str | high / medium / low |
 | `methods.<mode>.result` | dict | ANI/sourmash 方法的嵌套结果（marker 无此层） |
 | `methods.<mode>.error` | str | 方法执行错误（仅失败时出现） |
+| `methods.<mode>.suggested_command` | str | 缺库时的修复命令 |
+| `methods.<mode>.missing_tier` | str | 需要安装的档位（`panel` / `mash` / `sourmash` / `meta` / `meta_sylph`） |
+| `methods.<mode>.estimated_size` | str | 该档位的近似下载体积 |
+| `methods.<mode>.help_url` | str | 仅能手动安装档位（`meta` / `meta_sylph`）的上游页面 |
 | `verdict.species` | str | 最终仲裁判定（规范名 `Genus_species`） |
 | `verdict.display_name` | str | 同一判定的可读形式（空格分隔，如 `Escherichia coli`） |
 | `verdict.strain` | str \| null | 胜出方法给出的菌株信息 |

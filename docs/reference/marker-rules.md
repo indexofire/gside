@@ -21,7 +21,7 @@ rules:
     min_identity: <float>             # optional: minimum identity % (default 90)
     exclude_genes:                    # optional: exclusion guard
       - <cross_reactive_gene>
-    min_coverage: <float>             # optional: see caveat below
+    min_coverage: <float>             # optional: minimum coverage % (default 60)
     note: <str>                       # optional: documentation
     co_detect_note: <str>             # optional: documentation for
                                       # co-detection conflicts
@@ -74,10 +74,13 @@ Typical usage — Campylobacter species discrimination:
 
 ### min_coverage
 
-Documented per-rule coverage intent. **Caveat**: rule-level `min_coverage`
-is currently ignored by the engine. The global coverage gate (60%, see
-below) is what actually applies. Treat this field as documentation until it
-is wired into the engine.
+Minimum query coverage percentage for a gene to count toward this rule
+(default 60, matching the global gate). The check runs per rule against
+every raw hit of the gene, so a lower-identity hit with better coverage can
+still satisfy the rule.
+
+Set it lower (e.g. 50) only for rules where partial gene matches are
+accepted; those two *Campylobacter* rules do exactly that.
 
 ### note / co_detect_note
 
@@ -96,7 +99,13 @@ The engine layer defines global gates (in `multigene_identifier.py`):
 | `_MIN_COVERAGE` | 60.0 | Global minimum coverage (prevents short-HSP false fires) |
 | `_HIGH_CONF` | 90.0 | High confidence threshold (average identity of matched genes) |
 
-Rule-level `min_identity` can override the global value (but not below 85).
+Rule-level `min_identity` / `min_coverage` apply to each gene's raw hits;
+rules that omit them use 90 / 60. The global `_MIN_IDENTITY` (85) and
+`_MIN_COVERAGE` (60) still gate `detected_markers` reporting and the
+`exclude_genes` guard.
+
+`priority_over` is supported by the engine (a matching priority species
+suppresses non-priority ones) but no shipped rule uses it.
 
 ## Adding a New Species
 

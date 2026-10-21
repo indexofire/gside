@@ -165,7 +165,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zlib-ng-2.3.3-hce19668_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.7-hb78ec9c_7.conda
       - pypi: https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/17/c2/613ca5f729b55b2f7a9c17a3cd59d3f053ee2816da2d19933acc6b8741ec/biopython-1.88-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b3/81/4da04ced5a082363ecfa159c010d200ecbd959ae410c10c0264a38cac0f5/markdown_it_py-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl
@@ -348,7 +347,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/77/f5/21d2de20e8b8b0408f0681956ca2c69f1320a3848ac50e6e7f39c6159675/babel-2.18.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/29/13/232505664e8e2a0c7a2eb0c505cfade9d715538f89a5d62bc4c272968f62/backrefs-8.0-py312-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/17/c2/613ca5f729b55b2f7a9c17a3cd59d3f053ee2816da2d19933acc6b8741ec/biopython-1.88-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7f/c5/38806a25ab5e65fc178f39affeda20858efafede2fce1ffc2556cfc9fe73/charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl
@@ -428,13 +426,6 @@ packages:
   sha256: 87f0fae8c5f207fe9f4b2887efc71d42f4900ac78faa1af08d675ef303692dc5
   requires_dist:
   - regex ; extra == 'extras'
-  requires_python: '>=3.10'
-- pypi: https://files.pythonhosted.org/packages/17/c2/613ca5f729b55b2f7a9c17a3cd59d3f053ee2816da2d19933acc6b8741ec/biopython-1.88-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
-  name: biopython
-  version: '1.88'
-  sha256: 9384c30460832926e765319040d732d1252a713a05af1dd4cc8b19cb1d590439
-  requires_dist:
-  - numpy
   requires_python: '>=3.10'
 - conda: https://conda.anaconda.org/conda-forge/linux-64/bitarray-3.11.0-py312h1b36aeb_1.conda
   sha256: 89d1064ca9a97a6c00bd3f0f5bf04894193254b3edaf887f16469b0ee600b75f
@@ -867,9 +858,8 @@ packages:
 - pypi: ./
   name: gside
   version: 0.1.4
-  sha256: 0648d698b079491d1d40531c1fa4128c5fad99d6a47bd58f65eecf6ecd34c49e
+  sha256: 95e3ed7e5bf763de70539a175d1eabc360db57dedbbcec025cd6ab93a38f0bb7
   requires_dist:
-  - biopython>=1.83
   - click>=8.0
   - pydantic>=2
   - pyyaml>=6.0
@@ -877,7 +867,6 @@ packages:
   - pytest>=8.0 ; extra == 'dev'
   - pytest-cov>=5.0 ; extra == 'dev'
   - ruff>=0.5 ; extra == 'dev'
-  - mypy>=1.10 ; extra == 'dev'
   - pyright>=1.1 ; extra == 'dev'
   - mkdocs>=1.6 ; extra == 'dev'
   - mkdocs-material>=9.0 ; extra == 'dev'

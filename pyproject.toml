@@ -11,7 +11,6 @@ requires-python = ">=3.12,<3.13"
 authors = [{ name = "indexofire", email = "indexofire@gmail.com" }]
 license = "MIT"
 dependencies = [
-    "biopython>=1.83",
     "click>=8.0",
     "pydantic>=2",
     "pyyaml>=6.0",
@@ -23,7 +22,7 @@ gside = "gside.cli:main"
 gside-mcp = "gside.mcp:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.5", "mypy>=1.10", "pyright>=1.1", "mkdocs>=1.6", "mkdocs-material>=9.0", "mkdocs-static-i18n>=1.2"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.5", "pyright>=1.1", "mkdocs>=1.6", "mkdocs-material>=9.0", "mkdocs-static-i18n>=1.2"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gside"]
@@ -32,7 +31,7 @@ packages = ["src/gside"]
 "data/db/D1_marker" = "src/gside/data/db/D1_marker"
 
 [tool.hatch.build.targets.sdist.force-include]
-"data/db/D1_marker" = "/data/db/D1_marker"
+"data/db/D1_marker" = "data/db/D1_marker"
 
 [tool.ruff]
 target-version = "py312"

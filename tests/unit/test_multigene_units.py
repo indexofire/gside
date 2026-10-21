@@ -193,3 +193,83 @@ class TestBestHitSelection:
         detected = {m["gene"]: m for m in result.detected_markers}
         assert "ctxa" in detected
         assert detected["ctxa"]["identity"] == 99.0
+
+
+class TestRuleCoverageThresholds:
+    def _identify(self, monkeypatch, rules, hits):
+        monkeypatch.setattr(mg, "_load_rules", lambda: rules)
+        monkeypatch.setattr(mg, "_blast_contigs", lambda contigs, threads=4: hits)
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        return identify_multigene("x.fna").to_dict()
+
+    def test_rule_min_coverage_below_global_is_honoured(self, monkeypatch):
+        rules = [
+            {
+                "species": "X",
+                "genes": ["g1"],
+                "min_hits": 1,
+                "min_identity": 90,
+                "min_coverage": 50,
+            }
+        ]
+        hits = [{"gene": "g1", "identity": 99.0, "coverage": 55.0}]
+        assert self._identify(monkeypatch, rules, hits)["species"] == "X"
+
+    def test_rule_without_min_coverage_uses_global_60(self, monkeypatch):
+        rules = [{"species": "X", "genes": ["g1"], "min_hits": 1, "min_identity": 90}]
+        hits = [{"gene": "g1", "identity": 99.0, "coverage": 55.0}]
+        assert self._identify(monkeypatch, rules, hits)["species"] == "Unknown"
+
+    def test_below_rule_min_coverage_is_rejected(self, monkeypatch):
+        rules = [
+            {
+                "species": "X",
+                "genes": ["g1"],
+                "min_hits": 1,
+                "min_identity": 90,
+                "min_coverage": 50,
+            }
+        ]
+        hits = [{"gene": "g1", "identity": 99.0, "coverage": 45.0}]
+        assert self._identify(monkeypatch, rules, hits)["species"] == "Unknown"
+
+    def test_lower_identity_hit_with_better_coverage_can_match(self, monkeypatch):
+        rules = [
+            {
+                "species": "X",
+                "genes": ["g1"],
+                "min_hits": 1,
+                "min_identity": 90,
+                "min_coverage": 60,
+            }
+        ]
+        hits = [
+            {"gene": "g1", "identity": 99.0, "coverage": 40.0},
+            {"gene": "g1", "identity": 95.0, "coverage": 90.0},
+        ]
+        assert self._identify(monkeypatch, rules, hits)["species"] == "X"
+
+
+class TestGeneAlsoExcluded:
+    def test_gene_in_both_lists_is_ignored(self, monkeypatch):
+        monkeypatch.setattr(
+            mg,
+            "_load_rules",
+            lambda: [
+                {
+                    "species": "X",
+                    "genes": ["g1", "g2"],
+                    "exclude_genes": ["g1"],
+                    "min_hits": 1,
+                }
+            ],
+        )
+        monkeypatch.setattr(
+            mg,
+            "_blast_contigs",
+            lambda contigs, threads=4: [{"gene": "g1", "identity": 99.0, "coverage": 100.0}],
+        )
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        assert identify_multigene("x.fna").to_dict()["species"] == "Unknown"

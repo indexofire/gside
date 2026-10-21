@@ -16,6 +16,16 @@ gside species contigs.fna --mode all
 gside meta reads_R1.fq reads_R2.fq --mode all
 ```
 
+`pip install` ships the Python package and the bundled marker database, but the
+aligners (`blastn`, `skani`, `mash`, `sourmash`, `kraken2`, `bracken`, `sylph`)
+come from conda/BioConda. Either use the pixi env (`pixi install`), or point
+`GSIDE_PIXI_BIN` at a directory that contains them:
+
+```bash
+export GSIDE_PIXI_BIN=/path/to/conda/env/bin
+gside db status          # shows which tiers are ready
+```
+
 ## Species Identification (`gside species`)
 
 | Mode | Engine | Method | Database |

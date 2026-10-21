@@ -14,7 +14,6 @@ from gside.config import SPECIES_DB_DIR, which
 from gside.engine._env import require_bin, run_checked
 
 _SYLPH_HINT = "sylph not found — pixi add sylph"
-_SYLPH_DOCS_URL = "https://sylph-docs.github.io/"
 FASTA_INPUT_ERROR = "sylph requires FASTQ reads, not contigs — use --mode kraken2 for FASTA input"
 
 _FASTA_SUFFIXES = (".fna", ".fa", ".fasta")
@@ -114,7 +113,9 @@ def identify_by_sylph(
     base = Path(db_dir) if db_dir else SPECIES_DB_DIR / "D6_sylph"
     dbs = sorted(base.glob("*.syldb")) if base.is_dir() else []
     if not dbs:
-        raise RuntimeError(f"sylph database not found in {base} (download from {_SYLPH_DOCS_URL})")
+        raise RuntimeError(
+            f"sylph database not found in {base} (run: gside db setup --tier meta_sylph)"
+        )
     db_file = dbs[0]
 
     with tempfile.TemporaryDirectory(prefix="gside-sylph-") as tmp:

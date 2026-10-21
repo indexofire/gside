@@ -121,6 +121,10 @@ nested objects.
 | `methods.<mode>.strain` | str | Strain / accession detail, when the method resolved one |
 | `methods.<mode>.confidence` | str | high / medium / low |
 | `methods.<mode>.error` | str | Method execution error (only on failure) |
+| `methods.<mode>.suggested_command` | str | Fix-up command when the error is a missing database |
+| `methods.<mode>.missing_tier` | str | Tier to provision (`panel`, `mash`, `sourmash`, `meta`, `meta_sylph`) |
+| `methods.<mode>.estimated_size` | str | Approximate download size for that tier |
+| `methods.<mode>.help_url` | str | Upstream page for manual-only tiers (`meta`, `meta_sylph`) |
 | `verdict.species` | str | Final arbitrated call (canonical `Genus_species`) |
 | `verdict.display_name` | str | Same call with spaces (`Escherichia coli`) |
 | `verdict.strain` | str \| null | Strain of the winning method, if any |
@@ -188,7 +192,8 @@ for mode, entry in payload["methods"].items():
         print(f"{mode}: failed — {entry['error']}")
 ```
 
-A method that failed carries an `error` key instead of a species call, and
+A method that failed carries an `error` key instead of a species call, plus the
+structured fix-up fields above when the cause is a missing database, and
 in `all` mode the remaining methods still contribute to the verdict.
 
 ## Exit Codes

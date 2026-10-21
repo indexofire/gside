@@ -140,7 +140,7 @@ class TestSourmashShortRows:
     def test_headerless_and_short(self, fakebin, monkeypatch):
         import subprocess
 
-        stdout = "q1,ok,fileX,refX,x,0.9,y\nshort,row\n"
+        stdout = "q1,ok,fileX,refX,x,0.9,y\n\nshort,row\n"
         monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed(stdout))
         res = SourmashBackend().distance(Path("q.sig"), Path("r.sig"))
         assert [(r.reference_id, r.distance) for r in res] == [("refX", 0.1)]
