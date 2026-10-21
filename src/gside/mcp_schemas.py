@@ -32,7 +32,7 @@ def _tool_entry(
 TOOLS: list[dict[str, object]] = [
     _tool_entry(
         "species",
-        "Identify species from assembled contigs FASTA. Returns a JSON verdict with"
+        "Identify species from assemblies or FASTQ reads (R1/R2 are paired into one"
         " methods (marker/panel/mash_refseq/sourmash/gtdbtk), arbitration, and"
         " confidence.",
         dict(

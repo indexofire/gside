@@ -21,25 +21,40 @@ lists: duplicates keep the row from the higher-confidence method (sylph ANI
 ## Usage
 
 ```bash
-gside scan --meta <reads.fastq> [reads_2.fastq] [options]
+gside scan --meta <reads...> [options]
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `reads` (positional) | — | 1 file = single-end reads or contigs FASTA; 2 files = paired FASTQ |
+| `reads` (positional) | — | 1 file = one sample; 2 files = one paired sample; >2 files = auto-grouped samples (`A_R1 A_R2 B_R1 B_R2` → two) |
 | `-m`, `--mode` | `all` | `kraken2` / `sylph` / `all` |
 | `-D`, `--db-dir` | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
 | `-f`, `--format` | `json` | Output format: `json` / `tsv` / `csv` / `md` |
 | `-o`, `--output PATH` | stdout | Write the report to PATH instead of stdout |
 | `-s`, `--samples PATH` | — | Batch manifest (`sample_id<TAB>reads[<TAB>reads2]`) |
-| `-j`, `--jobs N` | `1` | Concurrent samples when using `--samples` |
+| `-j`, `--jobs N` | `1` | Concurrent samples (positional batch or `--samples`); rejected for a single positional sample |
 | `-n`, `--no-header` | off | Suppress the header row (tsv/csv/md) |
 | `-a`, `--auto-setup` | off | Install a missing database tier, then retry that method once |
 | `-t`, `--threads N` | `4` | Threads per tool invocation |
 
+## Paired-end and positional batches
+
+Two positional FASTQ files are always **one paired sample** (the historic
+contract), whether or not the names carry `_R1/_R2`. With more than two files,
+mates are grouped by name (`_R1`/`_R2`, `_1`/`_2`, `.1`/`.2`, optional `_001`):
+
+```bash
+gside scan --meta A_R1.fq A_R2.fq B_R1.fq B_R2.fq -j 2   # two samples
+```
+
+Generated sample IDs come from the file stems without the mate marker (`A`,
+`B`, deduplicated with `_2`). Loose single-end files stay separate samples.
+`-j` parallelises positional samples too; for a single sample it is rejected.
+
 ## Batch samples
 
-For multiple samples, pass a manifest instead of positional reads:
+For explicit sample IDs, or when files do not follow the mate naming
+convention, use a manifest:
 
 ```bash
 gside scan --meta --samples samples.tsv -j 4 -f tsv -o profiles.tsv
@@ -147,7 +162,10 @@ gside scan --meta contigs.fna -m kraken2
 # Single-end reads with sylph ANI profiling
 gside scan --meta reads.fastq -m sylph
 
-# Batch manifest, 4 samples at once
+# Positional batch: two paired samples, 2 jobs
+gside scan --meta A_R1.fq A_R2.fq B_R1.fq B_R2.fq -j 2 -f tsv
+
+# Batch manifest with explicit IDs, 4 samples at once
 gside scan --meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 
 # Custom database root
@@ -168,7 +186,7 @@ gside scan --meta reads.fastq -D /path/to/db
 | `sylph requires FASTQ reads` | Use `-m kraken2`, or supply reads |
 | `Kraken2 database not found ... (run: gside db setup --tier meta)` | `gside db setup --tier meta`, or add `--auto-setup` |
 | `Bracken distribution for 150bp reads not found` | Reinstall the tier; the archive must include `database150mers.kmer_distrib` |
-| `--jobs requires --samples` | Add `--samples`, or drop `-j` |
+| `--jobs requires multiple samples` | Omit `-j`, or pass several samples (positional batch or `--samples`) |
 | `duplicate sample id` | Manifest IDs must be unique |
 | `paired input must be two FASTQ files` | Do not mix FASTQ and FASTA in one sample |
 

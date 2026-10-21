@@ -138,7 +138,7 @@ gside scan <files...> [选项]
   -D, --db-dir       数据库根目录
   -f, --format       json|tsv|md|csv
   -o, --output       写入文件（行式格式流式写入）
-  -j, --jobs         并行输入数；配合 --samples 时为并行样本数
+  -j, --jobs         并行样本数（双端 mate 算一个样本）
   -t, --threads      每工具线程数
   -n, --no-header    隐藏表头行
   -a, --auto-setup   自动安装缺失数据库并重试一次

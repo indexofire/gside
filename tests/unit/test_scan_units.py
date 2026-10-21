@@ -47,7 +47,7 @@ class TestScanIsolate:
     def test_defaults_to_marker(self, monkeypatch):
         calls = _capture(monkeypatch, "_run_species")
         assert CliRunner().invoke(main, ["scan", "g.fna"]).exit_code == 0
-        assert calls["args"][0] == ["g.fna"]
+        assert calls["args"][0] == [["g.fna"]]
         assert calls["args"][1] == "marker"
 
     def test_fastq_marker_is_allowed(self, monkeypatch):
@@ -147,15 +147,16 @@ class TestScanMeta:
         assert result.exit_code == 2
         assert "paired input must be two FASTQ" in result.output
 
-    def test_three_files_require_samples(self):
+    def test_three_unpaired_files_are_three_samples(self, monkeypatch):
+        calls = _capture(monkeypatch, "_run_meta_samples")
         result = CliRunner().invoke(main, ["scan", "a.fq", "b.fq", "c.fq", "--meta"])
-        assert result.exit_code == 2
-        assert "at most 2 files" in result.output
+        assert result.exit_code == 0
+        assert [s["id"] for s in calls["args"][0]] == ["a", "b", "c"]
 
     def test_jobs_requires_samples(self):
         result = CliRunner().invoke(main, ["scan", "r.fq", "--meta", "-j", "2"])
         assert result.exit_code == 2
-        assert "--jobs requires --samples" in result.output
+        assert "--jobs requires multiple samples" in result.output
 
     def test_manifest_dispatch(self, monkeypatch, tmp_path):
         calls = _capture(monkeypatch, "_run_meta_samples")

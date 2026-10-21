@@ -45,6 +45,10 @@ gside scan reads.fq --meta -m kraken2+sylph   # 两种群落方法
 breadth = 所有 primary 比对的参考区间并集 / 基因长度（与 gapit reads 模式相同的
 聚合算法）。随后把检出基因与 38 条组合规则匹配（数据驱动，`marker_rules.yaml`）。
 
+双端 mate 会从文件名识别（`_R1`/`_R2`、`_1`/`_2`、`.1`/`.2`）并在
+一次 minimap2 中一起比对，因此每基因 breadth 是两条 mate 的并集；它们算
+**一个**样本。
+
 读段只需约 1× 基因组覆盖：150bp 读段在 1× 时对 400–1000bp 标记基因即可达到
 60–80% breadth（10× 约 99%）。不会先把读段组装成 contigs。
 
@@ -102,7 +106,7 @@ skani 对 contigs 与精选参考面板（291 基因组，30 启用物种）做�
 
 ### 输入：读段或组装
 
-组装直接比较。FASTQ 会先执行 `mash sketch -m 2 -r`（过滤单拷贝 k-mer，按 k-mer
+组装直接比较。FASTQ 会先执行 `mash sketch -m 2 -r`（同一对的两条 mate 一起 sketch）（过滤单拷贝 k-mer，按 k-mer
 含量估计基因组大小），再把读段 sketch 与参考 sketch 比较。Mash 论文报告：对
 未组装读段（含高错误率 Nanopore）可正确判定**种**，但最佳**菌株**常出错；
 官方文档建议 10×–100× 覆盖，且距离会随覆盖度/错误率升高（D ≈ 1 - ANI 是在

@@ -10,6 +10,7 @@
 | 单基因组，最快 | `gside scan contigs.fna` |
 | 单基因组，最强证据 | `gside scan contigs.fna -m all` |
 | 单菌株测序读段 | `gside scan reads.fq -m marker` |
+| 单菌株双端读段 | `gside scan S_R1.fq S_R2.fq -m marker`（一个样本） |
 | 读段宏基因组 | `gside scan R1.fq R2.fq --meta` |
 | Contigs 宏基因组 | `gside scan contigs.fna --meta -m kraken2` |
 | 组装质量（QC） | `gside validate contigs.fna -o taxonomy` |
@@ -70,6 +71,10 @@ gside scan contigs.fna -m all -j 8 -o run.tsv    # 批量 + 流式 TSV
 gside scan reads.fq -m marker                    # minimap2，约 1× 覆盖即可
 gside scan reads.fq -m marker+mash_refseq
 
+# 双端：R1/R2（以及 _1/_2、.1/.2）是**一个**样本，不是两个
+gside scan S_R1.fq S_R2.fq -m marker
+gside scan A_R1.fq A_R2.fq B_R1.fq B_R2.fq -m marker   # 两个样本
+
 # 宏基因组群落（加 --meta）
 gside scan reads_R1.fq reads_R2.fq --meta        # kraken2 + sylph
 gside scan contigs.fna --meta -m kraken2         # 宏基因组 contigs
@@ -129,14 +134,15 @@ gside scan *.fna -m marker -f csv
 gside scan contigs.fna -m marker -f md
 ```
 
-- `-j/--jobs` 并行处理单菌株输入；输出顺序等于输入顺序
-- `-o` 写入文件（行式格式随输入完成流式写入）
+- `-j/--jobs` 并行处理样本（双端 mate 算一个样本）；输出顺序等于样本顺序
+- `-o` 写入文件（行式格式随样本完成流式写入）
 - `-n/--no-header` 隐藏表头
-- 单输入 JSON 为对象，多输入为数组；`meta` 批量（见下）会额外带 `sample` 键
+- 单样本 JSON 为对象，多样本为数组；`meta` 批量（见下）会额外带 `sample` 键
 
-宏基因组批量用清单文件：
+宏基因组批量支持位置参数分组或清单：
 
 ```bash
+gside scan --meta A_R1.fq A_R2.fq B_R1.fq B_R2.fq -j 2 -f tsv   # 两个样本
 gside scan --meta --samples samples.tsv -j 4 -f tsv -o profiles.tsv
 ```
 

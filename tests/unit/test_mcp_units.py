@@ -161,6 +161,18 @@ class TestToolHandlers:
         assert payload["contigs"] == "a.fna"
         assert payload["verdict"]["species"] == "Salmonella"
 
+    def test_species_pairs_mates_into_one_sample(self, monkeypatch):
+        calls: list[object] = []
+
+        def fake(contig, mode, db_dir, threads=4):
+            calls.append(contig)
+            return _payload(str(contig))
+
+        monkeypatch.setattr(cli, "_identify_one", fake)
+        payload = json.loads(TOOL_HANDLERS["species"]({"contigs": ["S_R1.fq", "S_R2.fq"]}))
+        assert calls == [["S_R1.fq", "S_R2.fq"]]
+        assert isinstance(payload, dict)
+
     def test_species_multiple_contigs_returns_payload_list(self, monkeypatch):
         monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
         payloads = json.loads(TOOL_HANDLERS["species"]({"contigs": ["a.fna", "b.fna"]}))

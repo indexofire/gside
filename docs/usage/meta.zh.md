@@ -19,25 +19,38 @@
 ## 用法
 
 ```bash
-gside scan --meta <reads.fastq> [reads_2.fastq] [选项]
+gside scan --meta <reads...> [选项]
 ```
 
 | 选项 | 默认 | 说明 |
 |---|---|---|
-| `reads`（位置参数） | 无 | 1 个文件 = 单端读段或 contigs FASTA；2 个文件 = 双端 FASTQ |
+| `reads`（位置参数） | 无 | 1 个文件 = 一个样本；2 个文件 = 一个双端样本；>2 个文件按 mate 名自动分组（`A_R1 A_R2 B_R1 B_R2` → 两个样本） |
 | `-m`，`--mode` | `all` | `kraken2` / `sylph` / `all` |
 | `-D`，`--db-dir` | 自动 | 数据库根目录（`$GSIDE_DB_DIR` 或 `data/db`） |
 | `-f`，`--format` | `json` | 输出格式：`json` / `tsv` / `csv` / `md` |
 | `-o`，`--output PATH` | stdout | 报告写入 PATH 而非 stdout |
 | `-s`，`--samples PATH` | — | 批量清单（`sample_id<TAB>reads[<TAB>reads2]`） |
-| `-j`，`--jobs N` | `1` | 使用 `--samples` 时的并发样本数 |
+| `-j`，`--jobs N` | `1` | 并发样本数（位置参数批量或 `--samples`）；单个位置参数样本时拒绝 |
 | `-n`，`--no-header` | 关 | 隐藏表头行（tsv/csv/md） |
 | `-a`，`--auto-setup` | 关 | 自动安装缺失档位并重试该方法一次 |
 | `-t`，`--threads N` | `4` | 每次工具调用的线程数 |
 
+## 双端与位置参数批量
+
+两个位置参数 FASTQ 始终视为**一个双端样本**（沿用既有约定），文件名是否带
+`_R1/_R2` 都一样。超过两个文件时按名称配对（`_R1`/`_R2`、`_1`/`_2`、
+`.1`/`.2`，可带 `_001`）：
+
+```bash
+gside scan --meta A_R1.fq A_R2.fq B_R1.fq B_R2.fq -j 2   # 两个样本
+```
+
+生成的样本 ID 取文件名去掉 mate 标记（`A`、`B`，重名时加 `_2`）；未配对的
+单端文件各自成样本。`-j` 同样并行位置参数样本；单个样本时拒绝。
+
 ## 批量样本
 
-多样本时改用清单文件而不是位置参数：
+需要显式样本 ID，或文件不符合 mate 命名约定时，使用清单：
 
 ```bash
 gside scan --meta --samples samples.tsv -j 4 -f tsv -o profiles.tsv
@@ -136,7 +149,10 @@ gside scan --meta contigs.fna -m kraken2
 # 单端读段，sylph ANI
 gside scan --meta reads.fastq -m sylph
 
-# 批量清单，一次 4 个样本
+# 位置参数批量：两个双端样本，2 并发
+gside scan --meta A_R1.fq A_R2.fq B_R1.fq B_R2.fq -j 2 -f tsv
+
+# 显式 ID 的批量清单，一次 4 个样本
 gside scan --meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 
 # 自定义数据库根目录
@@ -157,7 +173,7 @@ gside scan --meta reads.fastq -D /path/to/db
 | `sylph requires FASTQ reads` | 改用 `-m kraken2`，或提供读段 |
 | `Kraken2 database not found ... (run: gside db setup --tier meta)` | 执行 `gside db setup --tier meta`，或加 `--auto-setup` |
 | `Bracken distribution for 150bp reads not found` | 重装该 tier；归档必须含 `database150mers.kmer_distrib` |
-| `--jobs requires --samples` | 加 `--samples`，或去掉 `-j` |
+| `--jobs requires multiple samples` | 去掉 `-j`，或传入多个样本（位置参数批量或 `--samples`） |
 | `duplicate sample id` | 清单中的样本 ID 必须唯一 |
 | `paired input must be two FASTQ files` | 同一个样本不要混用 FASTQ 与 FASTA |
 

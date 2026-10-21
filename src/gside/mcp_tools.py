@@ -86,7 +86,11 @@ def _tool_species(arguments: dict[str, Any]) -> str:
     threads = _threads(arguments)
     from gside import cli
 
-    payloads = [cli._identify_one(contig, mode, db_dir, threads=threads) for contig in contigs]
+    samples = cli._group_read_samples(contigs)
+    payloads = [
+        cli._identify_one(sample[0] if len(sample) == 1 else sample, mode, db_dir, threads=threads)
+        for sample in samples
+    ]
     report: Any = payloads[0] if len(payloads) == 1 else payloads
     return json.dumps(report, ensure_ascii=False, indent=2)
 

@@ -7,7 +7,7 @@ alignment-length-weighted mean of ``nmatch / alen`` from the PAF rows. The
 multigene rule engine then runs unchanged, so a species needs the same
 per-gene identity/breadth as it would from an assembly.
 
-Preset: short reads (mean < 300 bp) use ``-x sr``; longer reads use
+Preset: short reads (mean < 300 bp, averaged over mates) use ``-x sr``; longer reads use
 ``-x map-ont``. ``--secondary=no`` keeps only the primary alignment of each
 read; identity/breadth thresholds live in the rule engine, not here.
 """
@@ -15,6 +15,7 @@ read; identity/breadth thresholds live in the rule engine, not here.
 from __future__ import annotations
 
 import gzip
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -133,17 +134,24 @@ def _aggregate(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def screen_reads(
-    reads: str | Path,
+    reads: str | Path | Sequence[str | Path],
     markers_fasta: str | Path,
     threads: int = 4,
 ) -> list[dict[str, Any]]:
-    """Map one FASTQ file to the marker FASTA and aggregate per-gene hits."""
+    """Map one FASTQ file (or both mates) to the marker FASTA.
+
+    Paired mates are processed in one minimap2 invocation, so per-gene
+    breadth is the union of intervals from both files.
+    """
+    files = [reads] if isinstance(reads, (str, Path)) else list(reads)
     minimap2 = require_bin(
         "minimap2",
         hint="minimap2 not found — install via pixi (conda) or point GSIDE_PIXI_BIN at a bin dir",
         resolver=which,
     )
-    preset = "sr" if mean_read_length(reads) < _SHORT_READ_CUTOFF else "map-ont"
+    lengths = [mean_read_length(f) for f in files] or [0.0]
+    mean = sum(lengths) / len(lengths)
+    preset = "sr" if mean < _SHORT_READ_CUTOFF else "map-ont"
     cmd = [
         minimap2,
         "-x",
@@ -152,7 +160,7 @@ def screen_reads(
         str(threads),
         "--secondary=no",
         str(markers_fasta),
-        str(reads),
+        *[str(f) for f in files],
     ]
     proc = run_checked(cmd, timeout=3600, name="minimap2 marker screening failed")
     rows = [row for line in proc.stdout.splitlines() if (row := _parse_paf_line(line))]

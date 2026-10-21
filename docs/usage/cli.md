@@ -37,6 +37,16 @@ mismatch exits 2 and names the offending mode. `--meta` likewise rejects
 isolate modes, and isolate mode rejects `kraken2`/`sylph`. Because `all`
 includes sylph, `--meta -m all` needs FASTQ; use `-m kraken2` for contigs.
 
+**Paired-end FASTQ is one sample.** Positional files whose names carry a mate
+marker (`_R1`/`_R2`, `_1`/`_2`, `.1`/`.2`, `-1`/`-2`, optional `_001`,
+case-insensitive, `.gz` allowed) are grouped: both mates go to `marker`
+(one minimap2 run), `mash_refseq` and `sourmash` (one sketch each), and the
+payload reports the first mate as `contigs`. Unmatched files stay separate
+samples, so `gside scan A_R1.fq A_R2.fq B_R1.fq B_R2.fq -m marker` is **two**
+samples, not four. FASTA files are never paired. In `--meta` mode exactly two
+positional files are always one sample; with more files the same mate grouping
+applies.
+
 ### Reading the verdict
 
 ```json
@@ -68,13 +78,13 @@ includes sylph, `--meta -m all` needs FASTQ; use `-m kraken2` for contigs.
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `files` | positional | — | One or more FASTA/FASTQ files (isolate: a batch; `--meta`: one sample of 1-2 files) |
+| `files` | positional | — | One or more FASTA/FASTQ files; FASTQ mates are auto-grouped (`_R1/_R2`, `_1/_2`, `.1/.2`); unmatched files are separate samples (`--meta`: 2 files = one sample) |
 | `-m`, `--mode` | option | `marker` / `all` | Method (defaults to `marker`, or `all` with `--meta`) |
 | `--meta` | flag | off | Treat the input as a metagenomic community |
 | `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
 | `-f`, `--format` | option | `json` | `json` / `tsv` / `md` / `csv` |
 | `-o`, `--output PATH` | option | stdout | Write the report to PATH (row formats stream as inputs complete; json once at the end) |
-| `-j`, `--jobs N` | option | `1` | Concurrent isolate inputs, or manifest samples with `--meta --samples` |
+| `-j`, `--jobs N` | option | `1` | Concurrent samples (isolate batch, positional `--meta` batch, or `--samples`) |
 | `-t`, `--threads N` | option | `4` | Threads per tool invocation |
 | `-n`, `--no-header` | option | off | Suppress the header row (tsv/csv/md) |
 | `-a`, `--auto-setup` | option | off | Install a missing database tier, then retry that method once |
@@ -88,6 +98,10 @@ gside scan contigs.fna                      # marker
 gside scan contigs.fna -m panel -f csv
 gside scan contigs.fna -m marker+sourmash
 gside scan *.fna -m marker -j 8 -o results.tsv
+
+# Isolate reads: mates are auto-grouped into ONE sample
+gside scan sample_R1.fq sample_R2.fq -m marker
+gside scan A_R1.fq A_R2.fq B_R1.fq B_R2.fq -m marker     # two samples
 
 # Long-read isolate data (marker treats reads as sequences)
 gside scan ont_reads.fastq -m marker

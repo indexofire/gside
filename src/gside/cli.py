@@ -7,6 +7,7 @@ import csv
 import io
 import json
 import logging
+import re
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -147,6 +148,85 @@ def _input_kind(path: str) -> str:
     return "unknown"
 
 
+_MATE_RE = re.compile(r"^(.*?)[._-](?:R)?([12])(?:_001)?$", re.IGNORECASE)
+
+
+def _mate_key(path: str) -> tuple[str, int] | None:
+    """`S_R1.fq.gz` → ("S", 1); None when the name has no mate marker."""
+    name = Path(path).name
+    for suffix in (".gz", ".bz2"):
+        if name.lower().endswith(suffix):
+            name = name[: -len(suffix)]
+    for suffix in (".fastq", ".fq"):
+        if name.lower().endswith(suffix):
+            name = name[: -len(suffix)]
+            break
+    match = _MATE_RE.match(name)
+    if not match:
+        return None
+    return match.group(1), int(match.group(2))
+
+
+def _group_read_samples(files: list[str]) -> list[list[str]]:
+    """Group FASTQ mates (`_R1/_R2`, `_1/_2`, `.1/.2`) into one sample.
+
+    Order follows the first occurrence of each sample; mate 1 precedes mate 2
+    in the produced pair. Files without a mate marker, FASTA files and
+    unmatched mates each become their own single-file sample.
+    """
+    keyed = [(_mate_key(f) if _input_kind(f) == "fastq" else None, f) for f in files]
+    bases: dict[str, dict[int, str]] = {}
+    for key, path in keyed:
+        if key:
+            bases.setdefault(key[0].lower(), {})[key[1]] = path
+
+    samples: list[list[str]] = []
+    emitted: set[str] = set()
+    for key, path in keyed:
+        if key is None:
+            samples.append([path])
+            continue
+        base = key[0].lower()
+        if base in emitted:
+            continue
+        mates = bases[base]
+        if 1 in mates and 2 in mates:
+            samples.append([mates[1], mates[2]])
+        else:
+            samples.append([mates[1] if 1 in mates else mates[2]])
+        emitted.add(base)
+    return samples
+
+
+def _group_meta_samples(paths: list[str]) -> list[list[str]]:
+    """Group positional ``--meta`` inputs.
+
+    Exactly two files are one sample (the historic positional pairing
+    contract, so ``a.fq b.fq`` stays paired). More than two files are grouped
+    by mate marker, so ``A_R1 A_R2 B_R1 B_R2`` becomes two samples while
+    loose single-end files stay separate.
+    """
+    if len(paths) == 2:
+        return [paths]
+    return _group_read_samples(paths)
+
+
+def _sample_id(files: list[str]) -> str:
+    """Stable sample id for positional `--meta` batches (`A_R1.fq` → `A`)."""
+    first = Path(files[0]).name
+    key = _mate_key(files[0])
+    if key:
+        return key[0]
+    for suffix in (".gz", ".bz2"):
+        if first.lower().endswith(suffix):
+            first = first[: -len(suffix)]
+    for suffix in (".fastq", ".fq", ".fna", ".fa", ".fasta"):
+        if first.lower().endswith(suffix):
+            first = first[: -len(suffix)]
+            break
+    return first
+
+
 def _supported_inputs(mode: str, meta: bool) -> frozenset[str]:
     return _META_MODE_INPUTS[mode] if meta else _MODE_INPUTS[mode]
 
@@ -237,10 +317,12 @@ def _scan_dispatch(
             raise click.UsageError("--samples is only available with --meta")
         if not paths:
             raise click.UsageError("missing input: pass one or more FASTA/FASTQ files")
-        _validate_scan(paths, resolved, meta=False)
+        grouped = _group_read_samples(paths)
+        for sample in grouped:
+            _validate_scan(sample, resolved, meta=False)
         sys.exit(
             _run_species(
-                paths,
+                grouped,
                 resolved,
                 db_dir,
                 output_format,
@@ -256,11 +338,6 @@ def _scan_dispatch(
         raise click.UsageError("pass either FILES or --samples, not both")
     if not samples and not paths:
         raise click.UsageError("missing input: pass reads, contigs, or --samples")
-    if not samples and len(paths) > 2:
-        raise click.UsageError("at most 2 files per sample; use --samples for batches")
-    if not samples and jobs != 1:
-        raise click.UsageError("--jobs requires --samples in --meta mode")
-
     if samples:
         try:
             manifest = _read_samples(samples)
@@ -282,15 +359,44 @@ def _scan_dispatch(
             )
         )
 
-    _validate_scan(paths, resolved, meta=True)
+    grouped = _group_meta_samples(paths)
+    for sample in grouped:
+        _validate_scan(sample, resolved, meta=True)
+    if len(grouped) == 1:
+        if jobs != 1:
+            raise click.UsageError("--jobs requires multiple samples in --meta mode")
+        sys.exit(
+            _run_meta(
+                grouped[0],
+                resolved,
+                db_dir,
+                output_format=output_format,
+                output=output,
+                threads=threads,
+                no_header=no_header,
+                auto_setup=auto_setup,
+            )
+        )
+
+    manifest: list[dict[str, Any]] = []
+    used: set[str] = set()
+    for sample in grouped:
+        base = _sample_id(sample)
+        sample_id, n = base, 2
+        while sample_id in used:
+            sample_id = f"{base}_{n}"
+            n += 1
+        used.add(sample_id)
+        manifest.append({"id": sample_id, "files": sample})
     sys.exit(
-        _run_meta(
-            paths,
+        _run_meta_samples(
+            manifest,
             resolved,
             db_dir,
             output_format=output_format,
             output=output,
             threads=threads,
+            jobs=jobs,
             no_header=no_header,
             auto_setup=auto_setup,
         )
@@ -636,7 +742,7 @@ def _write_json_document(payload: Any, output: str | None) -> int:
 
 
 def _run_species(
-    contigs_list: list[str],
+    contigs_list: list[str] | list[list[str]],
     mode: str,
     db_dir: str | None,
     output_format: str = "json",
@@ -649,10 +755,13 @@ def _run_species(
 ) -> int:
     from gside.progress import species_progress
 
-    def identify(contigs: str) -> dict[str, Any]:
-        payload = _identify_one(contigs, mode, db_dir, threads)
+    samples = [list(item) if isinstance(item, (list, tuple)) else [item] for item in contigs_list]
+
+    def identify(sample: list[str]) -> dict[str, Any]:
+        target: str | list[str] = sample[0] if len(sample) == 1 else sample
+        payload = _identify_one(target, mode, db_dir, threads)
         if auto_setup:
-            payload = _auto_setup_retry(contigs, payload, mode, db_dir, threads)
+            payload = _auto_setup_retry(target, payload, mode, db_dir, threads)
         return payload
 
     if jobs > 1:
@@ -660,21 +769,22 @@ def _run_species(
 
         with (
             ThreadPoolExecutor(max_workers=jobs) as pool,
-            species_progress(
-                contigs_list, quiet=quiet, description=f"Identifying ({jobs} jobs)"
-            ) as (bar, _tid),
+            species_progress(samples, quiet=quiet, description=f"Identifying ({jobs} jobs)") as (
+                bar,
+                _tid,
+            ),
         ):
             return _emit_species(
-                _tracked(pool.map(identify, contigs_list), bar),
-                len(contigs_list),
+                _tracked(pool.map(identify, samples), bar),
+                len(samples),
                 output_format,
                 output,
                 no_header,
             )
-    with species_progress(contigs_list, quiet=quiet) as (bar, _tid):
+    with species_progress(samples, quiet=quiet) as (bar, _tid):
         return _emit_species(
-            _tracked(map(identify, contigs_list), bar),
-            len(contigs_list),
+            _tracked(map(identify, samples), bar),
+            len(samples),
             output_format,
             output,
             no_header,
@@ -837,7 +947,7 @@ def _setup_missing_tier(tier: str) -> None:
 
 
 def _auto_setup_retry(
-    contigs: str,
+    contigs: str | list[str],
     payload: dict[str, Any],
     mode: str,
     db_dir: str | None,
@@ -923,7 +1033,12 @@ def _verdict_for(results: dict[str, Any]) -> dict[str, Any]:
     return _verdict_payload(species, conf, res.get("strain"), list(results), [], "1/1")
 
 
-def _identify_one(contigs: str, mode: str, db_dir: str | None, threads: int = 4) -> dict[str, Any]:
+def _identify_one(
+    contigs: str | list[str], mode: str, db_dir: str | None, threads: int = 4
+) -> dict[str, Any]:
+    files = list(contigs) if isinstance(contigs, (list, tuple)) else [contigs]
+    primary = files[0]
+    reads: str | list[str] = files if len(files) > 1 else primary
     results: dict[str, Any] = {}
 
     modes = _expand_modes(mode, meta=False)
@@ -935,23 +1050,23 @@ def _identify_one(contigs: str, mode: str, db_dir: str | None, threads: int = 4)
             if m == "marker":
                 from gside.analysis.multigene_identifier import identify_multigene
 
-                results[m] = identify_multigene(contigs, threads=threads).to_dict()
+                results[m] = identify_multigene(reads, threads=threads).to_dict()
             elif m in ("panel", "mash_refseq"):
                 from gside.analysis.ani_identifier import identify_by_ani
 
                 results[m] = identify_by_ani(
-                    contigs, mode=m, db_dir=db_dir, threads=threads
+                    reads, mode=m, db_dir=db_dir, threads=threads
                 ).to_dict()
             elif m == "sourmash":
                 from gside.analysis.sourmash_identifier import (
                     identify_by_sourmash as identify_sourmash,
                 )
 
-                results[m] = identify_sourmash(contigs, db_dir=db_dir).to_dict()
+                results[m] = identify_sourmash(reads, db_dir=db_dir).to_dict()
             elif m == "gtdbtk":
                 from gside.analysis.gtdbtk_identifier import identify_by_gtdbtk
 
-                results[m] = identify_by_gtdbtk(contigs, threads=threads).to_dict()
+                results[m] = identify_by_gtdbtk(primary, threads=threads).to_dict()
         except Exception as e:  # noqa: BLE001 — CLI 边界：单法失败不终止其他方法
             entry = {"method": m, "error": str(e)[:300]}
             entry.update(_structured_missing_db_fields(entry["error"]))
@@ -963,7 +1078,7 @@ def _identify_one(contigs: str, mode: str, db_dir: str | None, threads: int = 4)
         "analysis_type": "species_identification",
         "tool": "gside",
         "version": __version__,
-        "contigs": contigs,
+        "contigs": primary,
         "methods": results,
         "verdict": verdict,
     }

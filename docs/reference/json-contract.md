@@ -95,14 +95,17 @@ findings under a `result` object, as the `all` example below shows.
 }
 ```
 
-## Multiple Input Files
+## Multiple Inputs (Samples)
 
-`gside scan` accepts several contigs files in one run. The top-level JSON
-shape depends on how many:
+`gside scan` accepts several inputs in one run. FASTQ mates (`_R1`/`_R2`,
+`_1`/`_2`, `.1`/`.2`) are grouped into **one sample**; unmatched files are
+separate samples. The top-level JSON shape depends on the sample count:
 
-- **1 file**: a single JSON object, as in the examples above
-- **2+ files**: a JSON **array** of those objects, one per input file, in
-  input order
+- **1 sample**: a single JSON object, as in the examples above
+- **2+ samples**: a JSON **array** of those objects, one per sample, in input
+  order
+
+For a paired sample, `contigs` is the first mate (both were analyzed).
 
 The `--format tsv` and `--format md` options are alternatives to the default
 `json`: they render one row per input file (TSV or Markdown table) instead of
@@ -115,6 +118,7 @@ nested objects.
 | `analysis_type` | str | Always `species_identification` |
 | `tool` | str | Always `gside` |
 | `version` | str | gside version |
+| `contigs` | str | Input path; for paired FASTQ, the first mate |
 | `methods` | dict | Results per method (key = mode name) |
 | `methods.<mode>.species` | str | Canonical `Genus_species` call for this method |
 | `methods.<mode>.species_raw` | str | Original tool label, present only when it differs from `species` |

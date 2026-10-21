@@ -34,6 +34,14 @@ gside scan --meta --samples samples.tsv [选项]
 单菌株模式，单菌株模式也拒绝 `kraken2`/`sylph`。由于 `all` 含 sylph，
 `--meta -m all` 需要 FASTQ；contigs 请用 `-m kraken2`。
 
+**双端 FASTQ 算一个样本。** 位置参数中带配对标记的文件（`_R1`/`_R2`、
+`_1`/`_2`、`.1`/`.2`、`-1`/`-2`，可带 `_001`，大小写不敏感，支持 `.gz`）会
+自动合并：两条 mate 一起送入 `marker`（一次 minimap2）、`mash_refseq` 与
+`sourmash`（各一次 sketch），输出中的 `contigs` 取第一条 mate。未配对的文件
+各自成样本，因此 `gside scan A_R1.fq A_R2.fq B_R1.fq B_R2.fq -m marker`
+是 **2** 个样本而不是 4 个。FASTA 永不配对。`--meta` 下两个位置参数文件始终
+视为一个样本；文件更多时同样按 mate 名分组。
+
 ### 解读 verdict
 
 ```json
@@ -64,7 +72,7 @@ gside scan --meta --samples samples.tsv [选项]
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| `files` | 位置参数 | — | 一个或多个 FASTA/FASTQ（单菌株：批量；`--meta`：单个样本 1–2 个文件） |
+| `files` | 位置参数 | — | 一个或多个 FASTA/FASTQ；FASTQ 的 mate 自动合并（`_R1/_R2`、`_1/_2`、`.1/.2`）；未配对文件各自成样本（`--meta` 下 2 个文件 = 一个样本） |
 | `-m`，`--mode` | 选项 | `marker` / `all` | 方法（默认 `marker`，`--meta` 时默认 `all`） |
 | `--meta` | 开关 | 关 | 输入视为宏基因组群落 |
 | `-D`，`--db-dir` | 选项 | 自动 | 数据库根目录 |

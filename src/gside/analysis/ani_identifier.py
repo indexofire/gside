@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -61,7 +62,9 @@ def _mash_dist(query: str | Path, msh: Path, threads: int = 4) -> list[tuple[str
     return [(r.reference_id, 1.0 - r.distance) for r in results]
 
 
-def _mash_dist_reads(reads: str | Path, msh: Path, threads: int = 4) -> list[tuple[str, float]]:
+def _mash_dist_reads(
+    reads: str | Path | Sequence[str | Path], msh: Path, threads: int = 4
+) -> list[tuple[str, float]]:
     """Sketch FASTQ reads (error-filtered) and compare against the mash DB.
 
     ``-m 2`` drops single-copy k-mers (sequencing errors) and ``-r`` estimates
@@ -78,10 +81,11 @@ def _mash_dist_reads(reads: str | Path, msh: Path, threads: int = 4) -> list[tup
         hint="mash not found — install via pixi (conda) or point GSIDE_PIXI_BIN at a bin dir",
         resolver=which,
     )
+    files = [reads] if isinstance(reads, (str, Path)) else list(reads)
     with tempfile.TemporaryDirectory(prefix="gside-mash-") as tmp:
         sketch = Path(tmp) / "reads.msh"
         run_checked(
-            [mash, "sketch", "-m", "2", "-r", "-o", str(sketch), str(reads)],
+            [mash, "sketch", "-m", "2", "-r", "-o", str(sketch), *[str(f) for f in files]],
             timeout=3600,
             name="mash sketch failed",
         )
@@ -118,7 +122,7 @@ def _db_version(db_dir: Path, name: str) -> str:
 
 def _mash_result(
     base: Path,
-    contigs: str | Path,
+    contigs: str | Path | Sequence[str | Path],
     taxa: dict[str, str],
     threads: int,
 ) -> dict[str, Any]:
@@ -129,10 +133,11 @@ def _mash_result(
     if not msh.exists():
         raise RuntimeError(f"mash sketch DB not found in {base} (run: gside db setup --tier mash)")
 
-    if is_fastq(contigs):
-        mash_rows = _mash_dist_reads(contigs, msh, threads)
+    files = [contigs] if isinstance(contigs, (str, Path)) else list(contigs)
+    if is_fastq(files[0]):
+        mash_rows = _mash_dist_reads(files, msh, threads)
     else:
-        mash_rows = _mash_dist(contigs, msh, threads)
+        mash_rows = _mash_dist(files[0], msh, threads)
     mash_top = sorted(mash_rows, key=lambda r: -r[1])[:_TOP_N]
     best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)
     raw_species = taxa.get(best_ref, _mash_species(best_ref)) if best_ref else "Unknown"
@@ -150,14 +155,15 @@ def _mash_result(
 
 def _panel_result(
     base: Path,
-    contigs: str | Path,
+    contigs: str | Path | Sequence[str | Path],
     taxa: dict[str, str],
     threads: int,
 ) -> dict[str, Any]:
     """panel: skani ANI against the curated reference panel."""
+    query = contigs if isinstance(contigs, (str, Path)) else contigs[0]
     skani_db = base / "panel.sketch" if (base / "panel.sketch").exists() else base
     skani_hits = sorted(
-        _skani_search(contigs, skani_db, threads), key=lambda h: (-h.ani, -h.aligned_fraction)
+        _skani_search(query, skani_db, threads), key=lambda h: (-h.ani, -h.aligned_fraction)
     )
     top = skani_hits[:_TOP_N]
     best = top[0] if top else None
@@ -187,7 +193,7 @@ def _panel_result(
 
 
 def identify_by_ani(
-    contigs: str | Path,
+    contigs: str | Path | Sequence[str | Path],
     mode: str,
     db_dir: str | Path | None = None,
     threads: int = 4,

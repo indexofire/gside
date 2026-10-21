@@ -6,6 +6,7 @@ import csv
 import json
 import subprocess
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -56,7 +57,9 @@ def _run(cmd: list[str]) -> str:
     return result.stdout
 
 
-def _gather_and_tax(contigs: str | Path, db_dir: Path) -> list[dict[str, Any]]:
+def _gather_and_tax(
+    contigs: str | Path | Sequence[str | Path], db_dir: Path
+) -> list[dict[str, Any]]:
     db_zip = db_dir / "gtdb-reps-k31.zip"
     lineages = db_dir / "lineages.csv"
     if not db_zip.exists() or not lineages.exists():
@@ -67,7 +70,19 @@ def _gather_and_tax(contigs: str | Path, db_dir: Path) -> list[dict[str, Any]]:
         work = Path(tmp)
         sig = work / "query.sig"
         gather_csv = work / "gather.csv"
-        _run(["sourmash", "sketch", "dna", "-p", "k=31,scaled=1000", str(contigs), "-o", str(sig)])
+        files = [contigs] if isinstance(contigs, (str, Path)) else list(contigs)
+        _run(
+            [
+                "sourmash",
+                "sketch",
+                "dna",
+                "-p",
+                "k=31,scaled=1000",
+                *[str(f) for f in files],
+                "-o",
+                str(sig),
+            ]
+        )
         try:
             _run(["sourmash", "gather", str(sig), str(db_zip), "-o", str(gather_csv)])
         except RuntimeError:
@@ -119,7 +134,9 @@ def _db_version(db_dir: Path) -> str:
     return "RS226"
 
 
-def identify_by_sourmash(contigs: str | Path, db_dir: str | Path | None = None) -> SourmashIdResult:
+def identify_by_sourmash(
+    contigs: str | Path | Sequence[str | Path], db_dir: str | Path | None = None
+) -> SourmashIdResult:
     base = Path(db_dir) if db_dir else SPECIES_DB_DIR / "D4_sourmash"
     partition = _gather_and_tax(contigs, base)
     database = {"name": "D4_sourmash", "version": _db_version(base)}

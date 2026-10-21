@@ -855,10 +855,10 @@ class TestSampleManifest:
         assert lines[1] == "A\tsylph\tEscherichia_coli\t0.5\thigh\t99.0"
         assert lines[2].startswith("B\tsylph\t")
 
-    def test_jobs_without_samples_is_a_usage_error(self):
+    def test_jobs_with_one_sample_is_a_usage_error(self):
         result = CliRunner().invoke(main, ["meta", "r.fq", "-j", "2"])
         assert result.exit_code == 2
-        assert "--jobs requires --samples" in result.output
+        assert "--jobs requires multiple samples" in result.output
 
     def test_reads_and_samples_are_exclusive(self, tmp_path):
         path = tmp_path / "s.tsv"

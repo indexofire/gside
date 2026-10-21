@@ -208,11 +208,14 @@ def _pick_rule(
     return best_species, best_conf, best_rule
 
 
-def identify_multigene(contigs_fasta: str, threads: int = 4) -> MultiGeneResult:
-    if is_fastq(contigs_fasta):
-        raw_hits = screen_reads(contigs_fasta, _MARKERS_FASTA, threads)
+def identify_multigene(contigs_fasta: str | list[str], threads: int = 4) -> MultiGeneResult:
+    """Identify from an assembly or one/more FASTQ files (mates combined)."""
+    files = [contigs_fasta] if isinstance(contigs_fasta, str) else list(contigs_fasta)
+    if is_fastq(files[0]):
+        reads: str | list[str] = files[0] if len(files) == 1 else files
+        raw_hits = screen_reads(reads, _MARKERS_FASTA, threads)
     else:
-        raw_hits = _blast_contigs(contigs_fasta, threads)
+        raw_hits = _blast_contigs(files[0], threads)
     rules = _load_rules()
     significant = _best_per_gene(raw_hits, _MIN_IDENTITY, _MIN_COVERAGE)
 

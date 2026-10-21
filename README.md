@@ -66,8 +66,9 @@ gside scan contigs.fna
 gside scan contigs.fna -m marker+sourmash
 gside scan contigs.fna -m all --auto-setup
 
-# Isolate sequencing reads
+# Isolate sequencing reads (R1/R2 are one sample)
 gside scan reads.fq -m marker
+gside scan sample_R1.fq sample_R2.fq -m marker
 
 # Metagenomic community
 gside scan reads_R1.fq reads_R2.fq --meta
@@ -156,7 +157,7 @@ gside scan <files...> [options]
   -D, --db-dir       Database root
   -f, --format       json|tsv|md|csv
   -o, --output       Write to file (row formats stream)
-  -j, --jobs         Parallel inputs, or manifest samples with --samples
+  -j, --jobs         Parallel samples (paired mates count as one)
   -t, --threads      Threads per tool
   -n, --no-header    Suppress the header row
   -a, --auto-setup   Install missing databases, retry once

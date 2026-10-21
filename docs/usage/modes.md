@@ -50,6 +50,10 @@ length (the same aggregate-breadth recipe as gapit's reads mode). Detected
 genes are then matched against the 38 combination rules
 (data-driven, `marker_rules.yaml`).
 
+Paired-end mates are detected from the file names (`_R1`/`_R2`, `_1`/`_2`,
+`.1`/`.2`) and mapped in one minimap2 run, so per-gene breadth is the union of
+both mates; they count as **one** sample.
+
 Reads only need ~1x genome coverage: 150 bp reads at 1x already reach
 60-80% breadth for 400-1000 bp marker genes (10x reaches ~99%). Marker
 genes are not assembled first, so a read set is never turned into contigs.
@@ -113,7 +117,7 @@ reference panel (291 genomes, 30 enabled pathogen species).
 ### Inputs: reads or assemblies
 
 Assemblies are compared directly. For FASTQ, gside runs
-`mash sketch -m 2 -r` first (drop single-copy k-mers, estimate genome size
+`mash sketch -m 2 -r` first (both mates of a pair in one sketch) (drop single-copy k-mers, estimate genome size
 from k-mer content) and compares that read sketch to the reference sketch.
 The Mash paper reports correct **species** calls from unassembled reads
 (including noisy Nanopore), but the best-hit **strain** was often wrong;

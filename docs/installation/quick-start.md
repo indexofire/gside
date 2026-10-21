@@ -11,6 +11,7 @@ seconds; optional tiers add ANI/sketch/read-based methods.
 | One genome, fastest | `gside scan contigs.fna` |
 | One genome, best evidence | `gside scan contigs.fna -m all` |
 | Isolate sequencing reads | `gside scan reads.fq -m marker` |
+| Isolate paired-end reads | `gside scan S_R1.fq S_R2.fq -m marker` (one sample) |
 | Community from reads | `gside scan R1.fq R2.fq --meta` |
 | Community from contigs | `gside scan contigs.fna --meta -m kraken2` |
 | Assembly quality (QC) | `gside validate contigs.fna -o taxonomy` |
@@ -75,6 +76,10 @@ gside scan contigs.fna -m all -j 8 -o run.tsv    # batch + streaming TSV
 gside scan reads.fq -m marker                    # minimap2, ~1x coverage is enough
 gside scan reads.fq -m marker+mash_refseq
 
+# Paired-end: R1/R2 (and _1/_2, .1/.2) are ONE sample, not two
+gside scan S_R1.fq S_R2.fq -m marker
+gside scan A_R1.fq A_R2.fq B_R1.fq B_R2.fq -m marker   # two samples
+
 # Metagenomic community (add --meta)
 gside scan reads_R1.fq reads_R2.fq --meta        # kraken2 + sylph
 gside scan contigs.fna --meta -m kraken2         # metagenomic contigs
@@ -137,15 +142,17 @@ gside scan *.fna -m marker -f csv
 gside scan contigs.fna -m marker -f md
 ```
 
-- `-j/--jobs` parallelizes isolate inputs; output order is input order.
-- `-o` writes the report to a file (row formats stream per input).
+- `-j/--jobs` parallelizes samples (paired mates count as one sample); output
+  order is sample order.
+- `-o` writes the report to a file (row formats stream per sample).
 - `-n/--no-header` suppresses the header row.
-- JSON is a single object for one input, an array for several; `meta`
+- JSON is a single object for one sample, an array for several; `meta`
   batches (below) add a `sample` key.
 
-Metagenomic batches use a manifest:
+Metagenomic batches accept positional groups or a manifest:
 
 ```bash
+gside scan --meta A_R1.fq A_R2.fq B_R1.fq B_R2.fq -j 2 -f tsv   # two samples
 gside scan --meta --samples samples.tsv -j 4 -f tsv -o profiles.tsv
 ```
 
