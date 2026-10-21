@@ -57,12 +57,16 @@ JSON（默认）——单文档：
       "total_reads": 10000, "classified_reads": 100, "n_species": 4
     }},
     "sylph": {"method": "sylph_ani", "database": {}, "result": {
-      "species": [{"name": "...", "ani": 97.53, "abundance": 78.12, "coverage": 264.0, "confidence": "high"}],
+      "species": [{"name": "Escherichia coli str. K-12", "ani": 97.53, "abundance": 0.7812, "coverage": 264.0, "confidence": "high"}],
       "n_species": 3
     }}
   },
   "verdict": {
-    "top_species": [{"name": "...", "method": "sylph", "abundance": 78.12, "confidence": "high", "ani": 97.53}],
+    "top_species": [{
+      "name": "Escherichia_coli", "display_name": "Escherichia coli",
+      "strain": "str. K-12", "species_raw": "Escherichia coli str. K-12",
+      "method": "sylph", "abundance": 0.7812, "confidence": "high", "ani": 97.53
+    }],
     "richness": 3,
     "basis": ["kraken2", "sylph"]
   }
@@ -73,8 +77,8 @@ TSV（`-f tsv`）——每个合并后物种一行（kraken2 行的 `ani` 为空
 
 ```
 method	name	abundance	confidence	ani
-sylph	Escherichia coli	78.12	high	97.53
-kraken2	Salmonella enterica	0.20	medium	
+sylph	Escherichia_coli	0.7812	high	97.53
+kraken2	Salmonella_enterica	0.20	medium	
 ```
 
 与 `gside species` 一致，`gside meta` 始终以 0 退出：某方法失败时错误

@@ -35,8 +35,12 @@ Example with `--mode marker` (marker results are flat; no `result` wrapper):
   },
   "verdict": {
     "species": "Campylobacter_jejuni",
+    "display_name": "Campylobacter jejuni",
+    "strain": null,
     "confidence": "high",
-    "basis": ["marker"]
+    "basis": ["marker"],
+    "supporting": [],
+    "agreement": "1/1"
   }
 }
 ```
@@ -61,7 +65,9 @@ findings under a `result` object, as the `all` example below shows.
         "version": "e5f6g7h8"
       },
       "result": {
-        "species": "Campylobacter jejuni subsp. jejuni NCTC 11168",
+        "species": "Campylobacter_jejuni",
+        "species_raw": "Campylobacter jejuni subsp. jejuni NCTC 11168",
+        "strain": "subsp. jejuni NCTC 11168",
         "confidence": "high",
         "ani": 100.0,
         "aligned_fraction": 95.2,
@@ -78,9 +84,13 @@ findings under a `result` object, as the `all` example below shows.
     "mash_refseq": {}
   },
   "verdict": {
-    "species": "Campylobacter jejuni subsp. jejuni NCTC 11168",
+    "species": "Campylobacter_jejuni",
+    "display_name": "Campylobacter jejuni",
+    "strain": "subsp. jejuni NCTC 11168",
     "confidence": "high",
-    "basis": ["panel"]
+    "basis": ["panel"],
+    "supporting": ["mash_refseq"],
+    "agreement": "2/2"
   }
 }
 ```
@@ -106,12 +116,45 @@ nested objects.
 | `tool` | str | Always `gside` |
 | `version` | str | gside version |
 | `methods` | dict | Results per method (key = mode name) |
-| `methods.<mode>.species` | str | Species called by this method |
+| `methods.<mode>.species` | str | Canonical `Genus_species` call for this method |
+| `methods.<mode>.species_raw` | str | Original tool label, present only when it differs from `species` |
+| `methods.<mode>.strain` | str | Strain / accession detail, when the method resolved one |
 | `methods.<mode>.confidence` | str | high / medium / low |
 | `methods.<mode>.error` | str | Method execution error (only on failure) |
-| `verdict.species` | str | Final arbitrated call |
+| `verdict.species` | str | Final arbitrated call (canonical `Genus_species`) |
+| `verdict.display_name` | str | Same call with spaces (`Escherichia coli`) |
+| `verdict.strain` | str \| null | Strain of the winning method, if any |
 | `verdict.confidence` | str | Final confidence |
-| `verdict.basis` | list[str] | Methods that contributed to the verdict |
+| `verdict.basis` | list[str] | The single method that produced the verdict |
+| `verdict.supporting` | list[str] | Other successful methods that agree on `verdict.species` |
+| `verdict.agreement` | str | `agreeing/successful`, e.g. `2/3` (exact label match) |
+
+`agreement` compares canonical labels exactly. Marker's pathotype labels
+(`DEC`, `Shigella_EIEC`) are intentionally distinct from the binomial they
+belong to, so an E. coli genome can report `DEC` from marker while panel says
+`Escherichia_coli` — `agreement` then reads `2/3` even though both point at the
+same organism. Do not "fix" that by folding DEC into `Escherichia_coli`: the
+distinction is what routes pathotype typing downstream.
+
+## Species name contract
+
+`species` is always `Genus_species` with underscores, matching the labels in
+`data/db/D1_marker/marker_rules.yaml` and the downstream bacmap registry:
+
+| Tier | Raw tool label | `species` |
+|---|---|---|
+| marker | `Streptococcus_agalactiae` | `Streptococcus_agalactiae` (unchanged) |
+| panel | `Streptococcus agalactiae 2603V/R` | `Streptococcus_agalactiae` |
+| mash_refseq | `Streptococcus_agalactiae_GCF_949788565.1` | `Streptococcus_agalactiae` |
+| sourmash | `...;s__Vibrio parahaemolyticus` | `Vibrio_parahaemolyticus` |
+| gtdbtk | `Vibrio cholerae` | `Vibrio_cholerae` |
+
+Marker registry labels that carry a serogroup/pathotype suffix
+(`Vibrio_cholerae_O1`, `Shigella_EIEC`, `DEC`, `Salmonella`) are already in
+contract form and pass through unchanged. Strain/accession text is never glued
+into `species` (a dot would break the downstream matcher); it goes to `strain`.
+Species-group placeholders (`Campylobacter sp.`) and `Unknown` are emitted as
+`Unknown`.
 
 ## ANI-Specific Fields (panel / mash_refseq)
 

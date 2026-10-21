@@ -100,7 +100,7 @@ class TestConfidence:
     def test_low_empty(self, monkeypatch, tmp_path):
         monkeypatch.setattr(sm, "_gather_and_tax", lambda c, b: [])
         r = identify_by_sourmash("q.fna", db_dir=tmp_path).result
-        assert (r["species"], r["confidence"]) == ("Mixed/Unknown", "low")
+        assert (r["species"], r["confidence"]) == ("Unknown", "low")
 
 
 class TestGatherAndTax:
@@ -180,7 +180,8 @@ class TestTempDirIntermediates:
 
         monkeypatch.setattr(sm, "_run", fake_run)
         result = identify_by_sourmash("q.fna", db_dir=tmp_path)
-        assert result.result["species"] == "s__Vp"
+        assert result.result["species"] == "Vp"
+        assert result.result["species_raw"] == "s__Vp"
         assert not (tmp_path / "query.sig").exists()
         assert not (tmp_path / "gather.csv").exists()
         assert outs, "expected sketch and gather to run"

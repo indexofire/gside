@@ -92,6 +92,11 @@ class TestSetupTiers:
         assert db_setup("panel") == {"D2_ani": "already ready"}
         assert db_setup("mash") == {"D3_mash": "already ready"}
 
+    def test_all_tier_covers_panel_and_mash(self, root):
+        _touch(root / "D2_ani" / "panel.sketch" / "sketches.db")
+        _touch(root / "D3_mash" / "mash.msh")
+        assert db_setup("all") == {"D2_ani": "already ready", "D3_mash": "already ready"}
+
 
 class TestCopyFromSource:
     def test_copy_exact_dir(self, root, tmp_path):

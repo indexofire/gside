@@ -13,12 +13,58 @@ from typing import Any, TextIO
 import click
 
 from gside import __version__
+from gside.analysis.species_name import UNKNOWN, display_name, parse_species_name
 
 HELP_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 MODES = ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk", "all"]
 META_MODES = ["kraken2", "sylph", "all"]
 TIERS = ["mini", "panel", "mash", "sourmash", "meta", "meta_sylph", "all"]
+
+
+def _db_dir_option(func: Any) -> Any:
+    """``-D/--db-dir`` — shared by every command that reads reference databases."""
+    return click.option(
+        "-D",
+        "--db-dir",
+        type=click.Path(file_okay=False),
+        default=None,
+        help="Database root (default: $GSIDE_DB_DIR or data/db).",
+    )(func)
+
+
+def _format_option(choices: list[str], help_text: str) -> Any:
+    """``-f/--format`` factory so every command spells the flag identically."""
+
+    def decorate(func: Any) -> Any:
+        return click.option(
+            "-f",
+            "--format",
+            "output_format",
+            type=click.Choice(choices),
+            default="json",
+            show_default=True,
+            help=help_text,
+        )(func)
+
+    return decorate
+
+
+def _threads_option(help_text: str) -> Any:
+    """``-t/--threads`` factory (per-tool wording differs, the bounds do not)."""
+
+    def decorate(func: Any) -> Any:
+        return click.option(
+            "-t",
+            "--threads",
+            type=click.IntRange(min=1),
+            default=4,
+            show_default=True,
+            help=help_text,
+        )(func)
+
+    return decorate
+
 
 logger = logging.getLogger(__name__)
 
@@ -72,22 +118,8 @@ def main(ctx: click.Context, version: bool, version_json: bool, verbose: bool, q
     show_default=True,
     help="Identification method (all runs every method, then arbitrates).",
 )
-@click.option(
-    "-D",
-    "--db-dir",
-    type=click.Path(file_okay=False),
-    default=None,
-    help="Database root (default: $GSIDE_DB_DIR or data/db).",
-)
-@click.option(
-    "-f",
-    "--format",
-    "output_format",
-    type=click.Choice(["json", "tsv", "md"]),
-    default="json",
-    show_default=True,
-    help="Output format (tsv/md render one row per input file).",
-)
+@_db_dir_option
+@_format_option(["json", "tsv", "md"], "Output format (tsv/md render one row per input file).")
 @click.option(
     "-o",
     "--output",
@@ -107,14 +139,7 @@ def main(ctx: click.Context, version: bool, version_json: bool, verbose: bool, q
     show_default=True,
     help="Number of input files to identify concurrently (output order is always input order).",
 )
-@click.option(
-    "-t",
-    "--threads",
-    type=click.IntRange(min=1),
-    default=4,
-    show_default=True,
-    help="Threads per aligner invocation (blastn -num_threads / skani -t / mash -p).",
-)
+@_threads_option("Threads per aligner invocation (blastn -num_threads / skani -t / mash -p).")
 @click.option(
     "-n",
     "--no-header",
@@ -271,22 +296,8 @@ def validate_cmd(contigs: str, mode: str, output_dir: str | None) -> None:
     show_default=True,
     help="Profiling method (all runs kraken2 + sylph, then merges).",
 )
-@click.option(
-    "-D",
-    "--db-dir",
-    type=click.Path(file_okay=False),
-    default=None,
-    help="Database root (default: $GSIDE_DB_DIR or data/db).",
-)
-@click.option(
-    "-f",
-    "--format",
-    "output_format",
-    type=click.Choice(["json", "tsv"]),
-    default="json",
-    show_default=True,
-    help="Output format (tsv renders one row per species).",
-)
+@_db_dir_option
+@_format_option(["json", "tsv"], "Output format (tsv renders one row per species).")
 @click.option(
     "-o",
     "--output",
@@ -298,23 +309,24 @@ def validate_cmd(contigs: str, mode: str, output_dir: str | None) -> None:
     ),
 )
 @click.option(
-    "-t",
-    "--threads",
-    type=click.IntRange(min=1),
-    default=4,
-    show_default=True,
-    help="Threads per tool invocation (kraken2 --threads / sylph sketch -t).",
+    "-n",
+    "--no-header",
+    is_flag=True,
+    default=False,
+    help="Suppress the TSV header row (tsv only; json keeps its structure).",
 )
+@_threads_option("Threads per tool invocation (kraken2 --threads / sylph sketch -t).")
 def meta_cmd(
     reads: tuple[str, ...],
     mode: str,
     db_dir: str | None,
     output_format: str,
     output: str | None,
+    no_header: bool,
     threads: int,
 ) -> None:
     """Metagenomic species profiling from FASTQ reads or assembled contigs."""
-    sys.exit(_run_meta(list(reads), mode, db_dir, output_format, output, threads))
+    sys.exit(_run_meta(list(reads), mode, db_dir, output_format, output, threads, no_header))
 
 
 # Register commands
@@ -349,6 +361,21 @@ class _OutputFileWriter:
     def close(self) -> None:
         if self._handle is not None:
             self._handle.close()
+
+
+def _write_json_document(payload: Any, output: str | None) -> int:
+    """Emit one JSON document to stdout or to the ``-o`` file (truncating)."""
+    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    if output is None:
+        print(text, end="")
+        return 0
+    writer = _OutputFileWriter(Path(output))
+    try:
+        writer(text)
+    finally:
+        writer.close()
+    print(f"Results written to {output}", file=sys.stderr)
+    return 0
 
 
 def _run_species(
@@ -413,15 +440,7 @@ def _emit_species(
     if output_format == "json":
         payloads = list(payload_source)
         report: Any = payloads[0] if n_inputs == 1 else payloads
-        text = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
-        if output is None:
-            print(text, end="")
-        else:
-            writer = _OutputFileWriter(Path(output))
-            writer(text)
-            writer.close()
-            print(f"Results written to {output}", file=sys.stderr)
-        return 0
+        return _write_json_document(report, output)
 
     markdown = output_format == "md"
 
@@ -564,15 +583,40 @@ def _auto_setup_retry(
     return payload
 
 
+def _species_of(payload: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+    """(species, confidence, result-dict) from a method payload."""
+    res = payload.get("result", payload)
+    return res.get("species", "Unknown"), res.get("confidence", "low"), res
+
+
+def _verdict_payload(
+    species: str,
+    confidence: str,
+    strain: Any,
+    basis: list[str],
+    supporting: list[str],
+    agreement: str,
+) -> dict[str, Any]:
+    """Verdict object shape shared by single-mode and ``--mode all`` runs."""
+    return {
+        "species": species,
+        "display_name": display_name(species),
+        "strain": strain or None,
+        "confidence": confidence,
+        "basis": basis,
+        "supporting": supporting,
+        "agreement": agreement,
+    }
+
+
 def _verdict_for(results: dict[str, Any], mode: str) -> dict[str, Any]:
     if mode == "all" and len(results) > 1:
         return _arbitrate(results)
     first = next(iter(results.values()), {})
-    return {
-        "species": first.get("species", first.get("result", {}).get("species", "Unknown")),
-        "confidence": first.get("confidence", first.get("result", {}).get("confidence", "low")),
-        "basis": list(results),
-    }
+    if not first or "error" in first:
+        return _verdict_payload("Unknown", "low", None, list(results), [], "0/1")
+    species, conf, res = _species_of(first)
+    return _verdict_payload(species, conf, res.get("strain"), list(results), [], "1/1")
 
 
 def _identify_one(contigs: str, mode: str, db_dir: str | None, threads: int = 4) -> dict[str, Any]:
@@ -619,22 +663,39 @@ def _identify_one(contigs: str, mode: str, db_dir: str | None, threads: int = 4)
     return payload
 
 
+_LAYER = {"gtdbtk": 3, "panel": 2, "mash_refseq": 2, "sourmash": 2, "marker": 1}
+
+
 def _arbitrate(results: dict[str, Any]) -> dict[str, Any]:
-    """Layer-first arbitration: gtdbtk (phylogenetic) > panel/mash/sourmash (ANI) > marker."""
-    _LAYER = {"gtdbtk": 3, "panel": 2, "mash_refseq": 2, "sourmash": 2, "marker": 1}
-    best = None
+    """Layer-first arbitration: gtdbtk (phylogenetic) > panel/mash/sourmash (ANI) > marker.
+
+    Within a layer ``medium`` now outranks ``low``. ``basis`` keeps the single
+    winning method (bacmap maps it to a validated ``method`` field), while
+    ``supporting``/``agreement`` expose corroboration from the other tiers.
+    """
+    best_score: tuple[int, int] | None = None
+    winner: tuple[str, str, str, dict[str, Any]] | None = None
+    successful: dict[str, str] = {}
+
     for mode, payload in results.items():
         if "error" in payload:
             continue
-        res = payload.get("result", payload)
-        species = res.get("species", "Unknown")
-        conf = res.get("confidence", "low")
-        score = (_LAYER.get(mode, 0), 1 if conf == "high" else 0)
-        if species != "Unknown" and (best is None or score > best[0]):
-            best = (score, species, conf, mode)
-    if best is None:
-        return {"species": "Unknown", "confidence": "low", "basis": list(results)}
-    return {"species": best[1], "confidence": best[2], "basis": [best[3]]}
+        species, conf, res = _species_of(payload)
+        successful[mode] = species
+        if species == "Unknown":
+            continue
+        score = (_LAYER.get(mode, 0), _CONF_RANK.get(conf, 0))
+        if best_score is None or score > best_score:
+            best_score = score
+            winner = (mode, species, conf, res)
+
+    if winner is None:
+        return _verdict_payload("Unknown", "low", None, list(results), [], f"0/{len(successful)}")
+
+    mode, species, conf, res = winner
+    supporting = sorted(m for m, s in successful.items() if m != mode and s == species)
+    agreement = f"{1 + len(supporting)}/{len(successful)}"
+    return _verdict_payload(species, conf, res.get("strain"), [mode], supporting, agreement)
 
 
 _META_FASTA_SUFFIXES = (".fna", ".fa", ".fasta")
@@ -675,17 +736,15 @@ def _run_meta_method(
         return {"method": mode, "error": str(e)[:300]}
 
 
-def _binomial_key(name: str) -> str:
-    """`Escherichia coli str. K-12 W3110` → `escherichia coli` (dedup key)."""
-    parts = name.split()
-    return " ".join(parts[:2]).lower()
-
-
 def _meta_verdict(methods: dict[str, Any]) -> dict[str, Any]:
-    """Merge species lists from successful methods; on duplicates keep the
-    higher-confidence method's row (sylph ANI outranks a kraken2 fraction).
-    Deduplication uses the binomial (genus + species epithet) so strain-level
-    names from sylph and taxonomy names from kraken2 resolve to one entry."""
+    """Merge species lists from successful methods into canonical rows.
+
+    Rows are keyed by the canonical ``Genus_species`` label (the same contract
+    as ``gside species``), so sylph's strain-level names and kraken2's
+    taxonomy names collapse to one entry; on duplicates the higher-confidence
+    method wins, with sylph (ANI) outranking kraken2 (fraction) at equal
+    confidence. Species-group placeholders (``Campylobacter sp.``) are dropped.
+    """
     merged: dict[str, dict[str, Any]] = {}
     basis: list[str] = []
     for mode, payload in methods.items():
@@ -695,41 +754,45 @@ def _meta_verdict(methods: dict[str, Any]) -> dict[str, Any]:
         res = payload.get("result", payload)
         entries = res.get("top_species") or res.get("species") or []
         for entry in entries:
-            name = entry.get("name", "")
-            if not name:
+            raw_name = entry.get("name", "")
+            if not raw_name:
+                continue
+            parsed = parse_species_name(raw_name)
+            if parsed.label == UNKNOWN:
                 continue
             conf = entry.get("confidence", "low")
             row = {
-                "name": name,
+                "name": parsed.label,
+                "display_name": parsed.display,
+                "strain": parsed.strain or None,
                 "method": mode,
                 "abundance": entry.get("fraction", entry.get("abundance", 0.0)),
                 "confidence": conf,
                 "ani": entry.get("ani"),
             }
-            key = _binomial_key(name)
-            prev = merged.get(key)
+            if raw_name != parsed.label:
+                row["species_raw"] = raw_name
+
+            prev = merged.get(parsed.label)
             wins = prev is None or _CONF_RANK[conf] > _CONF_RANK[prev["confidence"]]
             if not wins and prev is not None and _CONF_RANK[conf] == _CONF_RANK[prev["confidence"]]:
                 wins = _METHOD_RANK.get(mode, 0) > _METHOD_RANK.get(prev["method"], 0)
             if wins:
-                merged[key] = row
+                merged[parsed.label] = row
     top = sorted(merged.values(), key=lambda r: r["abundance"], reverse=True)
     return {"top_species": top, "richness": len(top), "basis": basis}
 
 
-def _emit_meta(payload: dict[str, Any], output_format: str, output: str | None) -> int:
+def _emit_meta(
+    payload: dict[str, Any],
+    output_format: str,
+    output: str | None,
+    no_header: bool = False,
+) -> int:
     if output_format == "json":
-        text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
-        if output is None:
-            print(text, end="")
-        else:
-            writer = _OutputFileWriter(Path(output))
-            writer(text)
-            writer.close()
-            print(f"Results written to {output}", file=sys.stderr)
-        return 0
+        return _write_json_document(payload, output)
 
-    lines = [_META_TSV_HEADER]
+    lines = [] if no_header else [_META_TSV_HEADER]
     for row in payload.get("verdict", {}).get("top_species", []):
         ani = "" if row.get("ani") is None else str(row["ani"])
         lines.append(
@@ -755,6 +818,7 @@ def _run_meta(
     output_format: str = "json",
     output: str | None = None,
     threads: int = 4,
+    no_header: bool = False,
 ) -> int:
     input_type = _detect_meta_input(files)
     modes = ["kraken2", "sylph"] if mode == "all" else [mode]
@@ -767,7 +831,7 @@ def _run_meta(
         "methods": methods,
         "verdict": _meta_verdict(methods),
     }
-    return _emit_meta(payload, output_format, output)
+    return _emit_meta(payload, output_format, output, no_header)
 
 
 if __name__ == "__main__":

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import tempfile
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
+from gside.analysis._envelope import METAGENOMIC, MethodEnvelope
+from gside.analysis._thresholds import ani_confidence
 from gside.config import SPECIES_DB_DIR, which
 from gside.engine._env import require_bin, run_checked
 
@@ -17,32 +19,11 @@ FASTA_INPUT_ERROR = "sylph requires FASTQ reads, not contigs — use --mode krak
 
 _FASTA_SUFFIXES = (".fna", ".fa", ".fasta")
 
-# Same thresholds as the panel ANI layer (cli.py:_arbitrate high/medium split).
-_HIGH_ANI = 95.0
-_MEDIUM_ANI = 93.0
-
 
 @dataclass
-class SylphResult:
+class SylphResult(MethodEnvelope):
+    analysis_type: ClassVar[str] = METAGENOMIC
     method: str = "sylph_ani"
-    database: dict[str, str] = field(default_factory=dict)
-    result: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "analysis_type": "metagenomic_profiling",
-            "method": self.method,
-            "database": self.database,
-            "result": self.result,
-        }
-
-
-def _ani_confidence(ani: float) -> str:
-    if ani >= _HIGH_ANI:
-        return "high"
-    if ani >= _MEDIUM_ANI:
-        return "medium"
-    return "low"
 
 
 def _looks_like_fasta(files: Sequence[str]) -> bool:
@@ -111,7 +92,7 @@ def _parse_profile(path: Path, taxa_map: dict[str, str] | None = None) -> list[d
                 "ani": ani,
                 "abundance": abundance,
                 "coverage": coverage,
-                "confidence": _ani_confidence(ani),
+                "confidence": ani_confidence(ani),
             }
         )
     species.sort(key=lambda s: s["abundance"], reverse=True)

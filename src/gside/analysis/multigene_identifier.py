@@ -104,80 +104,92 @@ def _blast_contigs(contigs_fasta: str, threads: int = 4) -> list[dict[str, Any]]
     return hits
 
 
+def _best_per_gene(
+    hits: list[dict[str, Any]],
+    min_identity: float = 0.0,
+    min_coverage: float = 0.0,
+) -> dict[str, dict[str, Any]]:
+    """Highest-identity hit per gene, optionally filtered by identity/coverage."""
+    best: dict[str, dict[str, Any]] = {}
+    for hit in hits:
+        if hit["identity"] < min_identity or hit["coverage"] < min_coverage:
+            continue
+        gene = hit["gene"]
+        if gene not in best or hit["identity"] > best[gene]["identity"]:
+            best[gene] = hit
+    return best
+
+
+def _priority_species(rules: list[dict[str, Any]]) -> set[str]:
+    """Species declared as priority targets by any rule."""
+    return {rule["species"] for rule in rules if rule.get("priority_over")}
+
+
+def _rule_match(
+    rule: dict[str, Any], significant: dict[str, dict[str, Any]]
+) -> tuple[list[str], list[str]]:
+    """(matched genes passing the rule's min_identity, excluded genes present)."""
+    genes = [g.lower() for g in rule.get("genes", [])]
+    exclude = [g.lower() for g in rule.get("exclude_genes", [])]
+    min_id = rule.get("min_identity", _HIGH_CONF)
+    matched = [
+        gene
+        for gene in genes
+        if gene in significant and significant[gene]["identity"] >= min_id and gene not in exclude
+    ]
+    excluded_present = [g for g in exclude if g in significant]
+    return matched, excluded_present
+
+
+def _pick_rule(
+    rules: list[dict[str, Any]],
+    significant: dict[str, dict[str, Any]],
+    priority_species: set[str],
+) -> tuple[str, str, str]:
+    """(species, confidence, matched_rule) for the best satisfied rule."""
+    best_species, best_conf, best_score, best_rule = "Unknown", "low", 0, ""
+    for rule in rules:
+        min_hits = rule.get("min_hits", 1)
+        matched, excluded_present = _rule_match(rule, significant)
+        if len(matched) < min_hits or excluded_present:
+            continue
+        score = len(matched)
+        avg_id = sum(significant[g]["identity"] for g in matched) / len(matched)
+        conf = "high" if avg_id >= _HIGH_CONF else "medium"
+        rule_str = f"{'+'.join(matched)} ({len(matched)}/{min_hits} required)"
+
+        is_priority = rule["species"] in priority_species
+        if is_priority:
+            # priority 物种：一旦命中即压制非 priority 物种（即使后者分数更高）
+            if best_species not in priority_species or score > best_score:
+                best_species, best_conf, best_score, best_rule = (
+                    rule["species"],
+                    conf,
+                    score,
+                    rule_str,
+                )
+        elif best_species not in priority_species and (
+            score > best_score or (score == best_score and conf == "high")
+        ):
+            best_species, best_conf, best_score, best_rule = (
+                rule["species"],
+                conf,
+                score,
+                rule_str,
+            )
+    return best_species, best_conf, best_rule
+
+
 def identify_multigene(contigs_fasta: str, threads: int = 4) -> MultiGeneResult:
     raw_hits = _blast_contigs(contigs_fasta, threads)
     rules = _load_rules()
-
-    best_hits: dict[str, dict[str, Any]] = {}
-    for hit in raw_hits:
-        gene = hit["gene"]
-        if gene not in best_hits or hit["identity"] > best_hits[gene]["identity"]:
-            best_hits[gene] = hit
-
-    significant: dict[str, dict[str, Any]] = {}
-    for hit in raw_hits:
-        if hit["identity"] < _MIN_IDENTITY or hit["coverage"] < _MIN_COVERAGE:
-            continue
-        gene = hit["gene"]
-        if gene not in significant or hit["identity"] > significant[gene]["identity"]:
-            significant[gene] = hit
+    significant = _best_per_gene(raw_hits, _MIN_IDENTITY, _MIN_COVERAGE)
 
     result = MultiGeneResult(database_version=_db_version())
-    result.all_hits = list(best_hits.values())
-
-    priority_species = set()
-    for rule in rules:
-        if rule.get("priority_over"):
-            for _target in rule["priority_over"]:
-                priority_species.add(rule["species"])
-
-    best_species = "Unknown"
-    best_conf = "low"
-    best_score = 0
-    best_rule = ""
-
-    for rule in rules:
-        genes = [g.lower() for g in rule.get("genes", [])]
-        min_hits = rule.get("min_hits", 1)
-        min_id = rule.get("min_identity", _HIGH_CONF)
-        exclude = [g.lower() for g in rule.get("exclude_genes", [])]
-
-        matched = []
-        for gene in genes:
-            if (
-                gene in significant
-                and significant[gene]["identity"] >= min_id
-                and gene not in exclude
-            ):
-                matched.append(gene)
-
-        excluded_present = [g for g in exclude if g in significant]
-
-        if len(matched) >= min_hits and not excluded_present:
-            score = len(matched)
-            avg_id = sum(significant[g]["identity"] for g in matched) / len(matched)
-            conf = "high" if avg_id >= _HIGH_CONF else "medium"
-            rule_str = f"{'+'.join(matched)} ({len(matched)}/{min_hits} required)"
-
-            is_priority = rule["species"] in priority_species
-            if is_priority:
-                # priority 物种：一旦命中即压制非 priority 物种（即使后者分数更高）
-                if best_species not in priority_species or score > best_score:
-                    best_species = rule["species"]
-                    best_conf = conf
-                    best_score = score
-                    best_rule = rule_str
-            elif best_species not in priority_species and (
-                score > best_score or (score == best_score and conf == "high")
-            ):
-                best_species = rule["species"]
-                best_conf = conf
-                best_score = score
-                best_rule = rule_str
-
-    result.species = best_species
-    result.confidence = best_conf
-    result.matched_rule = best_rule
+    result.all_hits = list(_best_per_gene(raw_hits).values())
+    result.species, result.confidence, result.matched_rule = _pick_rule(
+        rules, significant, _priority_species(rules)
+    )
 
     if significant:
         result.detected_markers = [

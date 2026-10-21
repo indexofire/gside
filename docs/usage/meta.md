@@ -59,24 +59,34 @@ JSON (default) — a single document:
       "total_reads": 10000, "classified_reads": 100, "n_species": 4
     }},
     "sylph": {"method": "sylph_ani", "database": {...}, "result": {
-      "species": [{"name": "...", "ani": 97.53, "abundance": 78.12, "coverage": 264.0, "confidence": "high"}],
+      "species": [{"name": "Escherichia coli str. K-12", "ani": 97.53, "abundance": 0.7812, "coverage": 264.0, "confidence": "high"}],
       "n_species": 3
     }}
   },
   "verdict": {
-    "top_species": [{"name": "...", "method": "sylph", "abundance": 78.12, "confidence": "high", "ani": 97.53}],
+    "top_species": [{
+      "name": "Escherichia_coli", "display_name": "Escherichia coli",
+      "strain": "str. K-12", "species_raw": "Escherichia coli str. K-12",
+      "method": "sylph", "abundance": 0.7812, "confidence": "high", "ani": 97.53
+    }],
     "richness": 3,
     "basis": ["kraken2", "sylph"]
   }
 }
 ```
 
+`abundance` is always a **fraction (0-1)** for both engines (sylph's percentage
+is normalised at parse time), and `name` is the same canonical `Genus_species`
+label used by `gside species`; strain detail moves to `strain`, and the raw
+tool string to `species_raw`. Species-group placeholders (`Campylobacter sp.`)
+are dropped from the merged verdict.
+
 TSV (`-f tsv`) — one row per merged species (`ani` is blank for kraken2 rows):
 
 ```
 method	name	abundance	confidence	ani
-sylph	Escherichia coli	78.12	high	97.53
-kraken2	Salmonella enterica	0.20	medium	
+sylph	Escherichia_coli	0.7812	high	97.53
+kraken2	Salmonella_enterica	0.20	medium	
 ```
 
 Like `gside species`, `gside meta` always exits 0: a failing method records

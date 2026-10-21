@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
+from gside.analysis._envelope import MethodEnvelope
+from gside.analysis.species_name import apply_species_name
 from gside.config import GTDB_DB, which
 from gside.engine._env import require_bin, run_checked
 
@@ -17,18 +18,8 @@ _UNAVAILABLE = (
 
 
 @dataclass
-class GtdbkResult:
+class GtdbkResult(MethodEnvelope):
     method: str = "gtdbtk"
-    database: dict[str, str] = field(default_factory=dict)
-    result: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "analysis_type": "species_identification",
-            "method": self.method,
-            "database": self.database,
-            "result": self.result,
-        }
 
 
 def _species_from_classification(classification: str) -> str:
@@ -86,10 +77,10 @@ def identify_by_gtdbtk(contigs: str | Path, threads: int = 4) -> GtdbkResult:
         classification = _read_classification(out_dir)
     species = _species_from_classification(classification)
     result = {
-        "species": species,
         "confidence": "high" if species != "Unknown" else "low",
         "classification": classification,
     }
+    apply_species_name(result, species)
     return GtdbkResult(
         method="gtdbtk",
         database={"name": "GTDB-Tk", "data_path": str(GTDB_DB)},

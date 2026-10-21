@@ -95,7 +95,9 @@ class TestPanelThresholds:
     def test_high(self, monkeypatch, taxadb):
         monkeypatch.setattr(ani, "_skani_search", lambda q, d, threads=4: [_skani_hit(ani=99.0)])
         r = identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result
-        assert (r["species"], r["confidence"]) == ("Escherichia coli K12", "high")
+        assert (r["species"], r["confidence"]) == ("Escherichia_coli", "high")
+        assert r["strain"] == "K12"
+        assert r["species_raw"] == "Escherichia coli K12"
 
     def test_medium_band(self, monkeypatch, taxadb):
         monkeypatch.setattr(ani, "_skani_search", lambda q, d, threads=4: [_skani_hit(ani=94.0)])
@@ -130,7 +132,8 @@ class TestMashThresholds:
     def test_high(self, monkeypatch, taxadb):
         monkeypatch.setattr(ani, "_mash_dist", lambda q, m, threads=4: [("GCF_A", 0.99)])
         r = identify_by_ani("q.fna", mode="mash_refseq", db_dir=taxadb).result
-        assert (r["species"], r["confidence"]) == ("Escherichia coli K12", "high")
+        assert (r["species"], r["confidence"]) == ("Escherichia_coli", "high")
+        assert r["strain"] == "K12"
 
     def test_medium_band(self, monkeypatch, taxadb):
         monkeypatch.setattr(ani, "_mash_dist", lambda q, m, threads=4: [("GCF_A", 0.95)])

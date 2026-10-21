@@ -1,4 +1,4 @@
-"""Pure unit tests for kmer/minimap2 backends (subprocess stubbed)."""
+"""Pure unit tests for the kmer backends (subprocess stubbed)."""
 
 from __future__ import annotations
 
@@ -9,9 +9,7 @@ from pathlib import Path
 import pytest
 
 from gside.engine.backends import kmer as kmer_mod
-from gside.engine.backends import minimap2 as mm2_mod
 from gside.engine.backends.kmer import MashBackend, SourmashBackend
-from gside.engine.backends.minimap2 import MinimapBackend
 
 
 def _completed(stdout: str = "", returncode: int = 0, stderr: str = ""):
@@ -21,13 +19,11 @@ def _completed(stdout: str = "", returncode: int = 0, stderr: str = ""):
 @pytest.fixture()
 def fakebin(monkeypatch):
     monkeypatch.setattr(kmer_mod, "which", lambda tool: f"/bin/{tool}")
-    monkeypatch.setattr(mm2_mod, "which", lambda tool: "/bin/minimap2")
 
 
 @pytest.fixture()
 def nobin(monkeypatch):
     monkeypatch.setattr(kmer_mod, "which", lambda tool: None)
-    monkeypatch.setattr(mm2_mod, "which", lambda tool: None)
 
 
 class TestFindBin:
@@ -38,10 +34,6 @@ class TestFindBin:
     def test_sourmash_missing(self, nobin):
         with pytest.raises(RuntimeError, match="sourmash not found"):
             SourmashBackend()
-
-    def test_minimap2_missing(self, nobin):
-        with pytest.raises(RuntimeError, match="minimap2 not found"):
-            MinimapBackend()
 
 
 _MASH_LINE = "refA\tquery1\t0.02\t0.0\t80/1000"
@@ -128,39 +120,6 @@ class TestSourmashDistance:
         )
         SourmashBackend().sketch(tmp_path / "g.fna", tmp_path / "g.sig", name="n1")
         assert "--name" in seen["cmd"] and "n1" in seen["cmd"]
-
-
-_PAF = "\t".join(
-    ["q1", "1000", "100", "600", "+", "ref1", "2000", "300", "800", "490", "500", "60"]
-)
-
-
-class TestMinimapFind:
-    def test_parse_and_filter(self, fakebin, monkeypatch):
-        monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed(_PAF))
-        hits = MinimapBackend().find(
-            Path("q.fna"), Path("r.fna"), min_identity=90.0, min_coverage=40.0
-        )
-        assert len(hits) == 1 and hits[0].subject_id == "ref1"
-
-    def test_filter_rejects(self, fakebin, monkeypatch):
-        monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed(_PAF))
-        assert MinimapBackend().find(Path("q.fna"), Path("r.fna"), min_identity=99.9) == []
-
-    def test_kwargs_mapping(self, fakebin, monkeypatch):
-        seen = {}
-        monkeypatch.setattr(
-            subprocess, "run", lambda cmd, **kw: seen.update(cmd=cmd) or _completed("")
-        )
-        MinimapBackend().find(Path("q.fna"), Path("r.fna"), kmer=19, threads=8, drop=None)
-        cmd = seen["cmd"]
-        assert "-k" in cmd and "19" in cmd
-        assert cmd[cmd.index("-t") + 1] == "8"
-
-    def test_failure_raises(self, fakebin, monkeypatch):
-        monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed("", 1, "boom"))
-        with pytest.raises(RuntimeError, match="minimap2 failed"):
-            MinimapBackend().find(Path("q.fna"), Path("r.fna"))
 
 
 class TestScreenDelegate:

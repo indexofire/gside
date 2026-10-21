@@ -474,7 +474,15 @@ class TestRemainingBranches:
         from gside.cli import _arbitrate
 
         v = _arbitrate({"a": {"error": "x"}, "b": {"error": "y"}})
-        assert v == {"species": "Unknown", "confidence": "low", "basis": ["a", "b"]}
+        assert v == {
+            "species": "Unknown",
+            "display_name": "Unknown",
+            "strain": None,
+            "confidence": "low",
+            "basis": ["a", "b"],
+            "supporting": [],
+            "agreement": "0/0",
+        }
 
     def test_setup_with_source(self, tmp_path, monkeypatch):
         from click.testing import CliRunner

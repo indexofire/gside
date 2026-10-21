@@ -7,9 +7,9 @@ Agent guidance for this repository. Read this before writing or editing any code
 ## Project Overview
 
 - **Language**: Python 3.12 (standalone species-identification CLI, no frontend)
-- **Package manager**: [pixi](https://pixi.sh) — conda tools (blast/skani/mash/mmseqs2) + PyPI editable install via `pixi.toml`
-- **Linter + Formatter**: [ruff](https://docs.astral.sh/ruff/) (config in `pyproject.toml`; run via pip-installed dev extras, no pixi task)
-- **Testing**: pytest (`tests/`; single file `tests/unit/test_cli.py`, needs real `blastn`)
+- **Package manager**: [pixi](https://pixi.sh) — conda tools (blast/skani/mash/sourmash/kraken2/bracken/sylph) + PyPI editable install via `pixi.toml`
+- **Linter + Formatter**: [ruff](https://docs.astral.sh/ruff/) (config in `pyproject.toml`; `pixi run -e dev check`, or the pip-installed dev extras)
+- **Testing**: pytest — `tests/unit/` hermetic (no binaries), `tests/integration/` needs real binaries/databases (skipif-guarded)
 - **Docs**: MkDocs Material + static-i18n, English default + Chinese secondary (`docs/*.md` + `*.zh.md` pairs)
 
 ---
@@ -96,10 +96,10 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-10-20): 475 tests, total coverage **97.5%** — all modules 100%
-(including cli.py, gtdbtk_identifier.py, and mcp*.py)
-except: ani 93%, multigene 99%, taxonomic 93% (quarantined),
-db 92%, kma 94%, kmer 99%, read_mapper 99%, progress 97%. Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
+Baseline (2026-10-21): **503 tests**, total coverage **97.6%** (1912 statements)
+— all modules 100% except: ani 93%, multigene 98%, taxonomic 93%
+(quarantined), db 92%, kmer 99%, progress 97%.
+Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
 raise it every time coverage climbs.
 
 ---
@@ -179,11 +179,13 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 
 ### CLI Patterns
 - Click group style (mirrors gmlst/gapit family): `HELP_SETTINGS` (`-h`/`--help`), bare invocation prints help and exits 2 (`no_args_is_help`), `-v`/`-q` mutually exclusive (UsageError), thin commands registered via `add_command`
-- Every option carries a short flag: species `-m/--mode -f/--format -D/--db-dir -o/--output -a/--auto-setup`; db `-t/--tier -s/--source -f/--format`
+- Every option carries a short flag: species `-m/--mode -f/--format -D/--db-dir -o/--output -j/--jobs -t/--threads -n/--no-header -a/--auto-setup`; meta `-m/--mode -f/--format -D/--db-dir -o/--output -t/--threads -n/--no-header`; db `-t/--tier -s/--source -f/--format`
+- `-D/--db-dir`, `-f/--format` and `-t/--threads` are built by the shared factories `_db_dir_option` / `_format_option` / `_threads_option` in `cli.py` — add new commands through them so flags never drift
 - Agent-friendly outputs: species defaults to JSON on stdout; `-o` writes the payload to a file with gapit-style streaming (tsv/md rows flushed per input as they complete — a mid-batch failure persists the prefix; json single document at the end; stdout stays empty, notice on stderr); `db status|list` accept `--format table|tsv|json`; `db setup` accepts `--format text|json` (json routes progress to stderr); `-V -J` prints version as JSON
-- Subcommands: `species` / `db` group (`status|setup|list`) / `validate` / `mcp` (MCP stdio server) / `--version`; entry `gside.cli:main`
-- `--mode` choices are exactly `marker|panel|mash_refseq|sourmash|gtdbtk|all` — do not invent modes
+- Subcommands: `species` / `meta` / `db` group (`status|setup|list`) / `validate` / `mcp` (MCP stdio server) / `--version`; entry `gside.cli:main`
+- `species --mode` choices are exactly `marker|panel|mash_refseq|sourmash|gtdbtk|all`; `meta --mode` choices are exactly `kraken2|sylph|all` — do not invent modes
 - `--db-dir` overrides the database root for one invocation
+- `verdict` shape is shared by single-mode and `all`: `species` (canonical), `display_name`, `strain`, `confidence`, `basis` (winner only), `supporting`, `agreement`
 
 ### File & Module Organization
 ```
@@ -195,28 +197,35 @@ src/gside/
 ├── mcp.py                    # MCP stdio server: JSON-RPC protocol + serve loop (`gside mcp`)
 ├── mcp_schemas.py            # MCP tools/list declarations (species/db_status/db_list/db_setup)
 ├── mcp_tools.py              # MCP tool handlers (call cli._identify_one + db callables)
-├── engine/                   # Algorithm abstraction (mostly unused, see gotchas)
-│   ├── hits.py               #   Unified Hit dataclass
-│   ├── registry.py           #   Backend registry
-│   ├── read_mapper.py        #   ReadMapper facade
-│   └── backends/             #   blast / skani / kmer / minimap2 / kma / mmseqs2
+├── engine/                   # Alignment backends actually used by analysis/
+│   ├── _env.py               #   require_bin / run_checked / pixi_path
+│   ├── hits.py               #   BLAST tabular Hit row
+│   └── backends/             #   blast / skani / kmer (mash + sourmash)
 └── analysis/
+    ├── _envelope.py              # Shared {analysis_type,method,database,result}
+    ├── _thresholds.py            # Shared ANI_HIGH/ANI_MEDIUM + ani_confidence()
+    ├── species_name.py           # Genus_species canonicalizer (bacmap contract)
     ├── multigene_identifier.py   # L1 marker rules (blastn, live)
     ├── ani_identifier.py         # L2 panel/mash (live)
     ├── sourmash_identifier.py    # L2 sourmash (needs external binary + GTDB db)
     ├── gtdbtk_identifier.py      # L3 GTDB-Tk placement (needs external gtdbtk + GTDBTK_DATA_PATH)
-    ├── taxonomic_validator.py    # L3 (gside validate; standard needs CheckM2/GTDB-Tk env)
-    └── species_canon.py          # DORMANT (no importers)
+    ├── kraken2_identifier.py     # meta: kraken2 + bracken
+    ├── sylph_identifier.py       # meta: sylph ANI profiling (FASTQ only)
+    └── taxonomic_validator.py    # L3 (gside validate; standard needs CheckM2/GTDB-Tk env)
 tests/
-└── unit/
-    └── test_cli.py           # Real-BLAST smoke + arbitration unit tests
+├── unit/                     # Hermetic, no binaries, seconds
+│   └── test_cli.py           # Rendering + arbitration only (pure)
+└── integration/              # Real binaries/databases, skipif-guarded
+    └── test_marker_smoke.py  # Real blastn marker calls
 data/
 ├── db/
 │   ├── D1_marker/            # mini tier, TRACKED in git: rules + fasta + blastdb
 │   ├── D2_ani/               # panel tier (skani sketch + genomes), gitignored
 │   │                         # except manifests/ (tracked build recipe)
 │   ├── D3_mash/              # mash tier (mash.msh), gitignored
-│   └── D4_sourmash/          # GTDB reps k31 + lineages, via db setup (3.9GB)
+│   ├── D4_sourmash/          # GTDB reps k31 + lineages, via db setup (3.9GB)
+│   ├── D5_kraken2/           # meta tier (Kraken2 Standard-8), manual, gitignored
+│   └── D6_sylph/             # meta_sylph tier (.syldb), manual, gitignored
 docs/
 ├── index.md / index.zh.md    # + architecture|installation|usage|reference/, same pairing
 └── (nav in mkdocs.yml; en default, zh secondary; build with --strict)
@@ -251,7 +260,7 @@ testpaths = ["tests"]
 6. **One responsibility per module** — don't let files grow into god-modules
 7. **Don't add conda deps without updating `pixi.toml`** — use `pixi add <pkg>`; PyPI-only packages belong in `[feature.dev.pypi-dependencies]`, never in `[dependencies]` (conda channels don't carry them, e.g. `mkdocs-static-i18n`)
 8. **Do not rename `species_markers_v2`** — it is the JSON output contract name (`database.name`), not a filename
-9. **Do not wire up `species_canon.py`** — dormant with no importers; touching it is a separate project (`taxonomic_validator.py` is wired via `gside validate` since Cycle 19)
+9. **Keep `engine/` limited to backends the analysis layer calls** — blast / skani / kmer only. The old name-registry, ReadMapper, minimap2, kma and mmseqs2 abstractions were deleted as unconsumed ports from gmlst; do not reintroduce scaffolding without an in-repo caller and a test.
 10. **Docs come in en/zh pairs** — every `docs/**/*.md` change needs the matching `.zh.md` update, and `mkdocs build --strict` must pass
 11. **TDD is non-negotiable** — failing test first, then implementation; every new line covered; coverage never goes down (see TDD section)
 12. **Keep `pyright` at zero and CI green** — `pixi run -e dev typecheck` must report 0 errors (quarantined files are excluded in `pyproject.toml`, not waived); `.github/workflows/test.yml` must pass before merge
@@ -262,9 +271,10 @@ testpaths = ["tests"]
 - **`gside species` never fails loud**: check `methods.<mode>.error` in JSON, not the exit code.
 - **Marker thresholds are global**: `_MIN_IDENTITY=85.0` / `_MIN_COVERAGE=60.0` / `_HIGH_CONF=90.0`; rule-level `min_coverage` in YAML is currently **ignored** by the engine; `priority_over` is dead code.
 - **Panel thresholds**: ANI ≥ 95 + AF ≥ 0.65 → high; 93–95 → medium. Mash identity ≥ 0.97 → high, 0.90–0.97 → medium.
-- **Arbitration is layer-first**: `(layer, confidence)` tuple — gtdbtk=3 beats any L2 hit, any L2 hit beats any L1 hit (`cli.py:_arbitrate`).
+- **Arbitration is layer-first**: `(layer, confidence-rank)` tuple — gtdbtk=3 beats any L2 hit, any L2 hit beats any L1 hit, and within a layer `medium` now beats `low` (`cli.py:_arbitrate`). `verdict.basis` stays the single winning method (bacmap maps it to a validated `method`); `verdict.supporting` + `verdict.agreement` expose cross-method corroboration (exact label match — `DEC` vs `Escherichia_coli` is intentionally a non-match; do not alias them).
 - **Missing-database errors are structured**: alongside `methods.<mode>.error`, the payload carries `suggested_command` / `missing_tier` / `estimated_size` (from `gside.db._TIERS`); `species --auto-setup` installs the tier (progress on stderr) and retries that single method once, then recomputes the verdict. GTDB-Tk's own database is external (`GTDBTK_DATA_PATH`/`GTDBDB`) — it is NOT a `db setup` tier.
 - **`sourmash` needs its GTDB db**: provisioned via pixi (`sourmash>=4.9`) + `gside db setup --tier sourmash` (~3.9GB rs226 reps, renamed in place); `gather` output is read from `-o` file, never `--csv -` (unsupported flag).
 - **DB download verification**: `db.py` pins digests (`MASH_MD5`, `PANEL_SHA256`, `SOURMASH_LINEAGES_SHA256`); empty constants (`SOURMASH_SIG_SHA256`) mean warn-and-skip. Tar extraction uses `filter="data"`. All pinned artifacts live in the GitHub release tag `db-v0.1` (panel) — re-pin `PANEL_SHA256` whenever the release asset is replaced.
-- **`engine/` is wired for the species-ID hot paths**: marker → `BlastBackend`, panel → `SkaniBackend`, mash_refseq → `MashBackend` (analysis layer resolves binaries via `require_bin` and injects them with `binary=`; outputs are byte-equivalent to the former inline subprocess calls). Shared scaffolding lives in `engine/_env.py` (`require_bin`/`run_checked`; backends pass their module-level `which` as `resolver=` to keep test monkeypatch points). Still unconsumed: `KmaBackend`, `Mmseqs2Backend`, `MinimapBackend`, `ReadMapper`, `SequenceMatcher` — `KmaBackend` imports cleanly (`parse_db_header` ported verbatim into `gside/utils.py`) but has no in-repo callers and no provisioned binary.
+- **`engine/` holds only live backends**: marker → `BlastBackend`, panel → `SkaniBackend`, mash_refseq/sourmash → `MashBackend`/`SourmashBackend` (analysis resolves binaries via `require_bin` and injects them with `binary=`; backends pass their module-level `which` as `resolver=` so tests can monkeypatch discovery). Shared scaffolding is `engine/_env.py` (`require_bin`/`run_checked`).
+- **Species name contract is `Genus_species`**: every tier emits the underscored label via `analysis/species_name.py` (`apply_species_name`) and keeps the tool string in `species_raw`, the strain in `strain`. panel/mash/sourmash/gtdbtk are reduced to the binomial; GTDB `s__` ranks are stripped; `sp.`/`unidentified`/`Unknown` collapse to `Unknown`. marker labels are already contract form (`Salmonella`, `V_parahaemolyticus`, `Vibrio_cholerae_O1`, `Shigella_EIEC`, `DEC`) and pass through untouched — never "reduce" them to two tokens. bacmap's `canonical_from_verdict` only accepts `[A-Za-z]+(?:_[A-Za-z0-9]+)+`, so a spaced or dotted label breaks it.
 - **FASTA header contract**: `>markers~~~<gene>~~~<desc> role=<primary|confirm|typing|virulence>`; parser takes `split("~~~")[1]` — the `markers` prefix itself is never validated.

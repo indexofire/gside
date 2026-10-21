@@ -156,6 +156,8 @@ def db_setup(tier: str = "panel", source: str = "") -> dict[str, str]:
     if tier not in _TIERS:
         raise ValueError(f"unknown tier {tier!r}; expected one of {sorted(_TIERS)}")
 
+    # Installers are resolved by name at call time on purpose: tests monkeypatch
+    # the module-level downloaders, so they must not be captured in a table.
     results: dict[str, str] = {}
     if tier in ("panel", "all"):
         results["D2_ani"] = _setup_component("D2_ani", _install_panel, source)
@@ -288,74 +290,65 @@ def _download_mash_zenodo(dst: Path) -> str:
         return f"ERROR: Zenodo download failed: {e}"
 
 
-def _build_panel_from_manifest(dst: Path) -> str:
-    manifest = _MANIFEST_DIR / "panel_accessions.tsv"
-    metadata = _MANIFEST_DIR / "metadata.tsv"
-
-    if not manifest.exists() or not metadata.exists():
-        return "ERROR: panel manifest not found — cannot build from source"
-
-    datasets_bin = which("datasets")
-    if not datasets_bin:
-        return "ERROR: NCBI datasets CLI not found (pixi add ncbi-datasets-cli)"
-
-    skani_bin = which("skani")
-    if not skani_bin:
-        return "ERROR: skani not found (pixi add skani)"
-
-    genomes_dir = dst / "genomes"
-    genomes_dir.mkdir(parents=True, exist_ok=True)
-
+def _manifest_accessions(manifest: Path) -> list[str]:
+    """GCF accessions listed in the panel manifest (header row skipped)."""
     accessions = []
     for line in manifest.read_text().splitlines()[1:]:
         acc = line.split("\t")[0].strip()
         if acc and acc.startswith("GCF_"):
             accessions.append(acc)
+    return accessions
 
+
+def _download_panel_genomes(
+    datasets_bin: str, accessions: list[str], dst: Path, genomes_dir: Path
+) -> str | None:
+    """Fetch any genomes missing from ``genomes_dir``; returns an error or None."""
     existing = {f.name.split("_ASM")[0] for f in genomes_dir.glob("*.fna")}
     to_download = [a for a in accessions if a not in existing]
+    if not to_download:
+        return None
 
-    if to_download:
-        print(f"  downloading {len(to_download)} genomes from NCBI...")
-        acc_file = dst / "_accessions.txt"
-        acc_file.write_text("\n".join(to_download))
-        result = subprocess.run(
-            [
-                datasets_bin,
-                "download",
-                "genome",
-                "accession",
-                "-f",
-                str(acc_file),
-                "--include",
-                "genome",
-                "--filename",
-                str(dst / "_genomes.zip"),
-            ],
+    print(f"  downloading {len(to_download)} genomes from NCBI...")
+    acc_file = dst / "_accessions.txt"
+    acc_file.write_text("\n".join(to_download))
+    result = subprocess.run(
+        [
+            datasets_bin,
+            "download",
+            "genome",
+            "accession",
+            "-f",
+            str(acc_file),
+            "--include",
+            "genome",
+            "--filename",
+            str(dst / "_genomes.zip"),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=_DOWNLOAD_TIMEOUT,
+    )
+    acc_file.unlink(missing_ok=True)
+    if result.returncode != 0:
+        return f"ERROR: NCBI datasets download failed: {result.stderr[:200]}"
+
+    zip_path = dst / "_genomes.zip"
+    if zip_path.exists():
+        subprocess.run(
+            ["unzip", "-oq", str(zip_path), "-d", str(dst / "_dl")],
             capture_output=True,
-            text=True,
-            timeout=_DOWNLOAD_TIMEOUT,
+            timeout=300,
         )
-        acc_file.unlink(missing_ok=True)
-        if result.returncode != 0:
-            return f"ERROR: NCBI datasets download failed: {result.stderr[:200]}"
+        for fna in (dst / "_dl").rglob("*_genomic.fna"):
+            shutil.copy2(fna, genomes_dir / fna.name)
+        shutil.rmtree(dst / "_dl", ignore_errors=True)
+        zip_path.unlink(missing_ok=True)
+    return None
 
-        zip_path = dst / "_genomes.zip"
-        if zip_path.exists():
-            subprocess.run(
-                ["unzip", "-oq", str(zip_path), "-d", str(dst / "_dl")],
-                capture_output=True,
-                timeout=300,
-            )
-            for fna in (dst / "_dl").rglob("*_genomic.fna"):
-                shutil.copy2(fna, genomes_dir / fna.name)
-            shutil.rmtree(dst / "_dl", ignore_errors=True)
-            zip_path.unlink(missing_ok=True)
 
-    fnas = sorted(genomes_dir.glob("*.fna"))
-    if not fnas:
-        return "ERROR: no genome files after download"
-
+def _build_skani_sketch(skani_bin: str, fnas: list[Path], dst: Path) -> str | None:
+    """Sketch every genome into ``panel.sketch``; returns an error or None."""
     print(f"  building skani sketch from {len(fnas)} genomes...")
     sketch_dir = dst / "panel.sketch"
     if sketch_dir.exists():
@@ -368,9 +361,37 @@ def _build_panel_from_manifest(dst: Path) -> str:
     )
     if result.returncode != 0:
         return f"ERROR: skani sketch failed: {result.stderr[:200]}"
+    return None
+
+
+def _build_panel_from_manifest(dst: Path) -> str:
+    manifest = _MANIFEST_DIR / "panel_accessions.tsv"
+    metadata = _MANIFEST_DIR / "metadata.tsv"
+    if not manifest.exists() or not metadata.exists():
+        return "ERROR: panel manifest not found — cannot build from source"
+
+    datasets_bin = which("datasets")
+    if not datasets_bin:
+        return "ERROR: NCBI datasets CLI not found (pixi add ncbi-datasets-cli)"
+    skani_bin = which("skani")
+    if not skani_bin:
+        return "ERROR: skani not found (pixi add skani)"
+
+    genomes_dir = dst / "genomes"
+    genomes_dir.mkdir(parents=True, exist_ok=True)
+    error = _download_panel_genomes(datasets_bin, _manifest_accessions(manifest), dst, genomes_dir)
+    if error:
+        return error
+
+    fnas = sorted(genomes_dir.glob("*.fna"))
+    if not fnas:
+        return "ERROR: no genome files after download"
+
+    error = _build_skani_sketch(skani_bin, fnas, dst)
+    if error:
+        return error
 
     shutil.copy2(metadata, dst / "metadata.tsv")
-
     return f"built from manifest: {len(fnas)} genomes → panel.sketch"
 
 

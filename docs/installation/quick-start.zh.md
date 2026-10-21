@@ -23,7 +23,7 @@ cd gside
 pixi install
 ```
 
-自动拉取 blast / skani / mash / sourmash / mmseqs2 等。
+自动拉取 blast / skani / mash / sourmash / kraken2 / sylph 等。
 
 ### 3. Python 包
 

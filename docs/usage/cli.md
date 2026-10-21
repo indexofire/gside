@@ -189,6 +189,7 @@ gside meta <reads.fastq> [reads_2.fastq] [options]
 | `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
 | `-f`, `--format` | option | `json` | Output format: `json` / `tsv` |
 | `-o`, `--output PATH` | option | stdout | Write the report to PATH instead of stdout (json written once at the end; stdout then carries no data, a notice goes to stderr) |
+| `-n`, `--no-header` | option | off | Suppress the TSV header row (tsv only; json keeps its structure) |
 | `-t`, `--threads N` | option | `4` | Threads per tool invocation |
 
 ### Examples

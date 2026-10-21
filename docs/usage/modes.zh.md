@@ -168,19 +168,28 @@ gside species contigs.fna --mode all
 ```json
 {
   "verdict": {
-    "species": "Campylobacter jejuni subsp. jejuni NCTC 11168",
+    "species": "Campylobacter_jejuni",
+    "display_name": "Campylobacter jejuni",
+    "strain": "subsp. jejuni NCTC 11168",
     "confidence": "high",
-    "basis": ["panel"]
+    "basis": ["panel"],
+    "supporting": ["marker"],
+    "agreement": "2/3"
   },
   "methods": {
     "marker": { "species": "Campylobacter_jejuni", ... },
-    "panel": { "result": { "species": "...", "ani": 100.0, ... } },
+    "panel": { "result": { "species": "Campylobacter_jejuni", "species_raw":
+      "Campylobacter jejuni subsp. jejuni NCTC 11168", "ani": 100.0, ... } },
     "mash_refseq": { "result": { "species": "...", ... } },
     "sourmash": { "result": { "species": "...", ... } },
     "gtdbtk": { "result": { "species": "...", "classification": "...", ... } }
   }
 }
 ```
+
+`verdict.species` 一律为规范 `Genus_species` 标签（`verdict.display_name`
+为空格可读形式，`verdict.strain` 为菌株）；`supporting` 列出其他一致的方法，
+`agreement` 为 `一致数/成功数`，`basis` 仍是单个胜出方法。
 
 ## 方法选择建议
 

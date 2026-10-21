@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import tempfile
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
+from gside.analysis._envelope import METAGENOMIC, MethodEnvelope
 from gside.config import SPECIES_DB_DIR, which
 from gside.engine._env import require_bin, run_checked
 
@@ -23,18 +24,9 @@ _BRACKEN_THRESHOLD = "10"
 
 
 @dataclass
-class Kraken2Result:
+class Kraken2Result(MethodEnvelope):
+    analysis_type: ClassVar[str] = METAGENOMIC
     method: str = "kraken2_bracken"
-    database: dict[str, str] = field(default_factory=dict)
-    result: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "analysis_type": "metagenomic_profiling",
-            "method": self.method,
-            "database": self.database,
-            "result": self.result,
-        }
 
 
 def _fraction_confidence(fraction: float) -> str:
@@ -94,6 +86,59 @@ def _parse_kreport(path: Path) -> tuple[int, int]:
     return classified + unclassified, classified
 
 
+def _resolve_db(db_dir: str | Path | None) -> Path:
+    db = Path(db_dir) if db_dir else SPECIES_DB_DIR / "D5_kraken2"
+    if not any(db.glob("*.k2d")):
+        raise RuntimeError(
+            f"Kraken2 database not found in {db} (download a prebuilt index: {_K2_INDEXES_URL})"
+        )
+    return db
+
+
+def _run_kraken2(k2_bin: str, db: Path, inputs: list[str], threads: int, work: Path) -> Path:
+    """Classify reads; returns the kreport path."""
+    kreport = work / "kreport.txt"
+    cmd = [
+        k2_bin,
+        "--db",
+        str(db),
+        "--threads",
+        str(threads),
+        "--output",
+        str(work / "kraken.out"),
+        "--report",
+        str(kreport),
+    ]
+    if len(inputs) == 2:
+        cmd.append("--paired")
+    cmd += inputs
+    run_checked(cmd, timeout=3600, name="kraken2 failed")
+    return kreport
+
+
+def _run_bracken(bracken_bin: str, db: Path, kreport: Path, work: Path) -> Path:
+    """Re-estimate species abundances; returns the bracken report path."""
+    bracken_out = work / "bracken.txt"
+    run_checked(
+        [
+            bracken_bin,
+            "-d",
+            str(db),
+            "-i",
+            str(kreport),
+            "-o",
+            str(bracken_out),
+            "-r",
+            _BRACKEN_READ_LEN,
+            "-t",
+            _BRACKEN_THRESHOLD,
+        ],
+        timeout=300,
+        name="bracken failed",
+    )
+    return bracken_out
+
+
 def identify_by_kraken2(
     files: Sequence[str],
     db_dir: str | Path | None = None,
@@ -102,51 +147,13 @@ def identify_by_kraken2(
     """Profile one sample with kraken2 + bracken (1 file = single-end/contigs, 2 = paired)."""
     k2_bin = require_bin("kraken2", hint=_K2_HINT, resolver=which)
     bracken_bin = require_bin("bracken", hint=_BRACKEN_HINT, resolver=which)
-
-    db = Path(db_dir) if db_dir else SPECIES_DB_DIR / "D5_kraken2"
-    if not any(db.glob("*.k2d")):
-        raise RuntimeError(
-            f"Kraken2 database not found in {db} (download a prebuilt index: {_K2_INDEXES_URL})"
-        )
-
+    db = _resolve_db(db_dir)
     inputs = [str(f) for f in files]
+
     with tempfile.TemporaryDirectory(prefix="gside-kraken2-") as tmp:
         work = Path(tmp)
-        kreport = work / "kreport.txt"
-        kraken_cmd = [
-            k2_bin,
-            "--db",
-            str(db),
-            "--threads",
-            str(threads),
-            "--output",
-            str(work / "kraken.out"),
-            "--report",
-            str(kreport),
-        ]
-        if len(inputs) == 2:
-            kraken_cmd.append("--paired")
-        kraken_cmd += inputs
-        run_checked(kraken_cmd, timeout=3600, name="kraken2 failed")
-
-        bracken_out = work / "bracken.txt"
-        run_checked(
-            [
-                bracken_bin,
-                "-d",
-                str(db),
-                "-i",
-                str(kreport),
-                "-o",
-                str(bracken_out),
-                "-r",
-                _BRACKEN_READ_LEN,
-                "-t",
-                _BRACKEN_THRESHOLD,
-            ],
-            timeout=300,
-            name="bracken failed",
-        )
+        kreport = _run_kraken2(k2_bin, db, inputs, threads, work)
+        bracken_out = _run_bracken(bracken_bin, db, kreport, work)
         species = _parse_bracken(bracken_out)
         total_reads, classified_reads = _parse_kreport(kreport)
 

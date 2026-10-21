@@ -176,19 +176,29 @@ Output includes all method results plus final verdict:
 ```json
 {
   "verdict": {
-    "species": "Campylobacter jejuni subsp. jejuni NCTC 11168",
+    "species": "Campylobacter_jejuni",
+    "display_name": "Campylobacter jejuni",
+    "strain": "subsp. jejuni NCTC 11168",
     "confidence": "high",
-    "basis": ["panel"]
+    "basis": ["panel"],
+    "supporting": ["marker"],
+    "agreement": "2/3"
   },
   "methods": {
     "marker": { "species": "Campylobacter_jejuni", "..." : "..." },
-    "panel": { "result": { "species": "...", "ani": 100.0, "..." : "..." } },
+    "panel": { "result": { "species": "Campylobacter_jejuni", "species_raw":
+      "Campylobacter jejuni subsp. jejuni NCTC 11168", "ani": 100.0, "..." : "..." } },
     "mash_refseq": { "result": { "species": "...", "..." : "..." } },
     "sourmash": { "result": { "species": "...", "..." : "..." } },
     "gtdbtk": { "result": { "species": "...", "classification": "...", "..." : "..." } }
   }
 }
 ```
+
+`verdict.species` is always the canonical `Genus_species` label
+(`verdict.display_name` carries the spaced form, `verdict.strain` the strain).
+`supporting` lists other methods that agree, `agreement` summarises
+`agreeing/successful`; `basis` stays the single winning method.
 
 ## Method Selection Guide
 

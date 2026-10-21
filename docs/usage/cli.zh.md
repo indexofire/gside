@@ -179,6 +179,7 @@ gside meta <reads.fastq> [reads_2.fastq] [选项]
 | `-D`，`--db-dir` | 选项 | 自动 | 数据库根目录（`$GSIDE_DB_DIR` 或 `data/db`） |
 | `-f`，`--format` | 选项 | `json` | 输出格式：`json` / `tsv` |
 | `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH 而非 stdout（json 为单文档收尾一次写入；stdout 不再输出数据，提示信息走 stderr） |
+| `-n`，`--no-header` | 选项 | 关 | 隐藏 TSV 表头行（仅 tsv；json 保持结构） |
 | `-t`，`--threads N` | 选项 | `4` | 每次工具调用的线程数 |
 
 ### 示例

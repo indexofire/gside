@@ -104,7 +104,8 @@ class TestClassifyWf:
         monkeypatch.setattr(gt, "run_checked", _fake_run_checked())
         r = identify_by_gtdbtk(_contigs(tmp_path))
         assert r.method == "gtdbtk"
-        assert r.result["species"] == "Clostridium perfringens"
+        assert r.result["species"] == "Clostridium_perfringens"
+        assert r.result["species_raw"] == "Clostridium perfringens"
         assert r.result["confidence"] == "high"
         assert r.result["classification"] == _BAC120_LINE
 

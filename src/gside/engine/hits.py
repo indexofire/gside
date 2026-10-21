@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import contextlib
 from dataclasses import dataclass
 from typing import Any
 
 
 @dataclass
 class Hit:
-    """Unified alignment result (BLAST tabular + minimap2 PAF)."""
+    """BLAST tabular alignment row (outfmt 6)."""
 
     query_id: str = ""
     subject_id: str = ""
@@ -25,7 +24,6 @@ class Hit:
     query_length: int = 0
     subject_length: int = 0
     mismatches: int = 0
-    mapq: int = 0
     backend: str = ""
 
     @classmethod
@@ -60,56 +58,6 @@ class Hit:
             subject_coverage=scov,
             strand="+" if int(f[8]) <= int(f[9]) else "-",
             backend="blast",
-        )
-
-    @classmethod
-    def from_paf_line(cls, line: str) -> Hit:
-        """Parse minimap2 PAF line (>=12 columns + optional tags)."""
-        line = line.strip()
-        if not line or line.startswith("#"):
-            raise ValueError("Empty/comment PAF line")
-        f = line.split("\t")
-        if len(f) < 12:
-            raise ValueError(f"Invalid PAF line: {line}")
-
-        qlen = int(f[1])
-        qstart = int(f[2])
-        qend = int(f[3])
-        strand = f[4]
-        tname = f[5]
-        tlen = int(f[6])
-        tstart = int(f[7])
-        tend = int(f[8])
-        nmatch = int(f[9])
-        aln_len = int(f[10])
-        mapq = int(f[11])
-
-        identity = (nmatch / aln_len * 100.0) if aln_len > 0 else 0.0
-        qcov = ((qend - qstart) / qlen * 100.0) if qlen > 0 else 0.0
-        scov = ((tend - tstart) / tlen * 100.0) if tlen > 0 else 0.0
-
-        mismatches = 0
-        for tag in f[12:]:
-            parts = tag.split(":", 2)
-            if len(parts) == 3 and parts[0] == "NM" and parts[1] == "i":
-                with contextlib.suppress(ValueError):
-                    mismatches = int(parts[2])
-
-        return cls(
-            query_id=f[0],
-            subject_id=tname,
-            identity=identity,
-            alignment_length=aln_len,
-            mismatches=mismatches,
-            query_start=qstart,
-            query_end=qend,
-            subject_start=tstart,
-            subject_end=tend,
-            strand=strand,
-            mapq=mapq,
-            query_coverage=qcov,
-            subject_coverage=scov,
-            backend="minimap2",
         )
 
     def to_dict(self) -> dict[str, Any]:

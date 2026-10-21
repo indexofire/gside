@@ -1,41 +1,32 @@
-"""ANI-based species identification (species-id plan A: panel / skani_gtdb / mash_refseq)."""
+"""ANI-based species identification (species-id plan A: panel / mash_refseq)."""
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from gside.analysis._envelope import MethodEnvelope
+from gside.analysis._thresholds import ANI_HIGH, ANI_MEDIUM
+from gside.analysis.species_name import apply_species_name
 from gside.config import SPECIES_DB_DIR
 from gside.engine.backends.skani import AniHit
 
 _DB_BY_MODE = {
     "panel": "D2_ani",
-    "skani_gtdb": "D2_skani_gtdb",
     "mash_refseq": "D3_mash",
 }
 
-_ANI_HIGH = 95.0
-_ANI_MEDIUM = 93.0
 _AF_MIN = 0.65
 _MASH_IDENTITY_HIGH = 0.97
+_MASH_IDENTITY_MEDIUM = 0.90
 _TOP_N = 10
 
 
 @dataclass
-class AniIdResult:
-    method: str
-    database: dict[str, str]
-    result: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "analysis_type": "species_identification",
-            "method": self.method,
-            "database": self.database,
-            "result": self.result,
-        }
+class AniIdResult(MethodEnvelope):
+    pass
 
 
 def _hits_from_rows(rows: list[tuple[str, float, float]]) -> list[AniHit]:
@@ -96,6 +87,73 @@ def _db_version(db_dir: Path, name: str) -> str:
     return "unknown"
 
 
+def _mash_result(
+    base: Path,
+    contigs: str | Path,
+    taxa: dict[str, str],
+    threads: int,
+) -> dict[str, Any]:
+    """mash_refseq: nearest RefSeq sketch by MinHash identity."""
+    msh = base / "mash.msh"
+    if not msh.exists():
+        msh = base / "payload.bin"
+    if not msh.exists():
+        raise RuntimeError(f"mash sketch DB not found in {base} (run: gside db setup --tier mash)")
+
+    mash_rows = _mash_dist(contigs, msh, threads)
+    mash_top = sorted(mash_rows, key=lambda r: -r[1])[:_TOP_N]
+    best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)
+    raw_species = taxa.get(best_ref, _mash_species(best_ref)) if best_ref else "Unknown"
+
+    confidence = "high" if best_identity >= _MASH_IDENTITY_HIGH else "low"
+    if _MASH_IDENTITY_MEDIUM <= best_identity < _MASH_IDENTITY_HIGH:
+        confidence = "medium"
+    result = {
+        "confidence": confidence,
+        "identity": best_identity,
+        "top_hits": [{"genome": r, "identity": i} for r, i in mash_top],
+    }
+    return apply_species_name(result, raw_species or "Unknown")
+
+
+def _panel_result(
+    base: Path,
+    contigs: str | Path,
+    taxa: dict[str, str],
+    threads: int,
+) -> dict[str, Any]:
+    """panel: skani ANI against the curated reference panel."""
+    skani_db = base / "panel.sketch" if (base / "panel.sketch").exists() else base
+    skani_hits = sorted(
+        _skani_search(contigs, skani_db, threads), key=lambda h: (-h.ani, -h.aligned_fraction)
+    )
+    top = skani_hits[:_TOP_N]
+    best = top[0] if top else None
+
+    species, confidence = "Unknown", "low"
+    if best is not None and best.aligned_fraction >= _AF_MIN:
+        if best.ani >= ANI_HIGH:
+            species, confidence = taxa.get(best.ref, best.ref), "high"
+        elif best.ani >= ANI_MEDIUM:
+            species, confidence = taxa.get(best.ref, best.ref), "medium"
+
+    result = {
+        "confidence": confidence,
+        "ani": best.ani if best else None,
+        "aligned_fraction": best.aligned_fraction if best else None,
+        "top_hits": [
+            {
+                "genome": h.ref,
+                "species": taxa.get(h.ref, h.ref),
+                "ani": h.ani,
+                "af": h.aligned_fraction,
+            }
+            for h in top
+        ],
+    }
+    return apply_species_name(result, species)
+
+
 def identify_by_ani(
     contigs: str | Path,
     mode: str,
@@ -110,57 +168,9 @@ def identify_by_ani(
     database = {"name": db_name, "version": _db_version(base, db_name)}
 
     if mode == "mash_refseq":
-        msh = base / "mash.msh"
-        if not msh.exists():
-            msh = base / "payload.bin"
-        if not msh.exists():
-            raise RuntimeError(
-                f"mash sketch DB not found in {base} (run: gside db setup --tier mash)"
-            )
-        mash_rows = _mash_dist(contigs, msh, threads)
-        mash_top = sorted(mash_rows, key=lambda r: -r[1])[:_TOP_N]
-        best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)
-        species = taxa.get(best_ref, _mash_species(best_ref)) if best_ref else "Unknown"
-        confidence = "high" if best_identity >= _MASH_IDENTITY_HIGH else "low"
-        result = {
-            "species": species or "Unknown",
-            "confidence": confidence,
-            "identity": best_identity,
-            "top_hits": [{"genome": r, "identity": i} for r, i in mash_top],
-        }
-        if 0.90 <= best_identity < _MASH_IDENTITY_HIGH:
-            result["confidence"] = "medium"
-        return AniIdResult(method=mode, database=database, result=result)
-
-    skani_db = base / "panel.sketch" if (base / "panel.sketch").exists() else base
-    skani_hits = sorted(
-        _skani_search(contigs, skani_db, threads), key=lambda h: (-h.ani, -h.aligned_fraction)
-    )
-    top = skani_hits[:_TOP_N]
-    best = top[0] if top else None
-
-    species, confidence = "Unknown", "low"
-    if best is not None:
-        if best.ani >= _ANI_HIGH and best.aligned_fraction >= _AF_MIN:
-            species, confidence = taxa.get(best.ref, best.ref), "high"
-        elif _ANI_MEDIUM <= best.ani < _ANI_HIGH and best.aligned_fraction >= _AF_MIN:
-            species, confidence = taxa.get(best.ref, best.ref), "medium"
-
-    result = {
-        "species": species,
-        "confidence": confidence,
-        "ani": best.ani if best else None,
-        "aligned_fraction": best.aligned_fraction if best else None,
-        "top_hits": [
-            {
-                "genome": h.ref,
-                "species": taxa.get(h.ref, h.ref),
-                "ani": h.ani,
-                "af": h.aligned_fraction,
-            }
-            for h in top
-        ],
-    }
+        result = _mash_result(base, contigs, taxa, threads)
+    else:
+        result = _panel_result(base, contigs, taxa, threads)
     return AniIdResult(method=mode, database=database, result=result)
 
 

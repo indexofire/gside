@@ -1,4 +1,4 @@
-"""Pure unit tests for skani/blast/mmseqs2 backends (subprocess stubbed)."""
+"""Pure unit tests for skani/blast backends (subprocess stubbed)."""
 
 from __future__ import annotations
 
@@ -9,10 +9,8 @@ from pathlib import Path
 import pytest
 
 from gside.engine.backends import blast as blast_mod
-from gside.engine.backends import mmseqs2 as mmseqs_mod
 from gside.engine.backends import skani as skani_mod
 from gside.engine.backends.blast import BlastBackend
-from gside.engine.backends.mmseqs2 import Mmseqs2Backend, parse_cluster_tsv
 from gside.engine.backends.skani import SkaniBackend
 
 
@@ -24,14 +22,12 @@ def _completed(stdout: str = "", returncode: int = 0, stderr: str = ""):
 def nobin(monkeypatch):
     monkeypatch.setattr(skani_mod, "which", lambda tool: None)
     monkeypatch.setattr(blast_mod, "which", lambda tool: None)
-    monkeypatch.setattr(mmseqs_mod, "which", lambda tool: None)
 
 
 @pytest.fixture()
 def fakebin(monkeypatch):
     monkeypatch.setattr(skani_mod, "which", lambda tool: "/bin/skani")
     monkeypatch.setattr(blast_mod, "which", lambda tool: "/bin/blastn")
-    monkeypatch.setattr(mmseqs_mod, "which", lambda tool: "/bin/mmseqs")
     import gside.engine.backends.kmer as kmer_mod
 
     monkeypatch.setattr(kmer_mod, "which", lambda tool: "/bin/mash")
@@ -45,10 +41,6 @@ class TestFindBin:
     def test_blast_missing(self, nobin):
         with pytest.raises(RuntimeError, match="blastn not found"):
             BlastBackend()
-
-    def test_mmseqs_missing(self, nobin):
-        with pytest.raises(RuntimeError, match="mmseqs not found"):
-            Mmseqs2Backend()
 
 
 class TestExplicitBinary:
@@ -175,67 +167,6 @@ class TestEnsureIndex:
         backend = BlastBackend.__new__(BlastBackend)
         with pytest.raises(RuntimeError, match="makeblastdb not found"):
             backend.make_db(Path("a"), Path("b"))
-
-
-class TestParseClusterTsv:
-    def test_grouping_and_skips(self, tmp_path):
-        tsv = tmp_path / "c.tsv"
-        tsv.write_text("rep1\tm1\nrep1\tm2\nlonely\nrep2\t\nrep2\tm3\n")
-        assert parse_cluster_tsv(tsv) == {"rep1": ["m1", "m2"], "rep2": ["m3"]}
-
-
-class TestKmaParseRes:
-    def _backend(self, monkeypatch):
-        import gside.engine.backends.kma as kma_mod
-        from gside.engine.backends.kma import KmaBackend
-
-        monkeypatch.setattr(kma_mod, "which", lambda tool: "/bin/kma")
-        return KmaBackend()
-
-    def test_missing_file(self, monkeypatch, tmp_path):
-        assert self._backend(monkeypatch)._parse_res(tmp_path / "x", 0.0, 0.0) == []
-
-    def test_header_only(self, monkeypatch, tmp_path):
-        (tmp_path / "r.res").write_text("#Template\tTemplate_Identity\n")
-        assert self._backend(monkeypatch)._parse_res(tmp_path / "r", 0.0, 0.0) == []
-
-    def test_rows_and_filters(self, monkeypatch, tmp_path):
-        (tmp_path / "r.res").write_text(
-            "#Template\tTemplate_Identity\tTemplate_Coverage\tDepth\n"
-            "blaCTX-M-15\t100.0\t100.0\t30.0\n"
-            "\t99.0\t99.0\t10.0\n"
-            "blaTEM\tbadnum\tbadnum\t5.0\n"
-            "blaSHV\t80.0\t80.0\t5.0\n"
-        )
-        hits = self._backend(monkeypatch)._parse_res(tmp_path / "r", 90.0, 90.0)
-        assert [h.subject_id for h in hits] == ["blaCTX-M-15"]
-        assert hits[0].backend == "kma"
-
-    def test_parse_template(self, monkeypatch):
-        gene, acc, product = self._backend(monkeypatch)._parse_template("markers~~~inva~~~M90846.1")
-        assert (gene, acc) == ("inva", "M90846.1")
-
-    def test_make_index_cmd(self, monkeypatch, tmp_path):
-        import subprocess
-
-        import gside.engine.backends.kma as kma_mod
-
-        monkeypatch.setattr(kma_mod, "which", lambda tool: "/bin/kma")
-        seen = {}
-        monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: seen.update(cmd=cmd))
-        out = self._backend(monkeypatch).make_index(tmp_path / "t.fna", tmp_path / "idx")
-        assert seen["cmd"][:3] == ["/bin/kma", "index", "-i"]
-        assert out == tmp_path / "idx"
-
-    def test_find_failure(self, monkeypatch, tmp_path):
-        import subprocess
-
-        import gside.engine.backends.kma as kma_mod
-
-        monkeypatch.setattr(kma_mod, "which", lambda tool: "/bin/kma")
-        monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed("", 1, "boom"))
-        with pytest.raises(RuntimeError, match="KMA failed"):
-            self._backend(monkeypatch).find(tmp_path / "r1.fq", tmp_path / "idx")
 
 
 class TestMakeDbAndFlags:

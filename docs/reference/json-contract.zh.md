@@ -36,8 +36,12 @@
   },
   "verdict": {
     "species": "Campylobacter_jejuni",
+    "display_name": "Campylobacter jejuni",
+    "strain": null,
     "confidence": "high",
-    "basis": ["marker"]
+    "basis": ["marker"],
+    "supporting": [],
+    "agreement": "1/1"
   }
 }
 ```
@@ -59,7 +63,9 @@
         "version": "e5f6g7h8"
       },
       "result": {
-        "species": "Campylobacter jejuni subsp. jejuni NCTC 11168",
+        "species": "Campylobacter_jejuni",
+        "species_raw": "Campylobacter jejuni subsp. jejuni NCTC 11168",
+        "strain": "subsp. jejuni NCTC 11168",
         "confidence": "high",
         "ani": 100.0,
         "aligned_fraction": 95.2,
@@ -77,9 +83,13 @@
     "sourmash": { ... }
   },
   "verdict": {
-    "species": "Campylobacter jejuni subsp. jejuni NCTC 11168",
+    "species": "Campylobacter_jejuni",
+    "display_name": "Campylobacter jejuni",
+    "strain": "subsp. jejuni NCTC 11168",
     "confidence": "high",
-    "basis": ["panel"]
+    "basis": ["panel"],
+    "supporting": ["mash_refseq"],
+    "agreement": "2/2"
   }
 }
 ```
@@ -103,13 +113,42 @@
 | `version` | str | gside 版本号 |
 | `contigs` | str | 输入 contigs 文件路径 |
 | `methods` | dict | 每个运行的方法的结果（key = mode 名） |
-| `methods.<mode>.species` | str | 该方法判定的物种（Unknown 表示无法判定） |
+| `methods.<mode>.species` | str | 该方法判定的规范名 `Genus_species`（Unknown 表示无法判定） |
+| `methods.<mode>.species_raw` | str | 工具原始标签，仅当与 `species` 不同时出现 |
+| `methods.<mode>.strain` | str | 该方法解析出的菌株/登录号细节 |
 | `methods.<mode>.confidence` | str | high / medium / low |
 | `methods.<mode>.result` | dict | ANI/sourmash 方法的嵌套结果（marker 无此层） |
 | `methods.<mode>.error` | str | 方法执行错误（仅失败时出现） |
-| `verdict.species` | str | 最终仲裁判定 |
+| `verdict.species` | str | 最终仲裁判定（规范名 `Genus_species`） |
+| `verdict.display_name` | str | 同一判定的可读形式（空格分隔，如 `Escherichia coli`） |
+| `verdict.strain` | str \| null | 胜出方法给出的菌株信息 |
 | `verdict.confidence` | str | 最终置信度 |
-| `verdict.basis` | list[str] | 判定依据的方法列表 |
+| `verdict.basis` | list[str] | 产生该判定的方法（单个） |
+| `verdict.supporting` | list[str] | 其他成功且与 `verdict.species` 一致的方法 |
+| `verdict.agreement` | str | `一致数/成功数`，如 `2/3`（按标签精确匹配） |
+
+`agreement` 按规范标签精确比对。marker 的致病型标签（`DEC`、`Shigella_EIEC`）
+有意与所属二名法区分：同一个 E. coli 基因组可能 marker 报 `DEC`、panel 报
+`Escherichia_coli`，此时 `agreement` 为 `2/3`，但两者指向同一物种。**不要**把
+DEC 折叠成 `Escherichia_coli`——这个区分正是下游致病型分型的路由依据。
+
+## 物种名契约
+
+`species` 一律为下划线分隔的 `Genus_species`，与
+`data/db/D1_marker/marker_rules.yaml` 及下游 bacmap 注册表一致：
+
+| 档位 | 工具原始标签 | `species` |
+|---|---|---|
+| marker | `Streptococcus_agalactiae` | `Streptococcus_agalactiae`（原样） |
+| panel | `Streptococcus agalactiae 2603V/R` | `Streptococcus_agalactiae` |
+| mash_refseq | `Streptococcus_agalactiae_GCF_949788565.1` | `Streptococcus_agalactiae` |
+| sourmash | `...;s__Vibrio parahaemolyticus` | `Vibrio_parahaemolyticus` |
+| gtdbtk | `Vibrio cholerae` | `Vibrio_cholerae` |
+
+带血清群/致病型后缀的 marker 注册标签（`Vibrio_cholerae_O1`、
+`Shigella_EIEC`、`DEC`、`Salmonella`）本身即契约形式，原样透传。菌株/登录号
+文本绝不拼进 `species`（点号会破坏下游匹配），统一放入 `strain`。
+种组占位（`Campylobacter sp.`）与 `Unknown` 一律输出 `Unknown`。
 
 ## ANI 方法特有字段（panel / mash_refseq）
 

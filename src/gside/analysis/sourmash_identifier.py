@@ -6,10 +6,12 @@ import csv
 import json
 import subprocess
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from gside.analysis._envelope import MethodEnvelope
+from gside.analysis.species_name import apply_species_name
 from gside.config import SPECIES_DB_DIR
 
 _FUW_HIGH = 0.90
@@ -18,18 +20,8 @@ _MIXTURE_MEMBER = 0.10
 
 
 @dataclass
-class SourmashIdResult:
-    method: str
-    database: dict[str, str]
-    result: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "analysis_type": "species_identification",
-            "method": self.method,
-            "database": self.database,
-            "result": self.result,
-        }
+class SourmashIdResult(MethodEnvelope):
+    pass
 
 
 def _run(cmd: list[str]) -> str:
@@ -113,7 +105,6 @@ def identify_by_sourmash(contigs: str | Path, db_dir: str | Path | None = None) 
         species, confidence = "Mixed/Unknown", "low"
 
     result = {
-        "species": species or "Mixed/Unknown",
         "confidence": confidence,
         "f_unique_weighted": best_fuw,
         "gather_partition": [
@@ -122,4 +113,5 @@ def identify_by_sourmash(contigs: str | Path, db_dir: str | Path | None = None) 
         ],
         "flags": flags,
     }
+    apply_species_name(result, species or "Mixed/Unknown")
     return SourmashIdResult(method="sourmash", database=database, result=result)

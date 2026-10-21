@@ -293,6 +293,28 @@ class TestSylphUnavailable:
             sy.identify_by_sylph(["r.fq"])
 
 
+class TestSylphNameResolution:
+    def test_metadata_tsv_maps_full_name_and_stem(self, tmp_path):
+        (tmp_path / "metadata.tsv").write_text(
+            "genome_path\tspecies\n"
+            "/genomes/GCF_000005845.2_ASM584v2_genomic.fna\tEscherichia coli\n"
+        )
+        mapping = sy._load_taxa_map(tmp_path)
+        assert mapping["/genomes/GCF_000005845.2_ASM584v2_genomic.fna"] == "Escherichia coli"
+        assert mapping["GCF_000005845.2_ASM584v2_genomic"] == "Escherichia coli"
+
+    def test_missing_metadata_returns_empty(self, tmp_path):
+        assert sy._load_taxa_map(tmp_path / "nested") == {}
+
+    def test_short_rows_skipped(self, tmp_path):
+        (tmp_path / "metadata.tsv").write_text("header\nonlyonecolumn\n")
+        assert sy._load_taxa_map(tmp_path) == {}
+
+    def test_genome_stem_fallback(self):
+        assert sy._species_from_genome_file("/x/Escherichia_coli.fna") == "Escherichia coli"
+        assert sy._species_from_genome_file("/x/GCF_000005845.2.fna") == "GCF_000005845.2"
+
+
 class TestSylphHappyPath:
     def test_profile_parsed_with_ani_confidence(self, monkeypatch, tmp_path):
         db = _sy_ready(monkeypatch, tmp_path)
@@ -530,7 +552,8 @@ class TestMetaVerdict:
         payload = _run_capture(monkeypatch, capsys, ["r1.fq", "r2.fq"])
         top = payload["verdict"]["top_species"]
         names = [row["name"] for row in top]
-        assert names == ["Escherichia coli", "Salmonella enterica", "Campylobacter jejuni"]
+        assert names == ["Escherichia_coli", "Salmonella_enterica", "Campylobacter_jejuni"]
+        assert top[0]["display_name"] == "Escherichia coli"
         e_coli = top[0]
         assert e_coli["method"] == "sylph"  # high (sylph) beats low (kraken2)
         assert e_coli["abundance"] == pytest.approx(0.80)
@@ -540,6 +563,41 @@ class TestMetaVerdict:
         assert top[1]["ani"] is None
         assert payload["verdict"]["richness"] == 3
         assert payload["verdict"]["basis"] == ["kraken2", "sylph"]
+
+    def test_species_group_placeholders_dropped(self, monkeypatch, capsys):
+        _stub_both(
+            monkeypatch,
+            k2_species=[
+                {"name": "Campylobacter sp. CCS1377", "fraction": 0.01, "confidence": "low"},
+                {"name": "Escherichia coli", "fraction": 0.5, "confidence": "high"},
+            ],
+            sy_species=[],
+        )
+        payload = _run_capture(monkeypatch, capsys, ["r.fq"])
+        names = [row["name"] for row in payload["verdict"]["top_species"]]
+        assert names == ["Escherichia_coli"]
+        assert payload["verdict"]["richness"] == 1
+
+    def test_sylph_strain_kept_out_of_the_label(self, monkeypatch, capsys):
+        _stub_both(
+            monkeypatch,
+            k2_species=[],
+            sy_species=[
+                {
+                    "name": "Escherichia coli str. K-12 substr. W3110",
+                    "ani": 99.9,
+                    "abundance": 0.9,
+                    "coverage": 200.0,
+                    "confidence": "high",
+                }
+            ],
+        )
+        payload = _run_capture(monkeypatch, capsys, ["r.fq"])
+        row = payload["verdict"]["top_species"][0]
+        assert row["name"] == "Escherichia_coli"
+        assert row["display_name"] == "Escherichia coli"
+        assert row["strain"] == "str. K-12 substr. W3110"
+        assert row["species_raw"] == "Escherichia coli str. K-12 substr. W3110"
 
     def test_empty_name_entries_skipped(self, monkeypatch, capsys):
         _stub_both(
@@ -579,21 +637,77 @@ class TestMetaJsonContract:
         assert payload["version"] == __version__
 
 
+class TestConfidenceThresholds:
+    @pytest.mark.parametrize(
+        "fraction,expected",
+        [(0.10, "high"), (0.099, "medium"), (0.01, "medium"), (0.009, "low"), (0.0, "low")],
+    )
+    def test_kraken2_fraction_bands(self, fraction, expected):
+        from gside.analysis.kraken2_identifier import _fraction_confidence
+
+        assert _fraction_confidence(fraction) == expected
+
+    @pytest.mark.parametrize(
+        "ani,expected",
+        [(95.0, "high"), (94.99, "medium"), (93.0, "medium"), (92.99, "low")],
+    )
+    def test_ani_bands(self, ani, expected):
+        from gside.analysis._thresholds import ani_confidence
+
+        assert ani_confidence(ani) == expected
+
+
+class TestMetaVerdictTieBreak:
+    def test_sylph_wins_equal_confidence(self, monkeypatch, capsys):
+        _stub_both(
+            monkeypatch,
+            k2_species=[
+                {
+                    "name": "Escherichia coli",
+                    "taxid": 562,
+                    "reads": 100,
+                    "fraction": 0.6,
+                    "confidence": "high",
+                }
+            ],
+            sy_species=[
+                {
+                    "name": "Escherichia coli",
+                    "ani": 99.0,
+                    "abundance": 0.6,
+                    "coverage": 100.0,
+                    "confidence": "high",
+                }
+            ],
+        )
+        payload = _run_capture(monkeypatch, capsys, ["r.fq"])
+        row = payload["verdict"]["top_species"][0]
+        assert row["method"] == "sylph"
+        assert row["ani"] == 99.0
+
+
 class TestMetaTsv:
     def test_header_and_rows(self, monkeypatch, capsys):
         _stub_both(monkeypatch)
         assert _run_meta(["r1.fq", "r2.fq"], "all", None, output_format="tsv") == 0
         lines = capsys.readouterr().out.splitlines()
         assert lines[0] == "method\tname\tabundance\tconfidence\tani"
-        assert lines[1] == "sylph\tEscherichia coli\t0.8\thigh\t97.5"
-        assert lines[2] == "kraken2\tSalmonella enterica\t0.2\tmedium\t"
-        assert lines[3] == "sylph\tCampylobacter jejuni\t0.05\tlow\t92.0"
+        assert lines[1] == "sylph\tEscherichia_coli\t0.8\thigh\t97.5"
+        assert lines[2] == "kraken2\tSalmonella_enterica\t0.2\tmedium\t"
+        assert lines[3] == "sylph\tCampylobacter_jejuni\t0.05\tlow\t92.0"
 
     def test_kraken2_only_rows_have_blank_ani(self, monkeypatch, capsys):
         _stub_both(monkeypatch)
         assert _run_meta(["r.fq"], "kraken2", None, output_format="tsv") == 0
         row = capsys.readouterr().out.splitlines()[1].split("\t")
         assert row[0] == "kraken2" and row[4] == ""
+
+    def test_no_header_omits_header_row(self, monkeypatch, capsys):
+        _stub_both(monkeypatch)
+        assert _run_meta(["r.fq"], "kraken2", None, output_format="tsv", no_header=True) == 0
+        lines = capsys.readouterr().out.splitlines()
+        assert lines[0].startswith("kraken2\t")
+        assert "method\tname" not in lines[0]
 
 
 class TestMetaOutputFile:

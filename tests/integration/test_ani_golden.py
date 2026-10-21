@@ -24,7 +24,7 @@ class TestPanelSelfIdentity:
         from gside.analysis.ani_identifier import identify_by_ani
 
         r = identify_by_ani(str(_K12), mode="panel").result
-        assert "Escherichia coli" in r["species"]
+        assert r["species"] == "Escherichia_coli"
         assert r["confidence"] == "high"
         assert r["ani"] >= 99.0
         assert r["aligned_fraction"] >= 0.65
