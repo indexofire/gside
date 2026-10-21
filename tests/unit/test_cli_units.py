@@ -294,16 +294,24 @@ class TestCommandsEndToEnd:
     def test_validate_command(self, monkeypatch, tmp_path):
         from click.testing import CliRunner
 
-        class _R:
-            def to_dict(self):
-                return {"ok": True}
+        import gside.analysis.taxonomic_validator as tv
 
-        monkeypatch.setattr(
-            "gside.analysis.taxonomic_validator.validate_genome",
-            lambda c, mode, output_dir: _R(),
+        seen: dict[str, object] = {}
+
+        def fake(contigs, output_dir, threads=4):
+            seen.update(contigs=contigs, output_dir=output_dir, threads=threads)
+            return tv.ValidateResult(status="ok", quality={"verdict": "PASS"})
+
+        monkeypatch.setattr(tv, "validate_genome", fake)
+        source = tmp_path / "x.fna"
+        source.write_text(">c\nACGT\n")
+        result = CliRunner().invoke(
+            main, ["validate", str(source), "-o", str(tmp_path / "tax"), "-t", "8"]
         )
-        result = CliRunner().invoke(main, ["validate", "x.fna", "--mode", "simple"])
-        assert result.exit_code == 0 and '"ok": true' in result.output.lower()
+        assert result.exit_code == 0, result.output
+        assert seen["threads"] == 8
+        assert str(seen["output_dir"]).endswith("tax")
+        assert '"verdict": "PASS"' in result.output
 
 
 class TestSpeciesShortFlags:
@@ -999,27 +1007,49 @@ class TestCompositeUnknownMode:
             _identify_one("g.fna", "bogus", None)
 
 
-class TestValidateShortFlags:
-    def test_help_lists_short_flags(self):
+class TestValidateContract:
+    def test_help_lists_output_and_threads(self):
         result = CliRunner().invoke(main, ["validate", "-h"])
         assert result.exit_code == 0
-        assert "-m, --mode" in result.output
         assert "-o, --output-dir" in result.output
+        assert "-t, --threads" in result.output
+        assert "--mode" not in result.output
 
-    def test_short_flags_run(self, monkeypatch, tmp_path):
+    def test_output_dir_is_required(self, tmp_path):
+        source = tmp_path / "g.fna"
+        source.write_text(">c\nACGT\n")
+        result = CliRunner().invoke(main, ["validate", str(source)])
+        assert result.exit_code == 2
+        assert "-o" in result.output and "Missing option" in result.output
+
+    def test_mode_flag_is_gone(self, tmp_path):
+        source = tmp_path / "g.fna"
+        source.write_text(">c\nACGT\n")
+        result = CliRunner().invoke(
+            main, ["validate", str(source), "-m", "simple", "-o", str(tmp_path / "t")]
+        )
+        assert result.exit_code == 2
+        assert "No such option" in result.output
+
+    def test_output_dir_cannot_be_a_file(self, tmp_path):
+        source = tmp_path / "g.fna"
+        source.write_text(">c\nACGT\n")
+        target = tmp_path / "notadir"
+        target.write_text("x")
+        result = CliRunner().invoke(main, ["validate", str(source), "-o", str(target)])
+        assert result.exit_code == 2
+        assert "is a file" in result.output
+
+    def test_partial_status_exits_1(self, monkeypatch, tmp_path):
         import gside.analysis.taxonomic_validator as tv
 
-        seen: dict[str, object] = {}
-
-        def fake_validate(contigs, mode="simple", output_dir=None):
-            seen.update(contigs=contigs, mode=mode, output_dir=output_dir)
-            return tv.TaxonomyResult(mode=mode, marker_gene_species="Salmonella")
-
-        monkeypatch.setattr(tv, "validate_genome", fake_validate)
-        result = CliRunner().invoke(
-            main,
-            ["validate", "g.fna", "-m", "standard", "-o", str(tmp_path / "tax")],
+        monkeypatch.setattr(
+            tv,
+            "validate_genome",
+            lambda c, o, threads=4: tv.ValidateResult(status="partial", errors=["no gtdbtk"]),
         )
-        assert result.exit_code == 0, result.output
-        assert seen["mode"] == "standard"
-        assert str(seen["output_dir"]).endswith("tax")
+        source = tmp_path / "x.fna"
+        source.write_text(">c\nACGT\n")
+        result = CliRunner().invoke(main, ["validate", str(source), "-o", str(tmp_path / "tax")])
+        assert result.exit_code == 1
+        assert '"status": "partial"' in result.output

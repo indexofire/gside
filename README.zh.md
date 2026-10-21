@@ -136,8 +136,9 @@ gside db <subcommand>
   setup              安装数据库（--tier mini|panel|mash|sourmash|all）
   list               层级列表+状态（--format table|tsv|csv|json）
 
-gside validate <contigs.fna>
-  --mode simple|standard
+gside validate <contigs.fna> -o <目录>
+  -o, --output-dir   必填；输出 validation.json
+  -t, --threads      CheckM2 + GTDB-Tk 线程数
 
 gside mcp            MCP stdio 服务器
 gside --version      版本信息

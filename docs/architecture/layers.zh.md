@@ -32,7 +32,7 @@ gside/
 │       ├── gtdbtk_identifier.py      L3 GTDB-Tk 定位
 │       ├── kraken2_identifier.py     meta：kraken2 + bracken
 │       ├── sylph_identifier.py       meta：sylph ANI 定量
-│       ├── taxonomic_validator.py    L3（已通过 `gside validate` 接入）
+│       ├── taxonomic_validator.py    CheckM2 + GTDB-Tk 质控（`gside validate`）
 │       ├── _envelope.py              共享结果字典外壳
 │       └── _thresholds.py            共享 ANI 置信度阈值
 ├── data/
@@ -46,8 +46,8 @@ gside/
 └── tests/
 ```
 
-注：`taxonomic_validator.py` 已通过 `gside validate` 接入（simple 模式开箱即用，
-standard 模式需 CheckM2/GTDB-Tk 环境）。当前 `species` 命令提供
+注：`taxonomic_validator.py` 由 `gside validate` 驱动，做 CheckM2 + GTDB-Tk
+组装质控（需 `CHECKM2DB` 与 `GTDBTK_DATA_PATH` 环境）。当前 `species` 命令提供
 marker / panel / mash_refseq / sourmash / gtdbtk / all 六种模式。
 
 ## 设计原则

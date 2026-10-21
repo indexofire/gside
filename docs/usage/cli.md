@@ -125,31 +125,60 @@ gside db setup --tier panel --source /path/to/existing/data/db
 
 ## gside validate
 
-Assembly validation with marker genes, optionally CheckM2 + GTDB-Tk.
+Assembly **quality control**: CheckM2 (completeness / contamination) plus
+GTDB-Tk classification. It does not run marker rules — use `scan` for
+identification.
 
 ### Usage
 
 ```bash
-gside validate <contigs.fasta> [options]
+gside validate <contigs.fasta> -o <output-dir> [options]
 ```
 
 ### Arguments
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `contigs` | positional | — | Assembled contigs FASTA file |
-| `-m`, `--mode` | option | `simple` | Validation depth: `simple` (marker genes) or `standard` (adds CheckM2 + GTDB-Tk) |
-| `-o`, `--output-dir` | option | auto | Directory for `validation.json` (note: a directory, unlike `scan -o` which takes a file) |
+| `contigs` | positional | — | Assembled contigs FASTA (must exist) |
+| `-o`, `--output-dir` | option | **required** | Directory for `validation.json` (created if missing; a directory, not a file) |
+| `-t`, `--threads` | option | `4` | Threads for CheckM2 `--threads` and GTDB-Tk `--cpus` |
 
-`standard` mode degrades gracefully: missing CheckM2/GTDB-Tk databases or
-binaries produce warnings and partial results, never a crash. Configure via
-`CHECKM2DB` / `GTDBTK_DATA_PATH` (or `GTDBDB`) environment variables.
+Both tools are required for a complete report. Missing databases/binaries are
+recorded per tool instead of crashing:
+
+| `status` | Meaning | Exit code |
+|----------|---------|-----------|
+| `ok` | CheckM2 and GTDB-Tk both ran | 0 |
+| `partial` | exactly one tool ran | 1 |
+| `error` | neither tool ran | 1 |
+
+A low-quality genome (e.g. `WARNING`) is a **result**, not a command failure:
+it still exits 0 when both tools ran. Configure the tools with `CHECKM2DB` and
+`GTDBTK_DATA_PATH` (or `GTDBDB`).
+
+### `validation.json`
+
+```json
+{
+  "schema": "gside.validate/1",
+  "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
+  "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
+  "software": {"gside": "0.1.5", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "tools": {"checkm2": "ok", "gtdbtk": "ok"},
+  "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
+  "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},
+  "status": "ok",
+  "errors": [],
+  "interpretation": "Genome quality: PASS (completeness=99.1%, contamination=0.5%); GTDB-Tk: ...",
+  "created_at": "2026-10-21T14:30:00+00:00"
+}
+```
 
 ### Examples
 
 ```bash
-gside validate contigs.fna --mode simple
-gside validate contigs.fna --mode standard --output-dir ./taxonomy
+gside validate contigs.fna -o ./taxonomy
+gside validate contigs.fna -o ./taxonomy -t 8
 ```
 
 ## gside meta (alias)

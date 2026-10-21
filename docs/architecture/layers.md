@@ -41,7 +41,7 @@ gside/
 │       ├── gtdbtk_identifier.py      L3 GTDB-Tk placement
 │       ├── kraken2_identifier.py     meta: kraken2 + bracken
 │       ├── sylph_identifier.py       meta: sylph ANI profiling
-│       ├── taxonomic_validator.py    L3 (wired via `gside validate`)
+│       ├── taxonomic_validator.py    CheckM2 + GTDB-Tk QC (`gside validate`)
 │       ├── _envelope.py              Shared result-dict envelope
 │       └── _thresholds.py            Shared ANI confidence cutoffs
 ├── data/

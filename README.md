@@ -147,8 +147,9 @@ gside db <subcommand>
   setup              Install databases (--tier mini|panel|mash|sourmash|all)
   list               List tiers with readiness (--format table|tsv|csv|json)
 
-gside validate <contigs.fna>
-  --mode simple|standard
+gside validate <contigs.fna> -o <dir>
+  -o, --output-dir   Required; writes validation.json
+  -t, --threads      CheckM2 + GTDB-Tk threads
 
 gside mcp            MCP stdio server
 gside --version      Version info

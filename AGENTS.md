@@ -96,9 +96,9 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-10-21): **668 tests**, total coverage **99.0%**
+Baseline (2026-10-21): **683 tests**, total coverage **99.4%**
 — all modules 100% except: ani 94%, multigene 99%, sourmash 99%,
-taxonomic 93% (quarantined), db 99%, kraken2 99%, progress 97%.
+db 99%, kraken2 99%, progress 97%.
 Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
 raise it every time coverage climbs.
 
@@ -188,7 +188,7 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 - Mode choices: isolate `marker|panel|mash_refseq|sourmash|gtdbtk|all`; meta `kraken2|sylph|all` — do not invent modes. `-m` also accepts `+` combinations (`marker+sourmash`): `_split_modes` dedupes in order, `all` cannot be combined, and `_validate_scan` checks **every** component against the context and input kind
 - Input kinds are inferred from the extension (`.fna/.fa/.fasta` vs `.fq/.fastq`, `.gz` stripped) and validated **before** any tool runs: `_MODE_INPUTS` / `_META_MODE_INPUTS` in `cli.py` define the matrix (marker/mash_refseq/sourmash accept both; panel/gtdbtk are FASTA-only — skani and GTDB-Tk need assemblies; kraken2 both; sylph FASTQ-only). `all` expands to the context's full list (`_ISOLATE_MODES` / `_META_METHODS`) and is validated component-by-component, so isolate `all` needs FASTA and meta `all` needs FASTQ. Update the matrix and docs together when adding a mode
 - `--db-dir` overrides the database root for one invocation
-- `validate` is a separate QC command (marker + optional CheckM2/GTDB-Tk), not a scan mode: `-m` there means validation depth (`simple|standard`) and `-o` takes a **directory**, unlike `scan -o` (a file)
+- `validate` is assembly QC (CheckM2 + GTDB-Tk), not a scan mode and **not** marker-based: no `-m`; `-o/--output-dir` is required and takes a **directory** (file is always `validation.json`), unlike `scan -o` (a file); `-t/--threads` feeds both tools. Exit 0 only when both tools ran; `partial`/`error` exit 1. The report carries schema/genome/parameters/software/tools/quality/taxonomy/status/errors/created_at
 - `verdict` shape is shared by single-mode and `all`: `species` (canonical), `display_name`, `strain`, `confidence`, `basis` (winner only), `supporting`, `agreement`
 
 ### File & Module Organization
@@ -216,7 +216,7 @@ src/gside/
     ├── gtdbtk_identifier.py      # L3 GTDB-Tk placement (needs external gtdbtk + GTDBTK_DATA_PATH)
     ├── kraken2_identifier.py     # meta: kraken2 + bracken
     ├── sylph_identifier.py       # meta: sylph ANI profiling (FASTQ only)
-    └── taxonomic_validator.py    # L3 (gside validate; standard needs CheckM2/GTDB-Tk env)
+    └── taxonomic_validator.py    # CheckM2 + GTDB-Tk assembly QC (`gside validate`)
 tests/
 ├── unit/                     # Hermetic, no binaries, seconds
 │   └── test_cli.py           # Rendering + arbitration only (pure)

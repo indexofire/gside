@@ -29,10 +29,11 @@ class TestCliModesDocumented:
             assert tier in en, tier
             assert tier in zh, tier
 
-    def test_validate_modes(self):
+    def test_validate_documents_checkm2_and_gtdbtk(self):
         en, zh = _read("usage/cli.md"), _read("usage/cli.zh.md")
-        for mode in ("simple", "standard"):
-            assert mode in en and mode in zh
+        for token in ("CheckM2", "GTDB-Tk", "validation.json", "required"):
+            assert token in en, token
+        assert "CheckM2" in zh and "GTDB-Tk" in zh and "validation.json" in zh
 
     def test_species_auto_setup_documented(self):
         en, zh = _read("usage/cli.md"), _read("usage/cli.zh.md")

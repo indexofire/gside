@@ -120,31 +120,57 @@ gside db setup --tier panel --source /path/to/existing/db
 
 ## gside validate
 
-标记基因组装验证，可选叠加 CheckM2 + GTDB-Tk。
+组装**质量评估**：CheckM2（完整度/污染度）+ GTDB-Tk 分类。不再运行 marker
+规则——物种鉴定请用 `scan`。
 
 ### 用法
 
 ```bash
-gside validate <contigs.fasta> [选项]
+gside validate <contigs.fasta> -o <输出目录> [选项]
 ```
 
 ### 参数
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| `contigs` | 位置参数 | — | 组装后的 contigs FASTA 文件 |
-| `-m`，`--mode` | 选项 | `simple` | 验证深度：`simple`（标记基因）或 `standard`（叠加 CheckM2 + GTDB-Tk） |
-| `-o`，`--output-dir` | 选项 | 自动 | `validation.json` 输出目录（注意：是目录，不同于 `scan -o` 的文件） |
+| `contigs` | 位置参数 | — | 组装 contigs FASTA（必须存在） |
+| `-o`，`--output-dir` | 选项 | **必填** | `validation.json` 的输出目录（不存在会自动创建；是目录，不是文件） |
+| `-t`，`--threads` | 选项 | `4` | 传给 CheckM2 `--threads` 与 GTDB-Tk `--cpus` 的线程数 |
 
-`standard` 模式优雅降级：缺 CheckM2/GTDB-Tk 数据库或二进制时只告警并返回
-部分结果，不崩溃。通过 `CHECKM2DB` / `GTDBTK_DATA_PATH`（或 `GTDBDB`）
-环境变量配置。
+两项工具都成功才算完整报告；缺失数据库/二进制会按工具记录，不会崩溃：
+
+| `status` | 含义 | 退出码 |
+|---|---|---|
+| `ok` | CheckM2 与 GTDB-Tk 都成功 | 0 |
+| `partial` | 只有一个成功 | 1 |
+| `error` | 两个都未成功 | 1 |
+
+低质量（如 `WARNING`）是**结果**而非命令失败：只要两工具跑通仍退出 0。
+通过 `CHECKM2DB` 与 `GTDBTK_DATA_PATH`（或 `GTDBDB`）配置。
+
+### `validation.json`
+
+```json
+{
+  "schema": "gside.validate/1",
+  "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
+  "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
+  "software": {"gside": "0.1.5", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "tools": {"checkm2": "ok", "gtdbtk": "ok"},
+  "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
+  "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},
+  "status": "ok",
+  "errors": [],
+  "interpretation": "Genome quality: PASS (completeness=99.1%, contamination=0.5%); GTDB-Tk: ...",
+  "created_at": "2026-10-21T14:30:00+00:00"
+}
+```
 
 ### 示例
 
 ```bash
-gside validate contigs.fna --mode simple
-gside validate contigs.fna --mode standard --output-dir ./taxonomy
+gside validate contigs.fna -o ./taxonomy
+gside validate contigs.fna -o ./taxonomy -t 8
 ```
 
 ## gside meta（别名）

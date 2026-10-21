@@ -556,30 +556,29 @@ def db_list_cmd(output_format: str) -> None:
 
 
 @main.command("validate", context_settings=HELP_SETTINGS)
-@click.argument("contigs", type=click.Path(dir_okay=False))
-@click.option(
-    "-m",
-    "--mode",
-    type=click.Choice(["simple", "standard"]),
-    default="simple",
-    show_default=True,
-    help="Validation depth (standard adds CheckM2 + GTDB-Tk).",
-)
+@click.argument("contigs", type=click.Path(exists=True, dir_okay=False))
 @click.option(
     "-o",
     "--output-dir",
+    required=True,
     type=click.Path(file_okay=False),
-    default=None,
-    help="Directory for validation.json (default: <contigs-dir>/../taxonomy).",
+    help="Directory for validation.json (created if needed). Required.",
 )
-def validate_cmd(contigs: str, mode: str, output_dir: str | None) -> None:
-    """Validate an assembly with marker genes, optionally CheckM2/GTDB-Tk."""
-    import json
-
+@click.option(
+    "-t",
+    "--threads",
+    type=click.IntRange(min=1),
+    default=4,
+    show_default=True,
+    help="Threads for CheckM2 and GTDB-Tk.",
+)
+def validate_cmd(contigs: str, output_dir: str, threads: int) -> None:
+    """Assess assembly quality and taxonomy (CheckM2 + GTDB-Tk)."""
     from .analysis.taxonomic_validator import validate_genome
 
-    result = validate_genome(contigs, mode=mode, output_dir=output_dir)
+    result = validate_genome(contigs, output_dir, threads=threads)
     print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+    sys.exit(0 if result.status == "ok" else 1)
 
 
 # Register commands
