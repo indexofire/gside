@@ -335,6 +335,13 @@ def validate_cmd(contigs: str, mode: str, output_dir: str | None) -> None:
     default=False,
     help="Suppress the TSV/CSV header row (json keeps its structure).",
 )
+@click.option(
+    "-a",
+    "--auto-setup",
+    is_flag=True,
+    default=False,
+    help="Install missing database tiers before profiling (progress on stderr).",
+)
 @_threads_option("Threads per tool invocation (kraken2 --threads / sylph sketch -t).")
 def meta_cmd(
     reads: tuple[str, ...],
@@ -345,6 +352,7 @@ def meta_cmd(
     samples: str | None,
     jobs: int,
     no_header: bool,
+    auto_setup: bool,
     threads: int,
 ) -> None:
     """Metagenomic species profiling from FASTQ reads, contigs, or a samples manifest."""
@@ -359,12 +367,31 @@ def meta_cmd(
             raise click.UsageError(str(exc)) from exc
         sys.exit(
             _run_meta_samples(
-                manifest, mode, db_dir, output_format, output, threads, jobs, no_header
+                manifest,
+                mode,
+                db_dir,
+                output_format=output_format,
+                output=output,
+                threads=threads,
+                jobs=jobs,
+                no_header=no_header,
+                auto_setup=auto_setup,
             )
         )
     if jobs != 1:
         raise click.UsageError("--jobs only applies to --samples batches")
-    sys.exit(_run_meta(list(reads), mode, db_dir, output_format, output, threads, no_header))
+    sys.exit(
+        _run_meta(
+            list(reads),
+            mode,
+            db_dir,
+            output_format=output_format,
+            output=output,
+            threads=threads,
+            no_header=no_header,
+            auto_setup=auto_setup,
+        )
+    )
 
 
 # Register commands
@@ -625,6 +652,33 @@ def _auto_setup_retry(
         retry = _identify_one(contigs, m, db_dir, threads)
         methods[m] = retry["methods"].get(m, method_payload)
     payload["verdict"] = _verdict_for(methods, mode)
+    return payload
+
+
+def _auto_setup_retry_meta(
+    files: list[str],
+    payload: dict[str, Any],
+    mode: str,
+    db_dir: str | None,
+    threads: int,
+) -> dict[str, Any]:
+    """--auto-setup for meta: install each missing tier once, retry that method once."""
+    if db_dir is not None:
+        # A custom database root is user-managed; never write outside it.
+        return payload
+    methods = payload.get("methods", {})
+    input_type = payload.get("input", {}).get("type", _detect_meta_input(files))
+    for m, entry in methods.items():
+        tier = entry.get("missing_tier") if isinstance(entry, dict) else None
+        if not tier:
+            continue
+        try:
+            _setup_missing_tier(tier)
+        except Exception as e:  # noqa: BLE001 — CLI boundary: setup failure keeps the error entry
+            logger.warning("auto-setup of tier %s failed: %s", tier, e)
+            continue
+        methods[m] = _run_meta_method(m, files, db_dir, threads, input_type)
+    payload["verdict"] = _meta_verdict(methods)
     return payload
 
 
@@ -917,8 +971,11 @@ def _run_meta(
     output: str | None = None,
     threads: int = 4,
     no_header: bool = False,
+    auto_setup: bool = False,
 ) -> int:
     payload = _meta_payload(files, mode, db_dir, threads)
+    if auto_setup:
+        payload = _auto_setup_retry_meta(files, payload, mode, db_dir, threads)
     return _emit_meta(payload, output_format, output, no_header)
 
 
@@ -958,12 +1015,28 @@ def _run_meta_samples(
     threads: int = 4,
     jobs: int = 1,
     no_header: bool = False,
+    auto_setup: bool = False,
 ) -> int:
     """Profile every manifest sample, preserving manifest order in the output."""
 
     def identify(sample: dict[str, Any]) -> dict[str, Any]:
         payload = _meta_payload(sample["files"], mode, db_dir, threads)
+        if auto_setup:
+            payload = _auto_setup_retry_meta(sample["files"], payload, mode, db_dir, threads)
         return {"sample": sample["id"], **payload}
+
+    if auto_setup and samples:
+        # Install tiers once, serially, before the parallel fan-out.
+        first = identify(samples[0])
+        rest = samples[1:]
+        if jobs > 1 and rest:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=jobs) as pool:
+                payloads = [first, *pool.map(identify, rest)]
+        else:
+            payloads = [first, *(identify(sample) for sample in rest)]
+        return _emit_meta_batch(payloads, output_format, output, no_header)
 
     if jobs > 1:
         from concurrent.futures import ThreadPoolExecutor

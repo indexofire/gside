@@ -182,6 +182,7 @@ gside meta <reads.fastq> [reads_2.fastq] [选项]
 | `-s`，`--samples PATH` | 选项 | — | 批量清单 `sample_id<TAB>reads[<TAB>reads2]`（表头可省略） |
 | `-j`，`--jobs N` | 选项 | `1` | 并发处理的清单样本数（输出顺序保持不变） |
 | `-n`，`--no-header` | 选项 | 关 | 隐藏 TSV/CSV 表头行（json 保持结构） |
+| `-a`，`--auto-setup` | 选项 | 关 | 自动安装缺失档位并重试该方法一次 |
 | `-t`，`--threads N` | 选项 | `4` | 每次工具调用的线程数 |
 
 ### 示例

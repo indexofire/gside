@@ -32,6 +32,7 @@ gside meta <reads.fastq> [reads_2.fastq] [选项]
 | `-s`，`--samples PATH` | — | 批量清单（`sample_id<TAB>reads[<TAB>reads2]`） |
 | `-j`，`--jobs N` | `1` | 使用 `--samples` 时的并发样本数 |
 | `-n`，`--no-header` | 关 | 隐藏 TSV/CSV 表头 |
+| `-a`，`--auto-setup` | 关 | 自动安装缺失档位并重试该方法一次 |
 | `-t`，`--threads N` | `4` | 每次工具调用的线程数 |
 
 ## 批量样本

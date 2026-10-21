@@ -49,6 +49,17 @@ SOURMASH_LINEAGES_URL = f"{SOURMASH_FARM_BASE}/gtdb-rs226-reps.lineages.csv"
 K2_INDEXES_URL = "https://benlangmead.github.io/aws-indexes/k2"
 SYLPH_DOCS_URL = "https://sylph-docs.github.io/"
 
+# Auto-downloadable metagenomic tiers (Ben Langmead's Kraken2 packages include
+# the Bracken 50-300-mer distributions; sylph ships pre-sketched GTDB DBs).
+K2_STANDARD8_URL = "https://genome-idx.s3.amazonaws.com/kraken/k2_standard_08_GB_20260626.tar.gz"
+K2_STANDARD8_MD5_URL = (
+    "https://genome-idx.s3.amazonaws.com/kraken/standard_08_GB_20260626/standard_08_GB.md5"
+)
+SYLPH_DB_URL = "https://storage.googleapis.com/sylph-stuff/gtdb-r226-c200-dbv2.syl2db"
+SYLPH_DB_FILENAME = "gtdb-r226-c200-dbv2.syl2db"
+# GCS publishes the object MD5 (x-goog-hash) for this 14GB blob.
+SYLPH_DB_MD5 = "1815389774987c7ce3d713c975a8853f"
+
 _TIERS: dict[str, dict[str, Any]] = {
     "mini": {
         "description": "Marker rules + sequences (bundled)",
@@ -94,8 +105,8 @@ _CHUNK = 1024 * 1024
 
 
 def _has_sylph_db(db_dir: Path) -> bool:
-    """True when any ``*.syldb`` database lives under ``db_dir`` (glob probe)."""
-    return any(db_dir.glob("*.syldb"))
+    """True when any sylph database lives under ``db_dir`` (either format)."""
+    return any(db_dir.glob("*.syldb")) or any(db_dir.glob("*.syl2db"))
 
 
 # Database components in `db status` order — key: (tier, directory under
@@ -119,7 +130,13 @@ _COMPONENTS: dict[str, tuple[str, str, list[list[tuple[str, Callable[[Path], boo
         "meta",
         "D5_kraken2",
         [
-            [("hash.k2d", Path.exists), ("taxo.k2d", Path.exists), ("opts.k2d", Path.exists)],
+            [
+                ("hash.k2d", Path.exists),
+                ("taxo.k2d", Path.exists),
+                ("opts.k2d", Path.exists),
+                # Bracken needs the distribution matching our read length (150).
+                ("database150mers.kmer_distrib", Path.exists),
+            ],
         ],
     ),
     "D6_sylph": ("meta_sylph", "D6_sylph", [[("", _has_sylph_db)]]),
@@ -169,9 +186,9 @@ def db_setup(tier: str = "panel", source: str = "") -> dict[str, str]:
     if tier == "sourmash":
         results["D4_sourmash"] = _setup_component("D4_sourmash", _download_sourmash_farm, source)
     if tier == "meta":
-        results["D5_kraken2"] = _setup_component("D5_kraken2", _manual_kraken2_setup, source)
+        results["D5_kraken2"] = _setup_component("D5_kraken2", _install_kraken2, source)
     if tier == "meta_sylph":
-        results["D6_sylph"] = _setup_component("D6_sylph", _manual_sylph_setup, source)
+        results["D6_sylph"] = _setup_component("D6_sylph", _install_sylph, source)
     if not results:
         results["info"] = "mini tier ships with repo"
     return results
@@ -196,14 +213,98 @@ def _install_panel(dst: Path) -> str:
     return result if result else _build_panel_from_manifest(dst)
 
 
-def _manual_kraken2_setup(dst: Path) -> str:
-    """Kraken2 indexes are huge tarballs; users place them manually for now."""
-    return f"ERROR: not auto-downloadable yet — see {K2_INDEXES_URL}"
+def _file_md5(path: Path) -> str:
+    """Streaming MD5 of a local file (lowercase hex)."""
+    digest = hashlib.md5()
+    with path.open("rb") as fh:
+        while chunk := fh.read(_CHUNK):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
-def _manual_sylph_setup(dst: Path) -> str:
-    """sylph GTDB databases are hosted outside the release pipeline; manual setup."""
-    return f"ERROR: not auto-downloadable yet — see {SYLPH_DOCS_URL}"
+def _flatten_if_nested(dst: Path, marker: str) -> None:
+    """Move files up when an archive extracted into a single subdirectory."""
+    if (dst / marker).exists():
+        return
+    nested = [p for p in dst.iterdir() if p.is_dir() and (p / marker).exists()]
+    if len(nested) == 1:
+        for child in nested[0].iterdir():
+            shutil.move(str(child), str(dst / child.name))
+        nested[0].rmdir()
+
+
+def _published_md5_manifest(url: str) -> dict[str, str]:
+    """``<md5>  <filename>`` lines (Kraken2 style) → {filename: md5}."""
+    with urllib.request.urlopen(url, timeout=_DOWNLOAD_TIMEOUT) as resp:
+        text = resp.read().decode("utf-8", "replace")
+    manifest: dict[str, str] = {}
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and len(parts[0]) == 32:
+            manifest[parts[1].lstrip("*")] = parts[0].lower()
+    return manifest
+
+
+def _verify_kraken2_files(dst: Path) -> str | None:
+    """Compare every extracted file against the published MD5 manifest."""
+    try:
+        manifest = _published_md5_manifest(K2_STANDARD8_MD5_URL)
+    except Exception as e:  # noqa: BLE001 — network fallback: warn, keep the DB
+        print(f"  WARNING: could not fetch Kraken2 checksums ({e}); skipping verification")
+        return None
+    if not manifest:
+        print("  WARNING: empty Kraken2 checksum manifest; skipping verification")
+        return None
+    for name, expected in manifest.items():
+        target = dst / name
+        if not target.is_file():
+            continue
+        if _file_md5(target) != expected:
+            return f"ERROR: MD5 mismatch for {name}"
+    return None
+
+
+def _install_kraken2(dst: Path) -> str:
+    """Download the Kraken2 Standard-8 archive (includes Bracken distributions)."""
+    archive = dst / "k2_standard_08_GB.tar.gz"
+    print("  downloading Kraken2 Standard-8 (~5.5GB, includes Bracken)...")
+    try:
+        _download_file(K2_STANDARD8_URL, archive)
+    except Exception as e:  # noqa: BLE001 — setup boundary: report, don't crash
+        archive.unlink(missing_ok=True)
+        return f"ERROR: Kraken2 download failed: {e}"
+    print("  extracting...")
+    try:
+        with tarfile.open(archive, "r:gz") as tf:
+            tf.extractall(dst, filter="data")
+    except tarfile.TarError as e:
+        archive.unlink(missing_ok=True)
+        return f"ERROR: unsafe or corrupt archive: {e}"
+    archive.unlink(missing_ok=True)
+    _flatten_if_nested(dst, "hash.k2d")
+    error = _verify_kraken2_files(dst)
+    if error:
+        return error
+    if not _component_ready("D5_kraken2"):
+        return "ERROR: archive did not contain a complete Kraken2 + Bracken database"
+    return "downloaded Kraken2 Standard-8 (index + Bracken 150-mer)"
+
+
+def _install_sylph(dst: Path) -> str:
+    """Download a pre-sketched sylph GTDB database (-c 200, two-stage)."""
+    target = dst / SYLPH_DB_FILENAME
+    print("  downloading sylph GTDB r226 (~14GB, resumable by hand if it fails)...")
+    try:
+        _download_file(SYLPH_DB_URL, target)
+    except Exception as e:  # noqa: BLE001 — setup boundary: report, don't crash
+        target.unlink(missing_ok=True)
+        return f"ERROR: sylph download failed: {e}"
+    if SYLPH_DB_MD5 and _file_md5(target) != SYLPH_DB_MD5:
+        target.unlink(missing_ok=True)
+        return f"ERROR: MD5 mismatch for {target.name}"
+    if not _has_sylph_db(dst):
+        return "ERROR: sylph database missing after download"
+    return "downloaded GTDB r226 (c200, two-stage .syl2db)"
 
 
 def _download_sourmash_farm(dst: Path) -> str:
@@ -279,13 +380,10 @@ def _download_mash_zenodo(dst: Path) -> str:
         gz_path = dst / "mash.msh.gz"
         _download_file(MASH_ZENODO_URL, gz_path)
 
-        md5 = hashlib.md5()
-        with gz_path.open("rb") as f:
-            while chunk := f.read(_CHUNK):
-                md5.update(chunk)
-        if md5.hexdigest() != MASH_MD5:
+        digest = _file_md5(gz_path)
+        if digest != MASH_MD5:
             gz_path.unlink(missing_ok=True)
-            return f"ERROR: MD5 mismatch (got {md5.hexdigest()}, expected {MASH_MD5})"
+            return f"ERROR: MD5 mismatch (got {digest}, expected {MASH_MD5})"
 
         print("  verifying MD5 ✓, decompressing...")
         with gzip.open(gz_path, "rb") as fin, open(dst / "mash.msh", "wb") as fout:

@@ -60,8 +60,8 @@ gside database status
 gside db setup --tier panel          # Panel only (ANI), the default tier
 gside db setup --tier mash           # MinHash only
 gside db setup --tier sourmash       # GTDB gather db (~3.9GB)
-gside db setup --tier meta           # Kraken2 index (manual, ~5.5GB)
-gside db setup --tier meta_sylph     # sylph GTDB db (manual, ~14GB)
+gside db setup --tier meta           # Kraken2 + Bracken (~5.5GB)
+gside db setup --tier meta_sylph     # sylph GTDB db (~14GB)
 gside db setup --tier all            # panel + mash (excludes sourmash)
 ```
 
@@ -75,22 +75,23 @@ if any step reports an error.
 (~3.9GB) is never included in `all`; run `gside db setup --tier sourmash`
 separately to provision it.
 
-The metagenomic tiers are **manual setup** — there is no auto-download.
-`gside db setup --tier meta` / `--tier meta_sylph` print an actionable
-pointer and exit non-zero until the database is placed by hand:
+The metagenomic tiers download automatically from upstream:
 
 ```bash
-# D5_kraken2: download a prebuilt index (e.g. Standard-8) from
-# https://benlangmead.github.io/aws-indexes/k2 and extract so that
-# hash.k2d / opts.k2d / taxo.k2d sit in data/db/D5_kraken2/
-# (Bracken additionally needs database100mer.kmer_distrib there)
-
-# D6_sylph: download a prebuilt *.syl2db (e.g. GTDB) from
-# https://sylph-docs.github.io/ and place it under data/db/D6_sylph/
+gside db setup --tier meta         # Kraken2 Standard-8 + Bracken (~5.5GB)
+gside db setup --tier meta_sylph   # sylph GTDB r226, .syl2db (~14GB)
 ```
 
-`--source` also works for these tiers, copying an existing local database
-directory into place.
+- **meta** pulls Ben Langmead's Standard-8 archive, which bundles the Kraken2
+  index *and* the Bracken 50-300-mer distributions. Extracted files are
+  verified against the published `.md5` manifest; readiness requires
+  `database150mers.kmer_distrib` (Bracken's read length in gside).
+- **meta_sylph** pulls the two-stage `gtdb-r226-c200-dbv2.syl2db` from the
+  HTTPS mirror and verifies the GCS-published MD5.
+
+Both are large, one-time downloads. `gside meta --auto-setup` installs the
+missing tier on first use (progress on stderr) and retries the method once.
+`--source` still copies an existing local database instead of downloading.
 
 ### Integrity checks
 

@@ -111,7 +111,10 @@ def identify_by_sylph(
         raise RuntimeError(FASTA_INPUT_ERROR)
 
     base = Path(db_dir) if db_dir else SPECIES_DB_DIR / "D6_sylph"
-    dbs = sorted(base.glob("*.syldb")) if base.is_dir() else []
+    dbs: list[Path] = []
+    if base.is_dir():
+        # .syl2db is the v1 two-stage format and is preferred by sylph itself.
+        dbs = sorted(base.glob("*.syl2db")) + sorted(base.glob("*.syldb"))
     if not dbs:
         raise RuntimeError(
             f"sylph database not found in {base} (run: gside db setup --tier meta_sylph)"

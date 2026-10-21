@@ -192,6 +192,7 @@ gside meta <reads.fastq> [reads_2.fastq] [options]
 | `-s`, `--samples PATH` | option | — | Batch manifest `sample_id<TAB>reads[<TAB>reads2]` (header optional) |
 | `-j`, `--jobs N` | option | `1` | Concurrent manifest samples (output order is preserved) |
 | `-n`, `--no-header` | option | off | Suppress the TSV/CSV header row (json keeps its structure) |
+| `-a`, `--auto-setup` | option | off | Install a missing database tier, then retry that method once |
 | `-t`, `--threads N` | option | `4` | Threads per tool invocation |
 
 ### Examples

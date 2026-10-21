@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import io
 import json
+import shutil
 import tarfile
 from pathlib import Path
 
@@ -65,6 +66,7 @@ class TestStatus:
         _touch(root / "D5_kraken2" / "hash.k2d")
         _touch(root / "D5_kraken2" / "taxo.k2d")
         _touch(root / "D5_kraken2" / "opts.k2d")
+        _touch(root / "D5_kraken2" / "database150mers.kmer_distrib")
         _touch(root / "D6_sylph" / "gtdb-r226.syldb")
         status = db_status()
         assert all(v["ready"] for v in status.values())
@@ -365,49 +367,142 @@ class TestMetaTiers:
         assert not status["D5_kraken2"]["ready"]
         assert not status["D6_sylph"]["ready"]
 
-    def test_kraken2_ready_on_k2d(self, root):
-        _touch(root / "D5_kraken2" / "hash.k2d")
-        _touch(root / "D5_kraken2" / "taxo.k2d")
-        _touch(root / "D5_kraken2" / "opts.k2d")
+    def test_kraken2_needs_bracken_distribution(self, root):
+        for name in ("hash.k2d", "taxo.k2d", "opts.k2d"):
+            _touch(root / "D5_kraken2" / name)
+        assert not db_status()["D5_kraken2"]["ready"]
+        _touch(root / "D5_kraken2" / "database150mers.kmer_distrib")
         assert db_status()["D5_kraken2"]["ready"]
 
-    def test_sylph_ready_on_syl2db_glob(self, root):
+    def test_sylph_ready_for_syldb(self, root):
         _touch(root / "D6_sylph" / "gtdb-r226.syldb")
+        assert db_status()["D6_sylph"]["ready"]
+
+    def test_sylph_ready_for_syl2db(self, root):
+        _touch(root / "D6_sylph" / "gtdb-r226.syl2db")
         assert db_status()["D6_sylph"]["ready"]
 
     def test_sylph_empty_dir_not_ready(self, root):
         (root / "D6_sylph").mkdir(parents=True)
         assert not db_status()["D6_sylph"]["ready"]
 
-    def test_setup_kraken2_not_auto_downloadable(self, root):
-        msg = db_setup("meta")["D5_kraken2"]
-        assert msg.startswith("ERROR: not auto-downloadable")
-        assert "https://benlangmead.github.io/aws-indexes/k2" in msg
-
-    def test_setup_sylph_not_auto_downloadable(self, root):
-        msg = db_setup("meta_sylph")["D6_sylph"]
-        assert msg.startswith("ERROR: not auto-downloadable")
-        assert "https://sylph-docs.github.io/" in msg
-
     def test_setup_already_ready(self, root):
-        _touch(root / "D5_kraken2" / "hash.k2d")
-        _touch(root / "D5_kraken2" / "taxo.k2d")
-        _touch(root / "D5_kraken2" / "opts.k2d")
+        for name in ("hash.k2d", "taxo.k2d", "opts.k2d", "database150mers.kmer_distrib"):
+            _touch(root / "D5_kraken2" / name)
         _touch(root / "D6_sylph" / "db.syldb")
         assert db_setup("meta") == {"D5_kraken2": "already ready"}
         assert db_setup("meta_sylph") == {"D6_sylph": "already ready"}
 
     def test_setup_from_source_copies(self, root, tmp_path):
-        _touch(tmp_path / "D5_kraken2" / "hash.k2d")
-        _touch(tmp_path / "D5_kraken2" / "taxo.k2d")
-        _touch(tmp_path / "D5_kraken2" / "opts.k2d")
+        for name in ("hash.k2d", "taxo.k2d", "opts.k2d", "database150mers.kmer_distrib"):
+            _touch(tmp_path / "D5_kraken2" / name)
         msg = db_setup("meta", source=str(tmp_path))["D5_kraken2"]
         assert msg.startswith("copied from")
         assert (root / "D5_kraken2" / "hash.k2d").is_file()
 
-    def test_setup_error_exits_1(self, root, capsys):
+    def test_setup_error_exits_1(self, root, monkeypatch, capsys):
+        monkeypatch.setattr(db, "_install_kraken2", lambda dst: "ERROR: boom")
         assert run_db_command(["setup", "--tier", "meta"]) == 1
-        assert "not auto-downloadable" in capsys.readouterr().out
+        assert "ERROR: boom" in capsys.readouterr().out
+
+
+class TestKraken2Installer:
+    _FILES = {
+        "hash.k2d": b"hash",
+        "taxo.k2d": b"taxo",
+        "opts.k2d": b"opts",
+        "database150mers.kmer_distrib": b"distrib",
+    }
+
+    def _prepare(self, tmp_path, files=None):
+        import tarfile
+
+        files = files or self._FILES
+        archive = tmp_path / "prepared.tar.gz"
+        src = tmp_path / "src"
+        src.mkdir(exist_ok=True)
+        with tarfile.open(archive, "w:gz") as tf:
+            for name, data in files.items():
+                path = src / name
+                path.write_bytes(data)
+                tf.add(path, arcname=name)
+        return archive
+
+    def _manifest(self, files=None):
+        import hashlib as _hashlib
+
+        files = files or self._FILES
+        return {name: _hashlib.md5(data).hexdigest() for name, data in files.items()}
+
+    def test_download_extract_and_verify(self, root, monkeypatch, tmp_path):
+        archive = self._prepare(tmp_path)
+        monkeypatch.setattr(db, "_download_file", lambda url, dst: shutil.copy2(archive, dst))
+        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: self._manifest())
+        msg = db_setup("meta")["D5_kraken2"]
+        assert msg.startswith("downloaded Kraken2 Standard-8")
+        assert (root / "D5_kraken2" / "database150mers.kmer_distrib").is_file()
+        assert db_status()["D5_kraken2"]["ready"]
+
+    def test_checksum_mismatch_rejected(self, root, monkeypatch, tmp_path):
+        archive = self._prepare(tmp_path)
+        monkeypatch.setattr(db, "_download_file", lambda url, dst: shutil.copy2(archive, dst))
+        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: {"hash.k2d": "0" * 32})
+        assert db_setup("meta")["D5_kraken2"] == "ERROR: MD5 mismatch for hash.k2d"
+
+    def test_nested_archive_is_flattened(self, root, monkeypatch, tmp_path):
+        import tarfile
+
+        archive = tmp_path / "nested.tar.gz"
+        src = tmp_path / "nested_src" / "k2_db"
+        src.mkdir(parents=True)
+        with tarfile.open(archive, "w:gz") as tf:
+            for name, data in self._FILES.items():
+                path = src / name
+                path.write_bytes(data)
+                tf.add(path, arcname=f"k2_db/{name}")
+        monkeypatch.setattr(db, "_download_file", lambda url, dst: shutil.copy2(archive, dst))
+        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: self._manifest())
+        assert db_setup("meta")["D5_kraken2"].startswith("downloaded")
+        assert (root / "D5_kraken2" / "hash.k2d").is_file()
+
+    def test_download_failure_reports(self, root, monkeypatch):
+        def boom(url, dst):
+            raise OSError("offline")
+
+        monkeypatch.setattr(db, "_download_file", boom)
+        msg = db_setup("meta")["D5_kraken2"]
+        assert msg.startswith("ERROR: Kraken2 download failed")
+
+    def test_corrupt_archive_reports(self, root, monkeypatch, tmp_path):
+        bad = tmp_path / "bad.tar.gz"
+        bad.write_bytes(b"not a tarball")
+        monkeypatch.setattr(db, "_download_file", lambda url, dst: shutil.copy2(bad, dst))
+        assert db_setup("meta")["D5_kraken2"].startswith("ERROR: unsafe or corrupt archive")
+
+
+class TestSylphInstaller:
+    def test_download_and_verify(self, root, monkeypatch):
+        payload = b"syl2db-bytes"
+        monkeypatch.setattr(db, "_download_file", lambda url, dst: Path(dst).write_bytes(payload))
+        monkeypatch.setattr(db, "SYLPH_DB_MD5", __import__("hashlib").md5(payload).hexdigest())
+        msg = db_setup("meta_sylph")["D6_sylph"]
+        assert msg.startswith("downloaded GTDB r226")
+        assert db_status()["D6_sylph"]["ready"]
+
+    def test_checksum_mismatch_rejected(self, root, monkeypatch):
+        monkeypatch.setattr(db, "_download_file", lambda url, dst: Path(dst).write_bytes(b"x"))
+        monkeypatch.setattr(db, "SYLPH_DB_MD5", "0" * 32)
+        assert db_setup("meta_sylph")["D6_sylph"] == (
+            f"ERROR: MD5 mismatch for {db.SYLPH_DB_FILENAME}"
+        )
+        assert not (root / "D6_sylph" / db.SYLPH_DB_FILENAME).exists()
+
+    def test_download_failure_reports(self, root, monkeypatch):
+        def boom(url, dst):
+            raise OSError("offline")
+
+        monkeypatch.setattr(db, "_download_file", boom)
+        assert db_setup("meta_sylph")["D6_sylph"].startswith("ERROR: sylph download failed")
 
 
 class TestSetupDownloadPaths:
@@ -696,3 +791,130 @@ class TestSourmashChecksumOverride:
         monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", _hashlib.sha256(b"payload").hexdigest())
         msg = db_setup("sourmash")["D4_sourmash"]
         assert msg.startswith("downloaded from farm.cse.ucdavis.edu")
+
+
+class _FakeResponse:
+    def __init__(self, chunks: list[bytes], headers: dict[str, str] | None = None):
+        self._chunks = list(chunks)
+        self.headers = headers or {}
+
+    def read(self, _size: int = -1) -> bytes:
+        return self._chunks.pop(0) if self._chunks else b""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+class TestManifestAndVerification:
+    def test_manifest_parsing(self, monkeypatch):
+        body = (
+            b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  hash.k2d\n"
+            b"not a manifest line\n"
+            b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  *database150mers.kmer_distrib\n"
+        )
+        monkeypatch.setattr(db.urllib.request, "urlopen", lambda *a, **k: _FakeResponse([body]))
+        manifest = db._published_md5_manifest("https://example.invalid/x.md5")
+        assert manifest == {
+            "hash.k2d": "a" * 32,
+            "database150mers.kmer_distrib": "b" * 32,
+        }
+
+    def test_manifest_fetch_failure_warns_and_skips(self, monkeypatch, tmp_path):
+        def boom(url):
+            raise OSError("offline")
+
+        monkeypatch.setattr(db, "_published_md5_manifest", boom)
+        assert db._verify_kraken2_files(tmp_path) is None
+
+    def test_empty_manifest_skips(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: {})
+        assert db._verify_kraken2_files(tmp_path) is None
+
+    def test_missing_file_is_ignored(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: {"absent.k2d": "0" * 32})
+        assert db._verify_kraken2_files(tmp_path) is None
+
+    def test_incomplete_archive_reports(self, root, monkeypatch, tmp_path):
+        import tarfile
+
+        archive = tmp_path / "partial.tar.gz"
+        src = tmp_path / "partial"
+        src.mkdir()
+        with tarfile.open(archive, "w:gz") as tf:
+            for name in ("hash.k2d", "taxo.k2d", "opts.k2d"):
+                path = src / name
+                path.write_bytes(b"x")
+                tf.add(path, arcname=name)
+        monkeypatch.setattr(db, "_download_file", lambda url, dst: shutil.copy2(archive, dst))
+        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: {})
+        assert db_setup("meta")["D5_kraken2"].startswith("ERROR: archive did not contain")
+
+    def test_sylph_download_without_file_reports(self, root, monkeypatch):
+        monkeypatch.setattr(db, "_download_file", lambda url, dst: None)
+        monkeypatch.setattr(db, "SYLPH_DB_MD5", "")
+        assert db_setup("meta_sylph")["D6_sylph"] == (
+            "ERROR: sylph database missing after download"
+        )
+
+
+class TestDownloadFile:
+    def test_streams_chunks_and_reports_progress(self, tmp_path, monkeypatch, capsys):
+        response = _FakeResponse([b"abc", b"def", b""], {"Content-Length": "6"})
+        monkeypatch.setattr(db.urllib.request, "urlopen", lambda *a, **k: response)
+        target = tmp_path / "out.bin"
+        db._download_file("https://example.invalid/f", target)
+        assert target.read_bytes() == b"abcdef"
+        assert "100%" in capsys.readouterr().out
+
+    def test_unknown_length_skips_percentage(self, tmp_path, monkeypatch, capsys):
+        response = _FakeResponse([b"abc", b""])
+        monkeypatch.setattr(db.urllib.request, "urlopen", lambda *a, **k: response)
+        db._download_file("https://example.invalid/f", tmp_path / "out.bin")
+        assert "%" not in capsys.readouterr().out
+
+
+class TestPanelArchiveFailure:
+    def test_corrupt_panel_archive_reports(self, root, monkeypatch, tmp_path):
+        bad = tmp_path / "panel.tar.gz"
+        bad.write_bytes(b"not a tarball")
+        (root / "D2_ani").mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(db, "_download_file", lambda url, dst: shutil.copy2(bad, dst))
+        monkeypatch.setattr(db, "PANEL_SHA256", hashlib.sha256(b"not a tarball").hexdigest())
+        msg = db._try_download_panel_release(root / "D2_ani")
+        assert msg is not None and msg.startswith("ERROR: unsafe or corrupt archive")
+
+
+class TestPanelGenomeUnzip:
+    def test_zip_is_extracted_and_cleaned(self, tmp_path, monkeypatch):
+        import types as _types
+
+        dst = tmp_path / "panel"
+        genomes = dst / "genomes"
+        genomes.mkdir(parents=True)
+
+        def fake_run(cmd, **kwargs):
+            if cmd[0] == "/bin/datasets":
+                Path(cmd[cmd.index("--filename") + 1]).write_bytes(b"zip")
+            return _types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(db.subprocess, "run", fake_run)
+        monkeypatch.setattr(
+            db.subprocess,
+            "run",
+            lambda cmd, **kw: (
+                (
+                    (dst / "_dl").mkdir(exist_ok=True),
+                    ((dst / "_dl" / "g_genomic.fna").write_text(">x\nACGT\n")),
+                    _types.SimpleNamespace(returncode=0, stdout="", stderr=""),
+                )[-1]
+                if cmd[0] == "unzip"
+                else fake_run(cmd, **kw)
+            ),
+        )
+        error = db._download_panel_genomes("/bin/datasets", ["GCF_1"], dst, genomes)
+        assert error is None
+        assert (genomes / "g_genomic.fna").is_file()
+        assert not (dst / "_genomes.zip").exists()

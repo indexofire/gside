@@ -89,6 +89,12 @@ def _resolve_db(db_dir: str | Path | None) -> Path:
     db = Path(db_dir) if db_dir else SPECIES_DB_DIR / "D5_kraken2"
     if not any(db.glob("*.k2d")):
         raise RuntimeError(f"Kraken2 database not found in {db} (run: gside db setup --tier meta)")
+    distrib = db / f"database{_BRACKEN_READ_LEN}mers.kmer_distrib"
+    if not distrib.is_file():
+        raise RuntimeError(
+            f"Bracken distribution for {_BRACKEN_READ_LEN}bp reads not found in {db}"
+            " (run: gside db setup --tier meta)"
+        )
     return db
 
 

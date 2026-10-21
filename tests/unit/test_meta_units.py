@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import types
 from pathlib import Path
+from typing import Any
 
 import pytest
 from click.testing import CliRunner
@@ -67,6 +68,7 @@ def _k2_ready(monkeypatch, tmp_path: Path) -> Path:
     db = tmp_path / "D5_kraken2"
     db.mkdir()
     (db / "hash.k2d").write_bytes(b"x")
+    (db / "database150mers.kmer_distrib").write_bytes(b"x")
     monkeypatch.setattr(k2, "which", lambda name: f"/bin/{name}")
     return db
 
@@ -902,3 +904,153 @@ class TestSampleManifestCliDispatch:
         result = CliRunner().invoke(main, ["meta", "--samples", str(path)])
         assert result.exit_code == 2
         assert "duplicate sample id" in result.output
+
+
+class TestSylphTwoStageDatabase:
+    def test_syl2db_is_discovered(self, monkeypatch, tmp_path):
+        db = tmp_path / "D6_sylph"
+        db.mkdir()
+        (db / "gtdb-r226-c200-dbv2.syl2db").write_bytes(b"x")
+        monkeypatch.setattr(sy, "which", lambda name: "/bin/sylph")
+        monkeypatch.setattr(sy, "run_checked", _sy_run())
+        r = sy.identify_by_sylph(["r.fq"], db_dir=str(db))
+        assert r.database["path"].endswith("gtdb-r226-c200-dbv2.syl2db")
+
+    def test_syl2db_preferred_over_syldb(self, monkeypatch, tmp_path):
+        db = tmp_path / "D6_sylph"
+        db.mkdir()
+        (db / "legacy.syldb").write_bytes(b"x")
+        (db / "gtdb-r226-c200-dbv2.syl2db").write_bytes(b"x")
+        monkeypatch.setattr(sy, "which", lambda name: "/bin/sylph")
+        monkeypatch.setattr(sy, "run_checked", _sy_run())
+        r = sy.identify_by_sylph(["r.fq"], db_dir=str(db))
+        assert r.database["path"].endswith(".syl2db")
+
+
+class TestMetaAutoSetup:
+    def test_installs_tier_once_and_retries(self, monkeypatch):
+        installed: list[str] = []
+        monkeypatch.setattr(cli, "_setup_missing_tier", lambda tier: installed.append(tier))
+        responses = [
+            {"method": "kraken2", "error": "missing", "missing_tier": "meta"},
+            {
+                "method": "kraken2",
+                "database": {"name": "D5_kraken2", "path": "/x"},
+                "result": {"top_species": [], "total_reads": 0, "n_species": 0},
+            },
+        ]
+        monkeypatch.setattr(cli, "_run_meta_method", lambda *a, **k: responses.pop(0))
+        payload = cli._meta_payload(["r.fq"], "kraken2", None, 4)
+        assert payload["methods"]["kraken2"]["missing_tier"] == "meta"
+        retried = cli._auto_setup_retry_meta(["r.fq"], payload, "kraken2", None, 4)
+        assert installed == ["meta"]
+        assert "missing_tier" not in retried["methods"]["kraken2"]
+
+    def test_custom_db_dir_is_left_alone(self, monkeypatch):
+        installed: list[str] = []
+        monkeypatch.setattr(cli, "_setup_missing_tier", lambda tier: installed.append(tier))
+        payload = {
+            "methods": {"kraken2": {"missing_tier": "meta"}},
+            "input": {"type": "fastq_single"},
+        }
+        out = cli._auto_setup_retry_meta(["r.fq"], payload, "kraken2", "/custom/db", 4)
+        assert installed == []
+        assert out is payload
+
+    def test_cli_flag_reaches_run_meta(self, monkeypatch):
+        seen: dict[str, Any] = {}
+
+        def fake_run(*args, **kwargs):
+            seen["kwargs"] = kwargs
+            return 0
+
+        monkeypatch.setattr(cli, "_run_meta", fake_run)
+        result = CliRunner().invoke(main, ["meta", "r.fq", "-a"])
+        assert result.exit_code == 0
+        assert seen["kwargs"]["auto_setup"] is True
+
+    def test_batch_auto_setup_retries_each_sample(self, monkeypatch):
+        seen: list[str] = []
+
+        def fake_retry(files, payload, mode, db_dir, threads):
+            seen.append(files[0])
+            return payload
+
+        monkeypatch.setattr(cli, "_auto_setup_retry_meta", fake_retry)
+        monkeypatch.setattr(
+            cli,
+            "_meta_payload",
+            lambda files, mode, db_dir, threads=4: {"methods": {}, "verdict": {"top_species": []}},
+        )
+        samples = [{"id": "A", "files": ["a.fq"]}, {"id": "B", "files": ["b.fq"]}]
+        assert cli._run_meta_samples(samples, "sylph", None, auto_setup=True, jobs=2) == 0
+        assert seen == ["a.fq", "b.fq"]
+
+
+class TestMetaAutoSetupEdges:
+    def test_entry_without_tier_is_skipped(self, monkeypatch):
+        installed: list[str] = []
+        monkeypatch.setattr(cli, "_setup_missing_tier", lambda tier: installed.append(tier))
+        monkeypatch.setattr(
+            cli,
+            "_run_meta_method",
+            lambda *a, **k: {"method": "sylph", "error": "boom"},
+        )
+        payload = {
+            "methods": {
+                "kraken2": {"missing_tier": "meta"},
+                "sylph": {"error": "boom"},
+            },
+            "input": {"type": "fastq_single"},
+        }
+        monkeypatch.setattr(
+            cli,
+            "_meta_payload",
+            lambda *a, **k: payload,
+        )
+        cli._auto_setup_retry_meta(["r.fq"], payload, "all", None, 4)
+        assert installed == ["meta"]
+
+    def test_setup_failure_keeps_error_entry(self, monkeypatch):
+        def boom(tier):
+            raise OSError("no space")
+
+        monkeypatch.setattr(cli, "_setup_missing_tier", boom)
+        retries: list[str] = []
+        monkeypatch.setattr(
+            cli,
+            "_run_meta_method",
+            lambda *a, **k: retries.append("called") or {"method": "kraken2"},
+        )
+        payload = {
+            "methods": {"kraken2": {"missing_tier": "meta", "error": "missing"}},
+            "input": {"type": "fastq_single"},
+        }
+        out = cli._auto_setup_retry_meta(["r.fq"], payload, "kraken2", None, 4)
+        assert retries == []
+        assert out["methods"]["kraken2"]["error"] == "missing"
+
+    def test_run_meta_invokes_retry_when_requested(self, monkeypatch, capsys):
+        called: list[int] = []
+
+        def fake_retry(files, payload, mode, db_dir, threads):
+            called.append(threads)
+            return payload
+
+        monkeypatch.setattr(cli, "_auto_setup_retry_meta", fake_retry)
+        monkeypatch.setattr(
+            cli, "_meta_payload", lambda *a, **k: {"methods": {}, "verdict": {"top_species": []}}
+        )
+        assert cli._run_meta(["r.fq"], "kraken2", None, auto_setup=True) == 0
+        assert called == [4]
+
+    def test_batch_serial_auto_setup_path(self, monkeypatch, capsys):
+        monkeypatch.setattr(
+            cli,
+            "_meta_payload",
+            lambda files, mode, db_dir, threads=4: {"methods": {}, "verdict": {"top_species": []}},
+        )
+        samples = [{"id": "A", "files": ["a.fq"]}, {"id": "B", "files": ["b.fq"]}]
+        assert cli._run_meta_samples(samples, "sylph", None, auto_setup=True, jobs=1) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert [p["sample"] for p in payload] == ["A", "B"]
