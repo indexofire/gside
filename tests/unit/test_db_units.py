@@ -43,14 +43,14 @@ class TestStatus:
     def test_empty_all_not_ready(self, root):
         status = db_status()
         assert set(status) == {
-            "markers",
+            "D1_marker",
             "D2_ani",
             "D3_mash",
             "D4_sourmash",
             "D5_kraken2",
             "D6_sylph",
         }
-        assert [status[k]["tier"] for k in ("markers", "D2_ani", "D3_mash")] == [
+        assert [status[k]["tier"] for k in ("D1_marker", "D2_ani", "D3_mash")] == [
             "mini",
             "panel",
             "mash",
@@ -243,7 +243,7 @@ class TestFormatStatus:
         text = db.format_status("tsv")
         lines = text.splitlines()
         assert lines[0] == "COMPONENT\tREADY\tTIER\tPATH"
-        assert lines[1].startswith("markers\tready\tmini\t")
+        assert lines[1].startswith("D1_marker\tready\tmini\t")
         assert lines[2].split("\t")[:3] == ["D2_ani", "missing", "panel"]
         assert "✅" not in text
         assert "Run 'gside" not in text

@@ -55,7 +55,7 @@ def _call(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 _STATUS: dict[str, dict[str, Any]] = {
-    "markers": {"ready": True, "path": "/repo/data/db/D1_marker", "tier": "mini"},
+    "D1_marker": {"ready": True, "path": "/repo/data/db/D1_marker", "tier": "mini"},
     "D2_ani": {"ready": False, "path": "/repo/data/db/D2_ani", "tier": "panel"},
     "D3_mash": {"ready": False, "path": "/repo/data/db/D3_mash", "tier": "mash"},
     "D4_sourmash": {"ready": False, "path": "/repo/data/db/D4_sourmash", "tier": "sourmash"},

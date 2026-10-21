@@ -45,7 +45,7 @@ gside db status
 ```
 gside database status
 ──────────────────────────────────────────
-  ✅ markers          tier=mini   path=data/db/D1_marker
+  ✅ D1_marker          tier=mini   path=data/db/D1_marker
   ✅ D2_ani        tier=panel  path=data/db/D2_ani
   ✅ D3_mash         tier=mash   path=data/db/D3_mash
   ✅ D4_sourmash     tier=sourmash path=data/db/D4_sourmash

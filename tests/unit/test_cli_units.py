@@ -205,7 +205,7 @@ class TestDbCommands:
         self._db(tmp_path, monkeypatch)
         result = CliRunner().invoke(main, ["db", "status"])
         assert result.exit_code == 0
-        assert "markers" in result.output
+        assert "D1_marker" in result.output
 
     def test_list(self, tmp_path, monkeypatch, capsys):
         from click.testing import CliRunner
@@ -359,7 +359,7 @@ class TestSpeciesOutputOption:
 
 class TestDbOutputFormats:
     _STATUS = {
-        "markers": {"ready": True, "path": "/p/D1_marker", "tier": "mini"},
+        "D1_marker": {"ready": True, "path": "/p/D1_marker", "tier": "mini"},
         "D2_ani": {"ready": False, "path": "/p/D2_ani", "tier": "panel"},
     }
 
@@ -367,7 +367,7 @@ class TestDbOutputFormats:
         "mini": {
             "description": "Marker rules + sequences (bundled)",
             "size": "~1MB",
-            "items": ["markers"],
+            "items": ["D1_marker"],
         },
     }
 
@@ -379,7 +379,7 @@ class TestDbOutputFormats:
         assert result.exit_code == 0
         lines = result.output.splitlines()
         assert lines[0] == "COMPONENT\tREADY\tTIER\tPATH"
-        assert lines[1] == "markers\tready\tmini\t/p/D1_marker"
+        assert lines[1] == "D1_marker\tready\tmini\t/p/D1_marker"
         assert lines[2] == "D2_ani\tmissing\tpanel\t/p/D2_ani"
         assert "✅" not in result.output
         assert "db setup" not in result.output

@@ -68,7 +68,7 @@ _TIERS: dict[str, dict[str, Any]] = {
     "mini": {
         "description": "Marker rules + sequences (bundled)",
         "size": "~1MB",
-        "items": ["markers"],
+        "items": ["D1_marker"],
     },
     "panel": {
         "description": "Curated reference panel for ANI (skani)",
@@ -118,7 +118,7 @@ def _has_sylph_db(db_dir: Path) -> bool:
 # every file of one probe group is present; ``is_file`` probes require a
 # regular file, ``exists`` probes match any path type.
 _COMPONENTS: dict[str, tuple[str, str, list[list[tuple[str, Callable[[Path], bool]]]]]] = {
-    "markers": ("mini", "D1_marker", [[("markers.fasta", Path.exists)]]),
+    "D1_marker": ("mini", "D1_marker", [[("markers.fasta", Path.exists)]]),
     "D2_ani": (
         "panel",
         "D2_ani",
