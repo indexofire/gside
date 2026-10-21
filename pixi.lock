@@ -865,8 +865,8 @@ packages:
   timestamp: 1786118485753
 - pypi: ./
   name: gside
-  version: 0.1.4
-  sha256: 95e3ed7e5bf763de70539a175d1eabc360db57dedbbcec025cd6ab93a38f0bb7
+  version: 0.1.5
+  sha256: e7ac9663d817983ab26fbd3088f079c41e69127fb816a2e5adbd0515899b68f3
   requires_dist:
   - click>=8.0
   - pydantic>=2
