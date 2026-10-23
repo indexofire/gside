@@ -69,7 +69,7 @@ def _load_rules() -> list[dict[str, Any]]:
     return list(data.get("rules", []))
 
 
-def _blast_contigs(contigs_fasta: str, threads: int = 4) -> list[dict[str, Any]]:
+def _legacy_blast_hits(contigs_fasta: str, threads: int) -> list[Any]:
     from gside.config import which
     from gside.engine._env import require_bin
     from gside.engine.backends.blast import BlastBackend
@@ -82,12 +82,44 @@ def _blast_contigs(contigs_fasta: str, threads: int = 4) -> list[dict[str, Any]]
 
     db = str(SPECIES_DB_DIR / "D1_marker" / "markers_blastdb")
     backend = BlastBackend(binary=blastn, threads=threads)
-    engine_hits = backend.find(
+    return backend.find(
         query=Path(contigs_fasta),
         db_path=db,
         evalue=1e-10,
         word_size=11,
     )
+
+
+def _blast_contigs(contigs_fasta: str, threads: int = 4) -> list[dict[str, Any]]:
+    from gside.engine.gseek_bridge import (
+        blast_hits,
+        engine_mode,
+        log_blast_shadow,
+    )
+
+    mode = engine_mode()
+    if mode == "gseek":
+        engine_hits = blast_hits(
+            Path(contigs_fasta),
+            _MARKERS_FASTA,
+            evalue=1e-10,
+            word_size=11,
+            threads=threads,
+        )
+    elif mode == "shadow":
+        legacy_hits = _legacy_blast_hits(contigs_fasta, threads)
+        new_hits = blast_hits(
+            Path(contigs_fasta),
+            _MARKERS_FASTA,
+            evalue=1e-10,
+            word_size=11,
+            threads=threads,
+        )
+        log_blast_shadow(legacy_hits, new_hits)
+        engine_hits = legacy_hits
+    else:
+        engine_hits = _legacy_blast_hits(contigs_fasta, threads)
+
     hits = []
     for hit in engine_hits:
         seqid = hit.subject_id

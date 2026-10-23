@@ -21,6 +21,11 @@ from typing import Any, TextIO
 
 from gside.config import which
 from gside.engine._env import require_bin, run_checked
+from gside.engine.gseek_bridge import (
+    engine_mode,
+    log_screen_shadow,
+    screen_reads_gseek,
+)
 
 _FASTQ_SUFFIXES = (".fq", ".fastq")
 _SHORT_READ_CUTOFF = 300  # bp: below -> sr preset, at/above -> map-ont
@@ -133,25 +138,17 @@ def _aggregate(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return hits
 
 
-def screen_reads(
-    reads: str | Path | Sequence[str | Path],
+def _screen_reads_legacy(
+    files: Sequence[str | Path],
     markers_fasta: str | Path,
-    threads: int = 4,
+    threads: int,
+    preset: str,
 ) -> list[dict[str, Any]]:
-    """Map one FASTQ file (or both mates) to the marker FASTA.
-
-    Paired mates are processed in one minimap2 invocation, so per-gene
-    breadth is the union of intervals from both files.
-    """
-    files = [reads] if isinstance(reads, (str, Path)) else list(reads)
     minimap2 = require_bin(
         "minimap2",
         hint="minimap2 not found — install via pixi (conda) or point GSIDE_PIXI_BIN at a bin dir",
         resolver=which,
     )
-    lengths = [mean_read_length(f) for f in files] or [0.0]
-    mean = sum(lengths) / len(lengths)
-    preset = "sr" if mean < _SHORT_READ_CUTOFF else "map-ont"
     cmd = [
         minimap2,
         "-x",
@@ -165,6 +162,34 @@ def screen_reads(
     proc = run_checked(cmd, timeout=3600, name="minimap2 marker screening failed")
     rows = [row for line in proc.stdout.splitlines() if (row := _parse_paf_line(line))]
     return _aggregate(rows)
+
+
+def screen_reads(
+    reads: str | Path | Sequence[str | Path],
+    markers_fasta: str | Path,
+    threads: int = 4,
+) -> list[dict[str, Any]]:
+    """Map one FASTQ file (or both mates) to the marker FASTA.
+
+    Paired mates are processed in one minimap2 invocation, so per-gene
+    breadth is the union of intervals from both files.
+
+    ``GSIDE_ENGINE`` switches between the legacy subprocess path (default),
+    gseek's minimap2 adapter, and a shadow comparison.
+    """
+    files = [reads] if isinstance(reads, (str, Path)) else list(reads)
+    lengths = [mean_read_length(f) for f in files] or [0.0]
+    mean = sum(lengths) / len(lengths)
+    preset = "sr" if mean < _SHORT_READ_CUTOFF else "map-ont"
+
+    mode = engine_mode()
+    if mode == "gseek":
+        return screen_reads_gseek(files, markers_fasta, threads=threads, preset=preset)
+    legacy = _screen_reads_legacy(files, markers_fasta, threads, preset)
+    if mode == "shadow":
+        new = screen_reads_gseek(files, markers_fasta, threads=threads, preset=preset)
+        log_screen_shadow(legacy, new)
+    return legacy
 
 
 __all__ = ["is_fastq", "mean_read_length", "screen_reads"]

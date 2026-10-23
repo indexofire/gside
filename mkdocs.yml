@@ -61,3 +61,5 @@ nav:
   - Reference:
     - Marker Rules Format: reference/marker-rules.md
     - JSON Output Contract: reference/json-contract.md
+  - Development:
+    - gseek Migration: development/gseek-migration.md

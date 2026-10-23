@@ -158,6 +158,48 @@ class TestScreenReads:
         assert rs.screen_reads("r.fq", "markers.fasta") == []
 
 
+class TestEngineSelection:
+    def test_gseek_delegates_to_bridge(self, monkeypatch):
+        monkeypatch.setenv("GSIDE_ENGINE", "gseek")
+        monkeypatch.setattr(rs, "mean_read_length", lambda path: 150.0)
+        seen = {}
+
+        def fake_screen(files, markers, *, threads, preset):
+            seen.update(files=files, markers=markers, threads=threads, preset=preset)
+            return [{"gene": "inva"}]
+
+        monkeypatch.setattr(rs, "screen_reads_gseek", fake_screen)
+        assert rs.screen_reads("r.fq", "markers.fasta", threads=2) == [{"gene": "inva"}]
+        assert seen == {
+            "files": ["r.fq"],
+            "markers": "markers.fasta",
+            "threads": 2,
+            "preset": "sr",
+        }
+
+    def test_shadow_runs_both_and_returns_legacy(self, monkeypatch):
+        monkeypatch.setenv("GSIDE_ENGINE", "shadow")
+        monkeypatch.setattr(rs, "mean_read_length", lambda path: 150.0)
+        monkeypatch.setattr(
+            rs, "_screen_reads_legacy", lambda files, markers, threads, preset: [{"gene": "old"}]
+        )
+        monkeypatch.setattr(
+            rs,
+            "screen_reads_gseek",
+            lambda files, markers, *, threads, preset: [{"gene": "new"}],
+        )
+        seen = {}
+        monkeypatch.setattr(rs, "log_screen_shadow", lambda old, new: seen.update(old=old, new=new))
+        assert rs.screen_reads("r.fq", "markers.fasta") == [{"gene": "old"}]
+        assert seen == {"old": [{"gene": "old"}], "new": [{"gene": "new"}]}
+
+    def test_invalid_engine_mode_fails_before_tool_discovery(self, monkeypatch):
+        monkeypatch.setenv("GSIDE_ENGINE", "fastest")
+        monkeypatch.setattr(rs, "mean_read_length", lambda path: 150.0)
+        with pytest.raises(RuntimeError, match="unknown GSIDE_ENGINE"):
+            rs.screen_reads("r.fq", "markers.fasta")
+
+
 class TestMalformedInputs:
     def test_non_at_header_is_skipped(self, tmp_path):
         fq = tmp_path / "r.fq"
