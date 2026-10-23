@@ -137,12 +137,11 @@ nested objects.
 | `verdict.supporting` | list[str] | Other successful methods that agree on `verdict.species` |
 | `verdict.agreement` | str | `agreeing/successful`, e.g. `2/3` (exact label match) |
 
-`agreement` compares canonical labels exactly. Marker's pathotype labels
-(`DEC`, `Shigella_EIEC`) are intentionally distinct from the binomial they
-belong to, so an E. coli genome can report `DEC` from marker while panel says
-`Escherichia_coli` — `agreement` then reads `2/3` even though both point at the
-same organism. Do not "fix" that by folding DEC into `Escherichia_coli`: the
-distinction is what routes pathotype typing downstream.
+`agreement` compares canonical labels exactly. Marker rules now emit
+species-level labels (genus-level `Shigella` only as the fallback when no
+species marker is detected), so marker and the ANI/sketch tiers agree on the
+same string. Pathotype/serotype typing (DEC, EIEC, Shigella serotypes) is
+gapit's job, not gside's.
 
 ## Species name contract
 
@@ -157,9 +156,10 @@ distinction is what routes pathotype typing downstream.
 | sourmash | `...;s__Vibrio parahaemolyticus` | `Vibrio_parahaemolyticus` |
 | gtdbtk | `Vibrio cholerae` | `Vibrio_cholerae` |
 
-Marker registry labels that carry a serogroup/pathotype suffix
-(`Vibrio_cholerae_O1`, `Shigella_EIEC`, `DEC`, `Salmonella`) are already in
-contract form and pass through unchanged. Strain/accession text is never glued
+Marker registry labels are already in contract form: `Salmonella_enterica`,
+`Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`, `Shigella_flexneri`,
+`Shigella_sonnei`, `Shigella_dysenteriae`, `Shigella_boydii`; genus-level
+`Shigella` is used only when no species marker is detected. Strain/accession text is never glued
 into `species` (a dot would break the downstream matcher); it goes to `strain`.
 Species-group placeholders (`Campylobacter sp.`) and `Unknown` are emitted as
 `Unknown`.

@@ -32,7 +32,7 @@ rules:
 ### species
 
 Species name using registry key format (spaces → underscores).
-Examples: `Campylobacter_jejuni`, `V_parahaemolyticus`.
+Examples: `Campylobacter_jejuni`, `Vibrio_parahaemolyticus`, `Escherichia_coli`.
 
 ### genes
 
@@ -86,8 +86,8 @@ accepted; those two *Campylobacter* rules do exactly that.
 
 Free-text documentation fields. They carry no runtime effect. Use `note` for
 general context and `co_detect_note` to record how to interpret the rule
-when its markers co-occur with another species' markers (e.g., DEC vs
-Shigella_EIEC).
+when its markers co-occur with another species' markers (e.g., Shigella vs
+Escherichia_coli).
 
 ## Global Thresholds
 

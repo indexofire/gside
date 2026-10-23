@@ -7,8 +7,8 @@ first two tokens, so every tier must emit ``Genus_species``:
 * panel / mash_refseq — ``Streptococcus agalactiae 2603V/R`` → ``Streptococcus_agalactiae``
 * sourmash — ``...;s__Vibrio parahaemolyticus`` → ``Vibrio_parahaemolyticus``
 * gtdbtk — ``Vibrio cholerae`` → ``Vibrio_cholerae``
-* marker — already registry labels (``Salmonella``, ``V_parahaemolyticus``,
-  ``Vibrio_cholerae_O1``), emitted as-is.
+* marker — already registry labels (``Salmonella_enterica``, ``Vibrio_parahaemolyticus``,
+  ``Escherichia_coli``, ``Shigella``), emitted as-is.
 
 Strain / accession detail lives in a separate ``strain`` field; it is never
 glued into ``species`` (a dot in the label breaks bacmap's matcher).

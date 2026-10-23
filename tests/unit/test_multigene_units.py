@@ -316,3 +316,48 @@ class TestFastqInput:
 
         assert identify_multigene(str(genome)).to_dict()["species"] == "Salmonella"
         assert seen["path"] == str(genome)
+
+
+def _pick(*genes: str) -> str:
+    """Species chosen by the real rules for a synthetic set of detected genes."""
+    rules = _load_rules()
+    by_gene = {gene: [{"gene": gene, "identity": 99.0, "coverage": 100.0}] for gene in genes}
+    significant = {gene: by_gene[gene][0] for gene in genes}
+    species, _confidence, _rule = mg._pick_rule(
+        rules, by_gene, significant, mg._priority_species(rules)
+    )
+    return species
+
+
+class TestRuleDesign:
+    def test_shigella_genus_is_uida_ipah_lacy_negative(self):
+        # No species marker -> genus-level Shigella (not forced to boydii).
+        assert _pick("uida", "ipah") == "Shigella"
+        assert _pick("uida", "ipah", "lacy") == "Escherichia_coli"
+
+    def test_shigella_flexneri_uses_rfc_or_rfb_marker(self):
+        assert _pick("uida", "ipah", "rfc") == "Shigella_flexneri"
+        assert _pick("uida", "ipah", "rfbe") == "Shigella_flexneri"
+
+    def test_shigella_sonnei_uses_wbgz_or_chromosomal_marker(self):
+        assert _pick("uida", "ipah", "wbgz") == "Shigella_sonnei"
+        assert _pick("uida", "ipah", "sonnei_psuk") == "Shigella_sonnei"
+
+    def test_shigella_dysenteriae_uses_rfpb_or_sd_panel(self):
+        assert _pick("uida", "ipah", "rfpb") == "Shigella_dysenteriae"
+        assert _pick("uida", "ipah", "sd1_wzx") == "Shigella_dysenteriae"
+
+    def test_shigella_boydii_uses_sb_serotype_panel(self):
+        assert _pick("uida", "ipah", "sb2_wzx") == "Shigella_boydii"
+        assert _pick("uida", "ipah", "rfc") == "Shigella_flexneri"
+
+    def test_eiec_is_escherichia_coli_not_shigella(self):
+        assert _pick("uida", "ipah", "lacy") == "Escherichia_coli"
+
+    def test_bordetella_pertussis_needs_both_targets(self):
+        assert _pick("ptxs1", "tcfa") == "Bordetella_pertussis"
+        assert _pick("ptxs1") == "Unknown"
+
+    def test_renamed_labels(self):
+        assert _pick("tlh") == "Vibrio_parahaemolyticus"
+        assert _pick("inva") == "Salmonella_enterica"

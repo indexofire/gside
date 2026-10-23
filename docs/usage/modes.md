@@ -43,11 +43,11 @@ explicit combination such as `-m marker+sourmash` or `--meta`.
 ### Principle
 
 **FASTA**: one BLAST scan of the contigs against the markers database
-(80 sequences). **FASTQ**: reads are mapped with minimap2 (`-x sr` for short
+(139 sequences). **FASTQ**: reads are mapped with minimap2 (`-x sr` for short
 reads, `-x map-ont` for long) and each gene's breadth is the union of the
 reference intervals covered by its primary alignments, divided by gene
 length (the same aggregate-breadth recipe as gapit's reads mode). Detected
-genes are then matched against the 38 combination rules
+genes are then matched against the 42 combination rules
 (data-driven, `marker_rules.yaml`).
 
 Paired-end mates are detected from the file names (`_R1`/`_R2`, `_1`/`_2`,

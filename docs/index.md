@@ -29,7 +29,7 @@ gside engine            rules + backends + arbitration + metagenomic profiling
 | **L2** | `panel` | skani | ANI against curated reference panel (291 genomes) | Requires panel tier |
 | **L2** | `mash_refseq` | mash | MinHash distance (RefSeq sketch) | Requires mash tier |
 | **L2** | `sourmash` | sourmash | GTDB gather (containment ANI) | Requires GTDB database |
-| **L1** | `marker` | blastn | Target gene combination rules (38 rules, 80 sequences) | Mini database bundled |
+| **L1** | `marker` | blastn | Target gene combination rules (42 rules, 139 sequences) | Mini database bundled |
 | **Arbitration** | `all` | — | Run all methods, layer consensus (L3 > L2 > L1) | Best of all layers |
 
 `-m` accepts `+` combinations (`marker+sourmash`). `marker`, `mash_refseq`

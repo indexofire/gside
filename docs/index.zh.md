@@ -23,7 +23,7 @@ gside            物种鉴定引擎 + 宏基因组谱分析
 | **L2** | `panel` | skani | ANI 精选面板（291 基因组） | 需 panel 层 |
 | **L2** | `mash_refseq` | mash | MinHash 距离（RefSeq） | 需 mash 层 |
 | **L2** | `sourmash` | sourmash | GTDB gather | 需 GTDB 库 |
-| **L1** | `marker` | blastn | 靶基因规则（38 条，80 序列） | mini 层随包分发 |
+| **L1** | `marker` | blastn | 靶基因规则（42 条，139 序列） | mini 层随包分发 |
 | **仲裁** | `all` | — | 全方法层级共识（L3 > L2 > L1） | 取最优 |
 
 ## 宏基因组谱分析

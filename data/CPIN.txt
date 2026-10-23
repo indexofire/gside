@@ -1,0 +1,63 @@
+Y. pestis
+V. cholerae
+Shigella
+Salmonella
+Salmonella typhi/paratyphi A,B,C
+Diarrheagenic E. coli
+V. parahaemolyticus
+Cronobacter
+Y. enterocolitica
+S. aureus
+Campylobacter
+A. baumannii
+K. pneumoniae
+N. meningitidis
+L. pneumophila
+B. pertussis
+C. diphtheriae
+H. influenzae
+S. pneumoniae
+S. pyogenes
+L. monocytogenes
+Aeromonas
+Leptospira
+Brucella
+S. suis
+B. anthracis
+B. pseudomallei
+Clostridioides
+M. tuberculosis
+B. burgdorferi
+M. pneumoniae
+H. pylori
+Y. pseudotuberculosis
+Citrobacter
+P. aeruginosa
+Bartonella
+Rickettsiaceae
+Anaplasmataceae
+C. psittaci
+E. albertii
+C. botulinum
+Plesiomonas shigelloides
+Vibrio fluvialis
+Vibrio vulnificus
+Chlamydia pneumoniae
+Streptococcus agalactiae
+Francisella tularensis
+Burkholderia mallei
+Burkholderia gladioli
+Nocardia
+Cryptococcus
+Aspergillus
+Pneumocystis
+Coccidioides spp.
+Histoplasma spp.
+Blastomyces spp.
+Paracoccidioides spp.
+Talaromyces marneffei
+Rhinocladiella mackenziei
+Cladophialophora bantiana
+Candida spp.
+fusarium spp.
+Sporothrix spp.

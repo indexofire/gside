@@ -131,10 +131,9 @@
 | `verdict.supporting` | list[str] | 其他成功且与 `verdict.species` 一致的方法 |
 | `verdict.agreement` | str | `一致数/成功数`，如 `2/3`（按标签精确匹配） |
 
-`agreement` 按规范标签精确比对。marker 的致病型标签（`DEC`、`Shigella_EIEC`）
-有意与所属二名法区分：同一个 E. coli 基因组可能 marker 报 `DEC`、panel 报
-`Escherichia_coli`，此时 `agreement` 为 `2/3`，但两者指向同一物种。**不要**把
-DEC 折叠成 `Escherichia_coli`——这个区分正是下游致病型分型的路由依据。
+`agreement` 按规范标签精确比对。marker 规则现在输出种级标签（仅在无种特异
+标记时回退到属级 `Shigella`），因此 marker 与 ANI/sketch 层使用同一字符串。
+DEC/EIEC、志贺菌血清型等致病型/血清型分型属于 gapit，不在 gside 中做。
 
 ## 物种名契约
 
@@ -149,8 +148,10 @@ DEC 折叠成 `Escherichia_coli`——这个区分正是下游致病型分型的
 | sourmash | `...;s__Vibrio parahaemolyticus` | `Vibrio_parahaemolyticus` |
 | gtdbtk | `Vibrio cholerae` | `Vibrio_cholerae` |
 
-带血清群/致病型后缀的 marker 注册标签（`Vibrio_cholerae_O1`、
-`Shigella_EIEC`、`DEC`、`Salmonella`）本身即契约形式，原样透传。菌株/登录号
+marker 注册标签本身即契约形式：`Salmonella_enterica`、
+`Vibrio_parahaemolyticus`、`Escherichia_coli`、`Shigella`、
+`Shigella_flexneri`、`Shigella_sonnei`、`Shigella_dysenteriae`、
+`Shigella_boydii`；属级 `Shigella` 仅在无种特异标记时输出。菌株/登录号
 文本绝不拼进 `species`（点号会破坏下游匹配），统一放入 `strain`。
 种组占位（`Campylobacter sp.`）与 `Unknown` 一律输出 `Unknown`。
 

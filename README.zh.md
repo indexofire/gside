@@ -24,7 +24,7 @@ gside scan --meta reads_R1.fq reads_R2.fq
 
 | 模式 | 引擎 | 原理 | 数据库 |
 |---|---|---|---|
-| `marker`（默认） | blastn | 靶基因组合规则（38 条规则，80 条参考序列） | 随仓库分发 |
+| `marker`（默认） | blastn | 靶基因组合规则（42 条规则，139 条参考序列） | 随仓库分发 |
 | `panel` | skani | ANI 比对精选参考面板（291 基因组） | ~130 MB |
 | `mash_refseq` | mash | RefSeq MinHash 距离 | ~179 MB |
 | `sourmash` | sourmash | GTDB gather | ~3.9 GB |

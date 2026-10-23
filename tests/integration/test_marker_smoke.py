@@ -27,13 +27,13 @@ def _gene_seq(prefix: str) -> str:
 @pytest.mark.skipif(not _HAS_BLASTN, reason="blastn not available")
 class TestSpeciesMarker:
     def test_inva_single_gene_calls_salmonella(self, tmp_path):
-        """inva alone satisfies its single-gene rule → Salmonella."""
+        """inva alone satisfies its single-gene rule → Salmonella_enterica."""
         from gside.analysis.multigene_identifier import identify_multigene
 
         q = tmp_path / "inva.fna"
         q.write_text(f">inva_q\n{_gene_seq('markers~~~inva~~~')}\n")
         r = identify_multigene(str(q)).to_dict()
-        assert r["species"] == "Salmonella"
+        assert r["species"] == "Salmonella_enterica"
 
     def test_excluded_gene_suppresses_coli_call(self, tmp_path):
         """ceuE + mapa suppress the coli call; jejuni then misses min_hits=2 → Unknown."""

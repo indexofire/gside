@@ -40,10 +40,10 @@ gside scan reads.fq --meta -m kraken2+sylph   # 两种群落方法
 
 ### 原理
 
-**FASTA**：对 contigs 执行一次 BLAST（vs markers 库，80 条序列）。
+**FASTA**：对 contigs 执行一次 BLAST（vs markers 库，139 条序列）。
 **FASTQ**：用 minimap2 比对读段（短读 `-x sr`，长读 `-x map-ont`），每个基因的
 breadth = 所有 primary 比对的参考区间并集 / 基因长度（与 gapit reads 模式相同的
-聚合算法）。随后把检出基因与 38 条组合规则匹配（数据驱动，`marker_rules.yaml`）。
+聚合算法）。随后把检出基因与 42 条组合规则匹配（数据驱动，`marker_rules.yaml`）。
 
 双端 mate 会从文件名识别（`_R1`/`_R2`、`_1`/`_2`、`.1`/`.2`）并在
 一次 minimap2 中一起比对，因此每基因 breadth 是两条 mate 的并集；它们算

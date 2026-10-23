@@ -47,10 +47,11 @@ class TestMarkerRegistryLabels:
     @pytest.mark.parametrize(
         "label",
         [
-            "Salmonella",
-            "V_parahaemolyticus",
-            "DEC",
-            "Shigella_EIEC",
+            "Salmonella_enterica",
+            "Vibrio_parahaemolyticus",
+            "Escherichia_coli",
+            "Shigella",
+            "Shigella_flexneri",
             "Streptococcus_agalactiae",
         ],
     )
@@ -58,14 +59,14 @@ class TestMarkerRegistryLabels:
         assert canonical_species(label) == label
 
     def test_registry_label_display_name(self):
-        assert display_name("V_parahaemolyticus") == "V parahaemolyticus"
+        assert display_name("Vibrio_parahaemolyticus") == "Vibrio parahaemolyticus"
         assert display_name("") == "Unknown"
 
     def test_serotype_variant_label_is_not_reduced(self):
         # marker_rules.yaml emits `Vibrio_cholerae_O1`; bacmap accepts
         # multi-segment labels, so display expansion must not drop the suffix.
         assert display_name("Vibrio_cholerae_O1") == "Vibrio cholerae O1"
-        assert display_name("Shigella_EIEC") == "Shigella EIEC"
+        assert display_name("Shigella_flexneri") == "Shigella flexneri"
 
 
 class TestSourmashNames:
@@ -129,7 +130,7 @@ class TestIdempotence:
         [
             "Streptococcus agalactiae 2603V/R",
             "s__Vibrio parahaemolyticus",
-            "V_parahaemolyticus",
+            "Vibrio_parahaemolyticus",
             "Salmonella",
         ],
     )

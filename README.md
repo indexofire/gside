@@ -35,7 +35,7 @@ gside db status          # shows which tiers are ready
 
 | Mode | Engine | Method | Database |
 |---|---|---|---|
-| `marker` (default) | blastn | Target-gene combination rules (38 rules, 80 reference sequences) | Bundled (mini tier) |
+| `marker` (default) | blastn | Target-gene combination rules (42 rules, 139 reference sequences) | Bundled (mini tier) |
 | `panel` | skani | ANI against curated reference panel (291 genomes) | ~130 MB |
 | `mash_refseq` | mash | RefSeq MinHash distance | ~179 MB |
 | `sourmash` | sourmash | GTDB gather | ~3.9 GB |

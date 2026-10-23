@@ -31,7 +31,7 @@ rules:
 ### species
 
 物种名，使用注册表键名（空格转下划线）。如 `Campylobacter_jejuni`、
-`V_parahaemolyticus`。
+`Vibrio_parahaemolyticus`。
 
 ### genes
 

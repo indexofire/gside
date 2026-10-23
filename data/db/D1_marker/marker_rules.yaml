@@ -1,10 +1,12 @@
 rules:
-- species: Salmonella
+- species: Salmonella_enterica
   genes:
   - inva
   min_hits: 1
   min_identity: 90
-- species: V_parahaemolyticus
+  note: Label is species-level per the genus_species contract; invA is also present
+    in S. bongori, which this marker does not distinguish.
+- species: Vibrio_parahaemolyticus
   genes:
   - tlh
   min_hits: 1
@@ -111,10 +113,13 @@ rules:
   min_identity: 90
 - species: Bordetella_pertussis
   genes:
-  - is481
   - ptxs1
-  min_hits: 1
+  - tcfa
+  min_hits: 2
   min_identity: 90
+  note: IS481 was removed (present in B. holmesii); ptxS1 alone cross-reacts with
+    B. bronchiseptica/B. parapertussis. tcfA is only 56% covered in those
+    neighbours, so requiring both genes is species-specific.
 - species: Corynebacterium_diphtheriae
   genes:
   - tox
@@ -182,28 +187,150 @@ rules:
   - cpa
   min_hits: 1
   min_identity: 90
-- species: DEC
+- species: Escherichia_coli
   genes:
   - uida
   - lacy
-  - gada
   min_hits: 2
   min_identity: 95
-  note: uidA+lacY or gadA+lacY at ≥95% → E. coli. ipaH may also be present (EIEC)
-    - see Shigella_EIEC.
-- species: Shigella_EIEC
+  note: Species-level E. coli call from uidA + lacY. DEC/EIEC pathotyping belongs
+    to gapit.
+- species: Shigella_flexneri
   genes:
+  - uida
   - ipah
-  min_hits: 1
+  - rfc
+  - rfbe
+  - rfbi
+  min_hits: 3
   min_identity: 95
-  note: ipaH ≥95% alone → Shigella/EIEC. Only fires when no DEC rule matches (DEC
-    outscores on 2+ core genes).
-  co_detect_note: When both DEC and Shigella_EIEC markers are positive, DEC is
-    reported. Marker-level DEC/Shigella_EIEC discrimination is fundamentally
-    unsound — ECO core genes can hit 100% while carrying ipaH paralogs, and real
-    EIEC carries near-reference core genes (bacmap V10 root cause — identity
-    distributions overlap with no separable threshold). Resolution requires
-    pINV-specific markers (virA/icsB) in the DB or gapit serotyping.
+  exclude_genes:
+  - lacy
+  priority_over:
+  - Shigella
+  - Escherichia_coli
+  note: Ojha 2013 pentaplex target rfc (chromosomal). The genus signature
+    (uidA+ipaH) plus lacY-negative keeps EIEC out.
+- species: Shigella_sonnei
+  genes:
+  - uida
+  - ipah
+  - wbgz
+  - sonnei_psuk
+  min_hits: 3
+  min_identity: 95
+  exclude_genes:
+  - lacy
+  priority_over:
+  - Shigella
+  - Escherichia_coli
+  note: Ojha 2013 target wbgZ is plasmid-borne; plasmid-less strains fall back
+    to the Shigella genus rule.
+- species: Shigella_dysenteriae
+  genes:
+  - uida
+  - ipah
+  - rfpb
+  - sd10_wzx
+  - sd10_wzy
+  - sd12_wzx
+  - sd12_wzy
+  - sd13_wzx
+  - sd13_wzy
+  - sd14_wzx
+  - sd14_wzy
+  - sd15_wzx
+  - sd15_wzy
+  - sd1_rfp
+  - sd1_wzx
+  - sd1_wzy
+  - sd2_wzx
+  - sd2_wzy
+  - sd3_wzx
+  - sd3_wzy
+  - sd4_wzx
+  - sd4_wzy
+  - sd6_wzx
+  - sd6_wzy
+  - sd8_wzx
+  - sd8_wzy
+  - sd9_wzx
+  - sd9_wzy
+  - sdprove_wzx
+  - sdprove_wzy
+  - sdprov_wzx
+  - sdprov_wzy
+  min_hits: 3
+  min_identity: 85
+  min_coverage: 50
+  exclude_genes:
+  - lacy
+  priority_over:
+  - Shigella
+  - Escherichia_coli
+  note: Genus signature (uidA+ipaH, lacY-negative) plus any one of the 29 ShigaTyper serotype determinants for this species. Coverage is limited by serotype diversity/plasmid loss; otherwise the call falls back to the Shigella genus.
+- species: Shigella_boydii
+  genes:
+  - uida
+  - ipah
+  - sb11_wzx
+  - sb11_wzy
+  - sb12_wzx
+  - sb12_wzy
+  - sb14_wzx
+  - sb14_wzy
+  - sb15_wzx
+  - sb15_wzy
+  - sb16_wzy
+  - sb17_wzx
+  - sb17_wzy
+  - sb18_wzx
+  - sb18_wzy
+  - sb19_wzx
+  - sb19_wzy
+  - sb1_wzx
+  - sb1_wzy
+  - sb2_wzx
+  - sb2_wzy
+  - sb3_wzx
+  - sb3_wzy
+  - sb4_wzx
+  - sb4_wzy
+  - sb5_wzx
+  - sb5_wzy
+  - sb6_wzx
+  - sb6_wzy
+  - sb7_wzx
+  - sb7_wzy
+  - sb8_wzx
+  - sb8_wzy
+  - sb9_wzx
+  - sb9_wzy
+  - sbprov_wzx
+  - sbprov_wzy
+  min_hits: 3
+  min_identity: 85
+  min_coverage: 50
+  exclude_genes:
+  - lacy
+  priority_over:
+  - Shigella
+  - Escherichia_coli
+  note: Genus signature (uidA+ipaH, lacY-negative) plus any one of the 35 ShigaTyper serotype determinants for this species. Coverage is limited by serotype diversity/plasmid loss; otherwise the call falls back to the Shigella genus.
+- species: Shigella
+  genes:
+  - uida
+  - ipah
+  min_hits: 2
+  min_identity: 95
+  exclude_genes:
+  - lacy
+  priority_over:
+  - Escherichia_coli
+  note: Shigella = uidA+ / ipaH+ / lacY-negative (Lobersli 2016). EIEC is
+    lacY-positive and is called Escherichia_coli; Shigella serotyping/pathotyping
+    belongs to gapit. S. boydii/dysenteriae strains lacking ipaH fall through to
+    the species-level layers.
 - species: Campylobacter_jejuni
   genes:
   - mapa
