@@ -31,6 +31,12 @@ export GSIDE_PIXI_BIN=/path/to/conda/env/bin
 gside db status          # shows which tiers are ready
 ```
 
+Optional engine migration: `GSIDE_ENGINE=legacy|gseek|shadow` can route marker
+BLAST and FASTQ marker screening through
+[gseek](https://github.com/indexofire/gseek) while keeping the legacy result.
+See [gseek migration](docs/development/gseek-migration.md) for scope and
+verification.
+
 ## Species Identification (`gside scan`)
 
 | Mode | Engine | Method | Database |
