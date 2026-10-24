@@ -25,8 +25,9 @@ PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_pari
 
 
 > mash/sourmash 路径需要 gseek 0.6.0（`external_reference`），已发布 PyPI：
-> `pip install gseek==0.6.0`。optional extra 已固定为对应版本；sibling checkout
-> 仍可用于本地开发。
+> `pip install gseek==0.6.0`。optional extra 已固定为对应版本。开发/测试环境
+> 通过 `dev` extra（`pip install -e ".[dev]"`）和 pixi `dev` feature 安装；
+> sibling checkout 仅用于修改 gseek 本身。
 
 ## 已迁移路径
 

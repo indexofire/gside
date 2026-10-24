@@ -25,7 +25,9 @@ PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_pari
 
 > The mash/sourmash paths require gseek 0.6.0 (`external_reference`), which is
 > published on PyPI: `pip install gseek==0.6.0`. The optional extra is pinned
-> accordingly; the sibling checkout remains useful for local development.
+> accordingly. Development/test environments install it via the `dev` extra
+> (`pip install -e ".[dev]"`) and the pixi `dev` feature; the sibling checkout
+> remains useful for working on gseek itself.
 
 ## Migrated paths
 
