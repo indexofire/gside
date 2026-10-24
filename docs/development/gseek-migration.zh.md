@@ -24,9 +24,9 @@ PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_pari
 ```
 
 
-> mash/sourmash 路径依赖 gseek 的 `external_reference` 支持，该能力不在 gseek
-> 0.1.0 中。请使用 sibling checkout（`PYTHONPATH=../gseek/src`）或包含该能力的
-> gseek 构建；optional extra 已固定为 `gseek>=0.2`。
+> mash/sourmash 路径需要 gseek 0.2.0（`external_reference`）。请使用 sibling
+> checkout（`PYTHONPATH=../gseek/src`）或安装 `gseek>=0.2`；optional extra 已
+> 固定为对应版本。
 
 ## 已迁移路径
 
