@@ -311,3 +311,38 @@ def test_log_sourmash_shadow_ignores_row_order(caplog):
     with caplog.at_level("WARNING"):
         bridge.log_sourmash_shadow(legacy, new)
     assert "differs" not in caplog.text
+
+
+def test_skani_search_maps_ref_file_and_query_fraction(monkeypatch):
+    record = SimpleNamespace(
+        query_id="query.fna",
+        reference_id="long ref name",
+        ani=98.06,
+        aligned_fraction=0.833,
+        tags={
+            "reference_file": "GCF_009035845.1_ASM903584v1_genomic.fna",
+            "query_fraction": "85.79",
+        },
+    )
+    fake = _FakeDistanceGseek([record])
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
+    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
+
+    hits = bridge.skani_search("q.fna", "panel.sketch", threads=2)
+    call = fake.calls[0]
+    assert call["backend"] == "skani"
+    assert call["external_reference"] is True
+    assert call["reference"] == Path("panel.sketch")
+    assert hits[0].ref == "GCF_009035845.1_ASM903584v1_genomic.fna"
+    assert hits[0].ani == 98.06
+    assert hits[0].aligned_fraction == 85.79
+
+
+def test_log_skani_shadow_ignores_order(caplog):
+    from gside.engine.backends.skani import AniHit
+
+    legacy = [AniHit("a", 98.0, 85.0), AniHit("b", 97.0, 80.0)]
+    new = [AniHit("b", 97.0, 80.0), AniHit("a", 98.0, 85.0)]
+    with caplog.at_level("WARNING"):
+        bridge.log_skani_shadow(legacy, new)
+    assert "differs" not in caplog.text

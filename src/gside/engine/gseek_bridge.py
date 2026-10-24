@@ -8,10 +8,9 @@
 
 The bridge is imported unconditionally (it has no gseek import at module load),
 so installations that never set ``GSIDE_ENGINE`` do not need gseek. Marker
-BLAST/FASTQ screening, mash distances (assembly and reads), and sourmash gather
-use gseek. The skani ``panel`` database directory remains on the legacy backend;
-gseek's external-reference support accepts a pre-built file
-(``.msh``/``.sig``/``.zip``), not a database directory.
+BLAST/FASTQ screening, mash distances (assembly and reads), sourmash gather, and
+skani panel searches use gseek. gseek external references accept pre-built
+files and database directories (sourmash rocksdb, skani sketch DB).
 """
 
 from __future__ import annotations
@@ -37,12 +36,14 @@ __all__ = [
     "gseek_available",
     "log_blast_shadow",
     "log_mash_shadow",
+    "log_skani_shadow",
     "log_screen_shadow",
     "log_sourmash_shadow",
     "mash_distance",
     "mash_distance_reads",
     "record_to_hit",
     "screen_reads_gseek",
+    "skani_search",
     "sourmash_gather",
 ]
 
@@ -366,6 +367,62 @@ def _mash_distance(item: Any) -> float:
         return float(item.distance)
     # legacy tuple is (reference_id, identity); identity = 1 - distance
     return 1.0 - float(item[1])
+
+
+def skani_search(
+    query: str | Path,
+    reference_db: str | Path,
+    *,
+    threads: int = 4,
+) -> list[Any]:
+    """Run gseek skani search against a pre-built database directory.
+
+    gside historically used the query-side aligned fraction
+    (``Align_fraction_query``) and the ``Ref_file`` basename. gseek's normalized
+    record carries the reference fraction in ``aligned_fraction``, so map the
+    raw query fraction tag back to gside's ``AniHit``.
+    """
+    from gside.engine.backends.skani import AniHit
+
+    gseek = _require_gseek()
+    result = gseek.distance(
+        backend="skani",
+        query=Path(query),
+        reference=Path(reference_db),
+        external_reference=True,
+        threads=threads,
+        resolver=_resolver(),
+        index="none",
+    )
+    hits: list[AniHit] = []
+    for record in result.records:
+        ref = record.tags.get("reference_file") or record.reference_id
+        aligned = float(record.tags.get("query_fraction", record.aligned_fraction or 0.0))
+        hits.append(
+            AniHit(
+                ref=ref,
+                ani=float(record.ani or 0.0),
+                aligned_fraction=aligned,
+            )
+        )
+    return hits
+
+
+def log_skani_shadow(legacy: Sequence[Any], new: Sequence[Any]) -> None:
+    legacy_keys = sorted(
+        (hit.ref, round(hit.ani, 3), round(hit.aligned_fraction, 3)) for hit in legacy
+    )
+    new_keys = sorted(
+        (hit.ref, round(hit.ani, 3), round(hit.aligned_fraction, 3)) for hit in new
+    )
+    if legacy_keys != new_keys:
+        logger.warning(
+            "gseek shadow skani differs: legacy=%d gseek=%d only_legacy=%d only_gseek=%d",
+            len(legacy_keys),
+            len(new_keys),
+            len(set(legacy_keys) - set(new_keys)),
+            len(set(new_keys) - set(legacy_keys)),
+        )
 
 
 def log_mash_shadow(legacy: Sequence[Any], new: Sequence[Any]) -> None:

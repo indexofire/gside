@@ -20,6 +20,7 @@ pytest.importorskip("gseek")
 
 from gseek.io import read_fasta  # noqa: E402
 
+from gside.analysis.ani_identifier import identify_by_ani  # noqa: E402
 from gside.analysis.multigene_identifier import identify_multigene  # noqa: E402
 from gside.analysis.read_screening import screen_reads  # noqa: E402
 from gside.config import which  # noqa: E402
@@ -161,3 +162,19 @@ def test_mash_reads_matches_legacy(tmp_path, monkeypatch):
     assert new["confidence"] == legacy["confidence"]
     assert new["top_hits"][0]["genome"] == legacy["top_hits"][0]["genome"]
     assert new["identity"] == pytest.approx(legacy["identity"], abs=1e-3)
+
+
+_PANEL_DB = _REPO / "data" / "db" / "D2_ani" / "panel.sketch"
+
+
+@pytest.mark.skipif(
+    not _PANEL_DB.is_dir() or which("skani") is None,
+    reason="panel sketched DB or skani missing",
+)
+def test_panel_matches_legacy(tmp_path, monkeypatch):
+    monkeypatch.setenv("GSEEK_CACHE_DIR", str(tmp_path / "gseek-cache"))
+    monkeypatch.setenv("GSIDE_ENGINE", "legacy")
+    legacy = identify_by_ani(str(_K12), mode="panel").result
+    monkeypatch.setenv("GSIDE_ENGINE", "gseek")
+    new = identify_by_ani(str(_K12), mode="panel").result
+    assert new == legacy

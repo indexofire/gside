@@ -310,3 +310,43 @@ def test_mash_dist_reads_uses_gseek_when_enabled(monkeypatch):
         ],
     )
     assert ani._mash_dist_reads("reads.fq", Path("db.msh"), threads=2) == [("GCF_1", 0.98)]
+
+
+def test_skani_search_uses_gseek_when_enabled(monkeypatch):
+    from gside.engine import gseek_bridge
+    from gside.engine.backends.skani import AniHit
+
+    monkeypatch.setenv("GSIDE_ENGINE", "gseek")
+    monkeypatch.setattr(
+        gseek_bridge,
+        "skani_search",
+        lambda query, db, *, threads: [AniHit("GCF_1", 98.0, 85.0)],
+    )
+    hits = ani._skani_search("q.fna", Path("panel.sketch"), threads=2)
+    assert hits[0].ref == "GCF_1"
+
+
+def test_skani_search_keeps_legacy_in_shadow(monkeypatch):
+    from gside.engine import gseek_bridge
+    from gside.engine.backends.skani import AniHit
+
+    monkeypatch.setenv("GSIDE_ENGINE", "shadow")
+    monkeypatch.setattr(
+        gseek_bridge,
+        "skani_search",
+        lambda query, db, *, threads: [AniHit("gseek", 98.0, 85.0)],
+    )
+    monkeypatch.setattr(
+        ani,
+        "_skani_search_legacy",
+        lambda query, db, threads: [AniHit("legacy", 97.0, 80.0)],
+    )
+    seen = {}
+    monkeypatch.setattr(
+        gseek_bridge,
+        "log_skani_shadow",
+        lambda old, new: seen.update(old=old, new=new),
+    )
+    hits = ani._skani_search("q.fna", Path("panel.sketch"))
+    assert hits[0].ref == "legacy"
+    assert seen["new"][0].ref == "gseek"

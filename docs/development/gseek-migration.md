@@ -23,8 +23,8 @@ pip install -e ../gseek
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
-> The mash/sourmash paths require gseek 0.3.1 (`external_reference`), which is
-> published on PyPI: `pip install gseek==0.3.1`. The optional extra is pinned
+> The mash/sourmash paths require gseek 0.4.0 (`external_reference`), which is
+> published on PyPI: `pip install gseek==0.4.0`. The optional extra is pinned
 > accordingly; the sibling checkout remains useful for local development.
 
 ## Migrated paths
@@ -35,6 +35,7 @@ PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_pari
 | FASTQ marker screening | minimap2 PAF + local aggregation | `gseek.align(backend="minimap2", ...)` + same aggregation |
 | mash_refseq (assembly/reads) | `MashBackend` against `mash.msh` | `gseek.distance(backend="mash", external_reference=True)` |
 | sourmash gather | sketch/gather CSV parsing | `gseek.distance(backend="sourmash", external_reference=True)`, one run per query file |
+| panel (skani) | `SkaniBackend` + `panel.sketch` DB | `gseek.distance(backend="skani", external_reference=True)` against the pre-built DB directory |
 
 The gseek path deliberately preserves gside semantics:
 
@@ -46,9 +47,9 @@ The gseek path deliberately preserves gside semantics:
 
 ## Not migrated yet
 
-- `panel` still uses the skani database directory (`panel.sketch`). gseek
-  accepts sourmash rocksdb directories, but its skani adapter does not support
-  external database directories.
+All gseek-backed gside modes are migrated (marker, mash, sourmash, panel).
+Modes without a gseek adapter (`gtdbtk`, `kraken2`, `sylph`) remain on their
+existing implementations.
 
 ## Verification
 
@@ -75,8 +76,8 @@ synthetic FASTQ generated from the `inva` marker:
 | 21 reads covering `inva` | `Salmonella_enterica` / high / `inva` 100.0 / 98.3 | identical | identical |
 | K12 assembly, `-m mash_refseq` | `Escherichia_coli` / high / identity 1.0 | identical | identical |
 
-`shadow` produced no difference warnings. Unit suite: 739 passed; integration: 27 passed, 1 skipped
-(with gseek installed; 5 are parity, 22 without gseek); coverage 97.30%.
+`shadow` produced no difference warnings. Unit suite: 743 passed; integration: 28 passed, 1 skipped
+(with gseek installed; 6 are parity, 22 without gseek); coverage 97.25%.
 
 
 
@@ -94,6 +95,8 @@ Inputs: one RefSeq genome from each of *Acinetobacter baumannii*,
 - A 260,000-read (150 bp, ~10x) FASTQ from *A. baumannii* produced identical
   marker (`Acinetobacter_baumannii`, high, `rpob-aba` 94.84 / `oxa51` 93.56)
   and mash (`0.9789136`, high) results in all three modes.
+- panel (skani) on *A. baumannii* and *C. coli*: legacy/gseek/shadow JSON were
+  byte-identical (A. baumannii 98.06 ANI / 85.79 AF; C. coli 99.72 / 98.09).
 - A mini sourmash signature DB built from three RefSeq genomes produced
   identical `species`, `confidence`, `f_unique_weighted`, `ani`, and
   `gather_partition` for *A. baumannii* and *S. enterica* in all three modes.
@@ -104,7 +107,7 @@ Inputs: one RefSeq genome from each of *Acinetobacter baumannii*,
   legacy sourmash CLI default; the initial 50 bp default admitted extra
   low-weight partitions.
 - The benchmark's **rocksdb directory** (`gtdb-k31.rocksdb`) is accepted by
-  gseek 0.3.1 as an external reference and hashed as a deterministic tree.
+  gseek 0.4.0 as an external reference and hashed as a deterministic tree.
   legacy, gseek, and shadow all returned the same full partition
   (`Acinetobacter_baumannii`, high, `0.5978601252609603`, ANI 98.3); shadow
   produced no difference warning.

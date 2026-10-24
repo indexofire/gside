@@ -36,10 +36,28 @@ def _hits_from_rows(rows: list[tuple[str, float, float]]) -> list[AniHit]:
     return [AniHit(ref=r, ani=a, aligned_fraction=af) for r, a, af in rows]
 
 
-def _skani_search(query: str | Path, db: Path, threads: int = 4) -> list[AniHit]:
+def _skani_search_legacy(query: str | Path, db: Path, threads: int) -> list[AniHit]:
     from gside.engine.backends.skani import SkaniBackend
 
     return SkaniBackend(threads=threads).search(Path(query), db)
+
+
+def _skani_search(query: str | Path, db: Path, threads: int = 4) -> list[AniHit]:
+    from gside.engine.gseek_bridge import (
+        engine_mode,
+        log_skani_shadow,
+        skani_search,
+    )
+
+    mode = engine_mode()
+    if mode in {"gseek", "shadow"}:
+        new = skani_search(query, db, threads=threads)
+        if mode == "gseek":
+            return new
+        legacy = _skani_search_legacy(query, db, threads)
+        log_skani_shadow(legacy, new)
+        return legacy
+    return _skani_search_legacy(query, db, threads)
 
 
 def _mash_dist_legacy(query: str | Path, msh: Path, threads: int) -> list[tuple[str, float]]:
