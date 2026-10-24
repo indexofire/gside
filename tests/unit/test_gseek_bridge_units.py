@@ -364,9 +364,7 @@ def test_resolver_is_cached(monkeypatch):
     import gside.config as gside_config
 
     fake = SimpleNamespace(ToolResolver=FakeResolver)
-    monkeypatch.setattr(
-        bridge, "importlib", SimpleNamespace(import_module=lambda name: fake)
-    )
+    monkeypatch.setattr(bridge, "importlib", SimpleNamespace(import_module=lambda name: fake))
     monkeypatch.setattr(gside_config, "pixi_path", lambda: "")
     first = bridge._resolver()
     second = bridge._resolver()

@@ -263,9 +263,7 @@ def identify_multigene(contigs_fasta: str | list[str], threads: int = 4) -> Mult
     if significant:
         result.detected_markers = [
             {"gene": g, "identity": h["identity"], "coverage": h["coverage"]}
-            for g, h in sorted(
-                significant.items(), key=lambda x: (-x[1]["identity"], x[0])
-            )
+            for g, h in sorted(significant.items(), key=lambda x: (-x[1]["identity"], x[0]))
         ]
 
     if not significant and raw_hits:

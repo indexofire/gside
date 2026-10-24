@@ -460,9 +460,7 @@ def log_skani_shadow(legacy: Sequence[Any], new: Sequence[Any]) -> None:
     legacy_keys = sorted(
         (hit.ref, round(hit.ani, 3), round(hit.aligned_fraction, 3)) for hit in legacy
     )
-    new_keys = sorted(
-        (hit.ref, round(hit.ani, 3), round(hit.aligned_fraction, 3)) for hit in new
-    )
+    new_keys = sorted((hit.ref, round(hit.ani, 3), round(hit.aligned_fraction, 3)) for hit in new)
     if legacy_keys != new_keys:
         logger.warning(
             "gseek shadow skani differs: legacy=%d gseek=%d only_legacy=%d only_gseek=%d",

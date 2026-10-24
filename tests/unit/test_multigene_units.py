@@ -375,10 +375,12 @@ def test_detected_marker_ties_are_gene_sorted(monkeypatch, tmp_path):
     monkeypatch.setattr(mg, "_load_rules", lambda: [])
     monkeypatch.setattr(mg, "_db_version", lambda: "test")
     monkeypatch.setattr(
-        mg, "_blast_contigs", lambda path, threads: [
+        mg,
+        "_blast_contigs",
+        lambda path, threads: [
             {"gene": "b", "identity": 100.0, "coverage": 100.0, "ref_len": 100},
             {"gene": "a", "identity": 100.0, "coverage": 100.0, "ref_len": 100},
-        ]
+        ],
     )
     # No rule is required to exercise detected_markers ordering.
     result = mg.identify_multigene(str(tmp_path / "g.fna"))
