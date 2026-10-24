@@ -196,7 +196,7 @@ def _mash_result(
         mash_rows = _mash_dist_reads(files, msh, threads)
     else:
         mash_rows = _mash_dist(files[0], msh, threads)
-    mash_top = sorted(mash_rows, key=lambda r: -r[1])[:_TOP_N]
+    mash_top = sorted(mash_rows, key=lambda r: (-r[1], r[0]))[:_TOP_N]
     best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)
     raw_species = taxa.get(best_ref, _mash_species(best_ref)) if best_ref else "Unknown"
 
@@ -221,7 +221,8 @@ def _panel_result(
     query = contigs if isinstance(contigs, (str, Path)) else contigs[0]
     skani_db = base / "panel.sketch" if (base / "panel.sketch").exists() else base
     skani_hits = sorted(
-        _skani_search(query, skani_db, threads), key=lambda h: (-h.ani, -h.aligned_fraction)
+        _skani_search(query, skani_db, threads),
+        key=lambda h: (-h.ani, -h.aligned_fraction, h.ref),
     )
     top = skani_hits[:_TOP_N]
     best = top[0] if top else None

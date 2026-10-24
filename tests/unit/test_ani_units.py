@@ -350,3 +350,25 @@ def test_skani_search_keeps_legacy_in_shadow(monkeypatch):
     hits = ani._skani_search("q.fna", Path("panel.sketch"))
     assert hits[0].ref == "legacy"
     assert seen["new"][0].ref == "gseek"
+
+
+def test_panel_tie_breaks_by_ref(monkeypatch, taxadb):
+    from gside.engine.backends.skani import AniHit
+
+    monkeypatch.setattr(
+        ani,
+        "_skani_search",
+        lambda q, d, threads=4: [AniHit("B", 99.0, 90.0), AniHit("A", 99.0, 90.0)],
+    )
+    result = identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result
+    assert [hit["genome"] for hit in result["top_hits"][:2]] == ["A", "B"]
+
+
+def test_mash_tie_breaks_by_ref(monkeypatch, taxadb):
+    monkeypatch.setattr(
+        ani,
+        "_mash_dist",
+        lambda q, m, threads=4: [("B", 0.99), ("A", 0.99)],
+    )
+    result = identify_by_ani("q.fna", mode="mash_refseq", db_dir=taxadb).result
+    assert [hit["genome"] for hit in result["top_hits"][:2]] == ["A", "B"]

@@ -72,7 +72,7 @@ parity 测试是额外集成检查，在 gseek 成为 CI 可选依赖前不进�
 | 覆盖 `inva` 的 21 条 reads | `Salmonella_enterica` / high / `inva` 100.0 / 98.3 | 完全一致 | 完全一致 |
 | K12 组装，`-m mash_refseq` | `Escherichia_coli` / high / identity 1.0 | 完全一致 | 完全一致 |
 
-`shadow` 没有产生差异 warning。单测 743 passed；集成 28 passed / 1 skipped（安装 gseek 时；
+`shadow` 没有产生差异 warning。单测 747 passed；集成 28 passed / 1 skipped（安装 gseek 时；
 其中 6 个为 parity，未装 gseek 时 22 个）；覆盖率 97.25%。
 
 
@@ -103,3 +103,23 @@ coli*、*Escherichia coli*、*Salmonella enterica*、*Shigella flexneri*。分�
   external reference，并按确定性 tree hash 记录。legacy/gseek/shadow 均返回相同
   的完整 partition（`Acinetobacter_baumannii`，high，0.5978601252609603，
   ANI 98.3），shadow 无差异 warning。
+
+
+## 全量数据基准（`~/temps/test`）
+
+实际数据是 **42 个 label、4,178 个基因组**（包含 `Shigella` 属级 label），
+每个基因组都跑 legacy 与 gseek 的四种模式，8 个 worker 并行：
+
+| 模式 | 运行数 | 完全一致 | 错误 | legacy 中位数 | gseek 中位数 | 性能比（中位数） |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| marker | 4,178 | 4,178 | 0 | 0.9005s | 1.6184s | 0.556x |
+| panel | 4,178 | 4,178 | 0 | 0.1356s | 0.3006s | 0.451x |
+| mash_refseq | 4,178 | 4,178 | 0 | 1.0373s | 2.1754s | 0.477x |
+| sourmash | 4,178 | 4,178 | 0 | 1.6733s | 2.2704s | 0.737x |
+
+总耗时：legacy 16,771s，gseek 28,007s（并行基准下 gseek 约慢 1.67 倍）。
+sourmash 的 gseek 时间使用进程内 reference tree-hash 缓存；生产逐次调用会额外
+对 12GB rocksdb 目录做哈希（约 8s/次），吞吐会更低。该基准是 8 路并行下的
+wall-clock，不是单核隔离对比。
+
+原始行与生成报告：`~/temps/test/results/gseek-full-benchmark-final/`。

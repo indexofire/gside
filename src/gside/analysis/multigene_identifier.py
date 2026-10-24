@@ -148,7 +148,10 @@ def _best_per_gene(
         if hit["identity"] < min_identity or hit["coverage"] < min_coverage:
             continue
         gene = hit["gene"]
-        if gene not in best or hit["identity"] > best[gene]["identity"]:
+        if gene not in best or (hit["identity"], hit["coverage"]) > (
+            best[gene]["identity"],
+            best[gene]["coverage"],
+        ):
             best[gene] = hit
     return best
 
@@ -260,11 +263,16 @@ def identify_multigene(contigs_fasta: str | list[str], threads: int = 4) -> Mult
     if significant:
         result.detected_markers = [
             {"gene": g, "identity": h["identity"], "coverage": h["coverage"]}
-            for g, h in sorted(significant.items(), key=lambda x: -x[1]["identity"])
+            for g, h in sorted(
+                significant.items(), key=lambda x: (-x[1]["identity"], x[0])
+            )
         ]
 
     if not significant and raw_hits:
-        near = [h for h in raw_hits if h["identity"] >= 75 and h["coverage"] >= 20]
+        near = sorted(
+            (h for h in raw_hits if h["identity"] >= 75 and h["coverage"] >= 20),
+            key=lambda h: h["gene"],
+        )
         if near:
             result.notes.append(
                 f"Near-threshold hits detected (identity 75-85%): "

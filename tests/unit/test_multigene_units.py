@@ -361,3 +361,25 @@ class TestRuleDesign:
     def test_renamed_labels(self):
         assert _pick("tlh") == "Vibrio_parahaemolyticus"
         assert _pick("inva") == "Salmonella_enterica"
+
+
+def test_best_per_gene_prefers_coverage_on_identity_tie():
+    hits = [
+        {"gene": "ipah", "identity": 100.0, "coverage": 74.1, "ref_len": 100},
+        {"gene": "ipah", "identity": 100.0, "coverage": 100.0, "ref_len": 100},
+    ]
+    assert mg._best_per_gene(hits)["ipah"]["coverage"] == 100.0
+
+
+def test_detected_marker_ties_are_gene_sorted(monkeypatch, tmp_path):
+    monkeypatch.setattr(mg, "_load_rules", lambda: [])
+    monkeypatch.setattr(mg, "_db_version", lambda: "test")
+    monkeypatch.setattr(
+        mg, "_blast_contigs", lambda path, threads: [
+            {"gene": "b", "identity": 100.0, "coverage": 100.0, "ref_len": 100},
+            {"gene": "a", "identity": 100.0, "coverage": 100.0, "ref_len": 100},
+        ]
+    )
+    # No rule is required to exercise detected_markers ordering.
+    result = mg.identify_multigene(str(tmp_path / "g.fna"))
+    assert [m["gene"] for m in result.detected_markers] == ["a", "b"]

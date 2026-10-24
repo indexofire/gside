@@ -76,7 +76,7 @@ synthetic FASTQ generated from the `inva` marker:
 | 21 reads covering `inva` | `Salmonella_enterica` / high / `inva` 100.0 / 98.3 | identical | identical |
 | K12 assembly, `-m mash_refseq` | `Escherichia_coli` / high / identity 1.0 | identical | identical |
 
-`shadow` produced no difference warnings. Unit suite: 743 passed; integration: 28 passed, 1 skipped
+`shadow` produced no difference warnings. Unit suite: 747 passed; integration: 28 passed, 1 skipped
 (with gseek installed; 6 are parity, 22 without gseek); coverage 97.25%.
 
 
@@ -111,3 +111,26 @@ Inputs: one RefSeq genome from each of *Acinetobacter baumannii*,
   legacy, gseek, and shadow all returned the same full partition
   (`Acinetobacter_baumannii`, high, `0.5978601252609603`, ANI 98.3); shadow
   produced no difference warning.
+
+
+## Full-dataset benchmark (`~/temps/test`)
+
+The actual dataset has **42 labels and 4,178 genomes** (the directory includes
+the `Shigella` genus label). Every genome was run through legacy and gseek for
+all four gseek-backed modes, using 8 worker processes:
+
+| Mode | Runs | Exact same | Errors | Legacy median | gseek median | Speed ratio (median) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| marker | 4,178 | 4,178 | 0 | 0.9005s | 1.6184s | 0.556x |
+| panel | 4,178 | 4,178 | 0 | 0.1356s | 0.3006s | 0.451x |
+| mash_refseq | 4,178 | 4,178 | 0 | 1.0373s | 2.1754s | 0.477x |
+| sourmash | 4,178 | 4,178 | 0 | 1.6733s | 2.2704s | 0.737x |
+
+Total measured time: legacy 16,771s, gseek 28,007s (gseek ≈ 1.67x slower
+under the parallel benchmark). Sourmash gseek timings use an in-process
+reference-tree-hash cache; without it the 12 GB rocksdb directory is hashed per
+call (~8s extra), so production throughput is lower. The benchmark is wall-clock
+under 8-way load, not an isolated single-core comparison.
+
+Raw rows and the generated report:
+`~/temps/test/results/gseek-full-benchmark-final/`.
