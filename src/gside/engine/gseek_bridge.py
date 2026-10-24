@@ -15,6 +15,7 @@ files and database directories (sourmash rocksdb, skani sketch DB).
 
 from __future__ import annotations
 
+import functools
 import importlib
 import importlib.util
 import logging
@@ -71,14 +72,39 @@ def _require_gseek() -> Any:
         ) from exc
 
 
+@functools.lru_cache(maxsize=1)
 def _resolver() -> Any:
-    """Use the same pixi/PATH discovery order as gside."""
+    """Use the same pixi/PATH discovery order as gside.
+
+    Tool version probing is cached by the resolver instance; reusing it avoids
+    one ``--version`` subprocess per alignment call in batch runs.
+    """
     from gside.config import pixi_path
 
     execution = importlib.import_module("gseek.execution")
     ToolResolver = execution.ToolResolver
     paths = [Path(part) for part in pixi_path().split(os.pathsep) if part and Path(part).is_dir()]
     return ToolResolver(extra_paths=paths)
+
+
+_REFERENCE_DIGESTS: dict[str, tuple[int, str]] = {}
+
+
+def _reference_digest(path: Path) -> tuple[int, str]:
+    """Return (size, sha256) for an external reference, cached per process."""
+    from gseek.provenance import directory_size, sha256_file, sha256_tree
+
+    resolved = path.resolve()
+    key = str(resolved)
+    cached = _REFERENCE_DIGESTS.get(key)
+    if cached is not None:
+        return cached
+    if resolved.is_dir():
+        value = (directory_size(resolved), sha256_tree(resolved))
+    else:
+        value = (resolved.stat().st_size, sha256_file(resolved))
+    _REFERENCE_DIGESTS[key] = value
+    return value
 
 
 def _coverage(aligned: int, length: int) -> float:
@@ -152,6 +178,7 @@ def blast_hits(
         threads=threads,
         resolver=_resolver(),
         index="auto",
+        record_manifest=False,
     )
     hits = [record_to_hit(record) for record in result.records]
     return [
@@ -237,6 +264,7 @@ def screen_reads_gseek(
         threads=threads,
         resolver=_resolver(),
         index="auto",
+        record_manifest=False,
     )
     return aggregate_screen(result.records)
 
@@ -247,8 +275,11 @@ def _mash_records(gseek: Any, **kwargs: Any) -> list[Any]:
     result = gseek.distance(
         backend="mash",
         external_reference=True,
+        external_sha256=kwargs.pop("external_sha256", None),
+        external_size=kwargs.pop("external_size", None),
         resolver=_resolver(),
         index="none",
+        record_manifest=False,
         **kwargs,
     )
     return [
@@ -277,10 +308,14 @@ def mash_distance(
     The query is FASTA/FASTQ; gseek sketches it with the default Mash settings
     and passes the external reference straight to ``mash dist``.
     """
+    reference = Path(reference_msh)
+    size, digest = _reference_digest(reference)
     return _mash_records(
         _require_gseek(),
         query=Path(query),
-        reference=Path(reference_msh),
+        reference=reference,
+        external_sha256=digest,
+        external_size=size,
         params={"max_distance": max_distance},
         threads=threads,
     )
@@ -295,10 +330,14 @@ def mash_distance_reads(
 ) -> list[Any]:
     """Run gseek mash on FASTQ reads with gside's ``-m 2 -r`` sketch flags."""
     files = [Path(reads)] if isinstance(reads, (str, Path)) else [Path(p) for p in reads]
+    reference = Path(reference_msh)
+    size, digest = _reference_digest(reference)
     return _mash_records(
         _require_gseek(),
         query=tuple(files),
-        reference=Path(reference_msh),
+        reference=reference,
+        external_sha256=digest,
+        external_size=size,
         params={"max_distance": max_distance, "reads": True},
         threads=threads,
     )
@@ -319,6 +358,7 @@ def sourmash_gather(
     gseek = _require_gseek()
     files = [Path(contigs)] if isinstance(contigs, (str, Path)) else [Path(p) for p in contigs]
     reference = Path(reference_db)
+    size, digest = _reference_digest(reference)
     rows: list[dict[str, Any]] = []
     # sourmash gather requires exactly one query signature, so batch multi-file
     # samples as one gseek run per file and merge the gather rows.
@@ -329,6 +369,8 @@ def sourmash_gather(
                 query=path,
                 reference=reference,
                 external_reference=True,
+                external_sha256=digest,
+                external_size=size,
                 params={
                     "mode": "gather",
                     "k": 31,
@@ -340,6 +382,7 @@ def sourmash_gather(
                 threads=threads,
                 resolver=_resolver(),
                 index="none",
+                record_manifest=False,
             )
         except Exception as exc:  # gseek errors are typed; gside's caller expects RuntimeError
             raise RuntimeError(f"gseek sourmash gather failed for {path}: {exc}") from exc
@@ -385,14 +428,19 @@ def skani_search(
     from gside.engine.backends.skani import AniHit
 
     gseek = _require_gseek()
+    reference = Path(reference_db)
+    size, digest = _reference_digest(reference)
     result = gseek.distance(
         backend="skani",
         query=Path(query),
-        reference=Path(reference_db),
+        reference=reference,
         external_reference=True,
+        external_sha256=digest,
+        external_size=size,
         threads=threads,
         resolver=_resolver(),
         index="none",
+        record_manifest=False,
     )
     hits: list[AniHit] = []
     for record in result.records:

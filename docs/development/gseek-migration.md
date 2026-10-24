@@ -23,8 +23,8 @@ pip install -e ../gseek
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
-> The mash/sourmash paths require gseek 0.4.0 (`external_reference`), which is
-> published on PyPI: `pip install gseek==0.4.0`. The optional extra is pinned
+> The mash/sourmash paths require gseek 0.6.0 (`external_reference`), which is
+> published on PyPI: `pip install gseek==0.6.0`. The optional extra is pinned
 > accordingly; the sibling checkout remains useful for local development.
 
 ## Migrated paths
@@ -76,8 +76,8 @@ synthetic FASTQ generated from the `inva` marker:
 | 21 reads covering `inva` | `Salmonella_enterica` / high / `inva` 100.0 / 98.3 | identical | identical |
 | K12 assembly, `-m mash_refseq` | `Escherichia_coli` / high / identity 1.0 | identical | identical |
 
-`shadow` produced no difference warnings. Unit suite: 747 passed; integration: 28 passed, 1 skipped
-(with gseek installed; 6 are parity, 22 without gseek); coverage 97.25%.
+`shadow` produced no difference warnings. Unit suite: 748 passed; integration: 28 passed, 1 skipped
+(with gseek installed; 6 are parity, 22 without gseek); coverage 96.88%.
 
 
 
@@ -107,7 +107,7 @@ Inputs: one RefSeq genome from each of *Acinetobacter baumannii*,
   legacy sourmash CLI default; the initial 50 bp default admitted extra
   low-weight partitions.
 - The benchmark's **rocksdb directory** (`gtdb-k31.rocksdb`) is accepted by
-  gseek 0.4.0 as an external reference and hashed as a deterministic tree.
+  gseek 0.6.0 as an external reference and hashed as a deterministic tree.
   legacy, gseek, and shadow all returned the same full partition
   (`Acinetobacter_baumannii`, high, `0.5978601252609603`, ANI 98.3); shadow
   produced no difference warning.
@@ -121,16 +121,16 @@ all four gseek-backed modes, using 8 worker processes:
 
 | Mode | Runs | Exact same | Errors | Legacy median | gseek median | Speed ratio (median) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| marker | 4,178 | 4,178 | 0 | 0.9005s | 1.6184s | 0.556x |
-| panel | 4,178 | 4,178 | 0 | 0.1356s | 0.3006s | 0.451x |
-| mash_refseq | 4,178 | 4,178 | 0 | 1.0373s | 2.1754s | 0.477x |
-| sourmash | 4,178 | 4,178 | 0 | 1.6733s | 2.2704s | 0.737x |
+| marker | 4,178 | 4,178 | 0 | 0.4381s | 0.4480s | 0.978x |
+| panel | 4,178 | 4,178 | 0 | 0.0660s | 0.0748s | 0.882x |
+| mash_refseq | 4,178 | 4,178 | 0 | 0.5183s | 0.7013s | 0.739x |
+| sourmash | 4,178 | 4,178 | 0 | 1.6415s | 1.6452s | 0.998x |
 
-Total measured time: legacy 16,771s, gseek 28,007s (gseek ≈ 1.67x slower
-under the parallel benchmark). Sourmash gseek timings use an in-process
-reference-tree-hash cache; without it the 12 GB rocksdb directory is hashed per
-call (~8s extra), so production throughput is lower. The benchmark is wall-clock
+Total measured time: legacy 11,309s, gseek 12,183s (gseek ≈ 1.08x slower
+under the parallel benchmark). The 0.6.0 run reuses ToolResolver probes,
+caches reference digests per process, skips manifest/result hashing when not
+needed, and uses mash's direct FASTA query path. The benchmark is wall-clock
 under 8-way load, not an isolated single-core comparison.
 
 Raw rows and the generated report:
-`~/temps/test/results/gseek-full-benchmark-final/`.
+`~/temps/test/results/gseek-full-benchmark-v4/`.

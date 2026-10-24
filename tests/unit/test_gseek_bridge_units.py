@@ -10,6 +10,11 @@ import pytest
 from gside.engine import gseek_bridge as bridge
 
 
+@pytest.fixture(autouse=True)
+def _fake_reference_digest(monkeypatch):
+    monkeypatch.setattr(bridge, "_reference_digest", lambda path: (1, "a" * 64))
+
+
 def test_engine_mode_defaults_to_legacy(monkeypatch):
     monkeypatch.delenv("GSIDE_ENGINE", raising=False)
     assert bridge.engine_mode() == "legacy"
@@ -346,3 +351,25 @@ def test_log_skani_shadow_ignores_order(caplog):
     with caplog.at_level("WARNING"):
         bridge.log_skani_shadow(legacy, new)
     assert "differs" not in caplog.text
+
+
+def test_resolver_is_cached(monkeypatch):
+    bridge._resolver.cache_clear()
+    calls = []
+
+    class FakeResolver:
+        def __init__(self, *, extra_paths):
+            calls.append(extra_paths)
+
+    import gside.config as gside_config
+
+    fake = SimpleNamespace(ToolResolver=FakeResolver)
+    monkeypatch.setattr(
+        bridge, "importlib", SimpleNamespace(import_module=lambda name: fake)
+    )
+    monkeypatch.setattr(gside_config, "pixi_path", lambda: "")
+    first = bridge._resolver()
+    second = bridge._resolver()
+    assert first is second
+    assert len(calls) == 1
+    bridge._resolver.cache_clear()
