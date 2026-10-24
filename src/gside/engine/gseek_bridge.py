@@ -92,7 +92,10 @@ _REFERENCE_DIGESTS: dict[str, tuple[int, str]] = {}
 
 def _reference_digest(path: Path) -> tuple[int, str]:
     """Return (size, sha256) for an external reference, cached per process."""
-    from gseek.provenance import directory_size, sha256_file, sha256_tree
+    provenance = importlib.import_module("gseek.provenance")
+    directory_size = provenance.directory_size
+    sha256_file = provenance.sha256_file
+    sha256_tree = provenance.sha256_tree
 
     resolved = path.resolve()
     key = str(resolved)
