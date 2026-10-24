@@ -866,7 +866,7 @@ packages:
 - pypi: ./
   name: gside
   version: 0.1.5
-  sha256: f4c1273913819342623f6e72134bf4cf433d123e5d3c32063d0d75509cb1ca60
+  sha256: 6686092ee908ee2d580232fc3beb1fadd7d28f4058014a1d7e49b7c653c2d17d
   requires_dist:
   - click>=8.0
   - pydantic>=2
@@ -879,7 +879,7 @@ packages:
   - mkdocs>=1.6 ; extra == 'dev'
   - mkdocs-material>=9.0 ; extra == 'dev'
   - mkdocs-static-i18n>=1.2 ; extra == 'dev'
-  - gseek>=0.1 ; extra == 'gseek'
+  - gseek>=0.2 ; extra == 'gseek'
   requires_python: '>=3.12,<3.13'
 - conda: https://conda.anaconda.org/conda-forge/linux-64/gsl-2.8-h3cd6761_2.conda
   sha256: 433d1b1570afa09f469fa5cfb633a2d860fe270639ffa6ba7a354088ab5aba23

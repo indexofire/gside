@@ -42,7 +42,7 @@ def _skani_search(query: str | Path, db: Path, threads: int = 4) -> list[AniHit]
     return SkaniBackend(threads=threads).search(Path(query), db)
 
 
-def _mash_dist(query: str | Path, msh: Path, threads: int = 4) -> list[tuple[str, float]]:
+def _mash_dist_legacy(query: str | Path, msh: Path, threads: int) -> list[tuple[str, float]]:
     from gside.config import which
     from gside.engine._env import require_bin
     from gside.engine.backends.kmer import MashBackend
@@ -60,6 +60,26 @@ def _mash_dist(query: str | Path, msh: Path, threads: int = 4) -> list[tuple[str
         Path(msh), Path(query), max_distance=1.0
     )
     return [(r.reference_id, 1.0 - r.distance) for r in results]
+
+
+def _mash_dist(query: str | Path, msh: Path, threads: int = 4) -> list[tuple[str, float]]:
+    from gside.engine.gseek_bridge import (
+        engine_mode,
+        log_mash_shadow,
+        mash_distance,
+    )
+
+    mode = engine_mode()
+    # Read sketches are still produced by the legacy ``-m 2 -r`` path; only a
+    # sequence query (assembly FASTA) is handed to gseek.
+    if mode in {"gseek", "shadow"} and Path(query).suffix.lower() != ".msh":
+        new = mash_distance(query, msh, threads=threads, max_distance=1.0)
+        if mode == "gseek":
+            return [(hit.reference_id, 1.0 - hit.distance) for hit in new]
+        legacy = _mash_dist_legacy(query, msh, threads)
+        log_mash_shadow(legacy, new)
+        return legacy
+    return _mash_dist_legacy(query, msh, threads)
 
 
 def _mash_dist_reads(

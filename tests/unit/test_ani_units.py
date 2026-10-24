@@ -267,3 +267,31 @@ class TestMashReadSketch:
         assert seen["cmd"][:6] == ["/bin/mash", "sketch", "-m", "2", "-r", "-o"]
         assert seen["cmd"][-1] == "reads.fq"
         assert str(seen["sketch"]).endswith("reads.msh")
+
+
+def test_mash_dist_uses_gseek_for_sequence_query(monkeypatch):
+    from gside.engine import gseek_bridge
+    from gside.engine.backends.kmer import KmerDistance
+
+    monkeypatch.setenv("GSIDE_ENGINE", "gseek")
+    monkeypatch.setattr(
+        gseek_bridge,
+        "mash_distance",
+        lambda query, msh, *, threads, max_distance: [
+            KmerDistance("q", "GCF_1", 0.01, 0.0, 990, 1000)
+        ],
+    )
+    assert ani._mash_dist("q.fna", Path("db.msh"), threads=2) == [("GCF_1", 0.99)]
+
+
+def test_mash_dist_keeps_legacy_for_sketch_query(monkeypatch):
+    from gside.engine import gseek_bridge
+
+    monkeypatch.setenv("GSIDE_ENGINE", "gseek")
+    monkeypatch.setattr(
+        gseek_bridge,
+        "mash_distance",
+        lambda *args, **kwargs: pytest.fail("gseek should not get a .msh query"),
+    )
+    monkeypatch.setattr(ani, "_mash_dist_legacy", lambda q, m, threads: [("GCF_1", 0.99)])
+    assert ani._mash_dist("reads.msh", Path("db.msh")) == [("GCF_1", 0.99)]

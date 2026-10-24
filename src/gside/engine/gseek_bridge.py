@@ -7,10 +7,11 @@
 - ``shadow``: run both, log differences, return the legacy result.
 
 The bridge is imported unconditionally (it has no gseek import at module load),
-so installations that never set ``GSIDE_ENGINE`` do not need gseek. The
-prebuilt-DB paths (panel/skani, mash_refseq, sourmash) are intentionally not
-migrated yet: gseek's index model consumes FASTA, while gside ships skani/mash
-database directories and a sourmash GTDB zip.
+so installations that never set ``GSIDE_ENGINE`` do not need gseek. Marker
+BLAST/FASTQ screening, mash assembly distances, and sourmash gather use gseek.
+The skani ``panel`` database directory and the mash read-sketch path remain on
+the legacy backend; gseek's external-reference support currently accepts a
+single pre-built file (``.msh``/``.sig``/``.zip``), not a database directory.
 """
 
 from __future__ import annotations
@@ -35,9 +36,13 @@ __all__ = [
     "engine_mode",
     "gseek_available",
     "log_blast_shadow",
+    "log_mash_shadow",
     "log_screen_shadow",
+    "log_sourmash_shadow",
+    "mash_distance",
     "record_to_hit",
     "screen_reads_gseek",
+    "sourmash_gather",
 ]
 
 
@@ -232,6 +237,125 @@ def screen_reads_gseek(
         index="auto",
     )
     return aggregate_screen(result.records)
+
+
+def mash_distance(
+    query: str | Path,
+    reference_msh: str | Path,
+    *,
+    threads: int = 4,
+    max_distance: float = 1.0,
+) -> list[Any]:
+    """Run gseek mash against a pre-built ``.msh`` reference.
+
+    The query is FASTA/FASTQ; gseek sketches it with the default Mash settings
+    and passes the external reference straight to ``mash dist``.
+    """
+    from gside.engine.backends.kmer import KmerDistance
+
+    gseek = _require_gseek()
+    result = gseek.distance(
+        backend="mash",
+        query=Path(query),
+        reference=Path(reference_msh),
+        external_reference=True,
+        params={"max_distance": max_distance},
+        threads=threads,
+        resolver=_resolver(),
+        index="none",
+    )
+    return [
+        KmerDistance(
+            query_id=record.query_id,
+            reference_id=record.reference_id,
+            distance=float(record.distance or 0.0),
+            pvalue=float(record.pvalue or 0.0),
+            shared_hashes=int(record.shared_hashes or 0),
+            total_hashes=int(record.total_hashes or 0),
+            backend="mash",
+        )
+        for record in result.records
+    ]
+
+
+def sourmash_gather(
+    contigs: str | Path | Sequence[str | Path],
+    reference_db: str | Path,
+    *,
+    threads: int = 4,
+) -> list[dict[str, Any]]:
+    """Run gseek sourmash gather against a pre-built GTDB zip/signature.
+
+    Returns rows shaped like the legacy gather CSV (``name``,
+    ``f_unique_weighted``, ``average_containment_ani``) so gside's lineage
+    mapping stays unchanged.
+    """
+    gseek = _require_gseek()
+    files = [Path(contigs)] if isinstance(contigs, (str, Path)) else [Path(p) for p in contigs]
+    if len(files) != 1:
+        raise RuntimeError("gseek sourmash gather currently supports one query file")
+    try:
+        result = gseek.distance(
+            backend="sourmash",
+            query=files[0],
+            reference=Path(reference_db),
+            external_reference=True,
+            params={"mode": "gather", "k": 31, "scaled": 1000},
+            threads=threads,
+            resolver=_resolver(),
+            index="none",
+        )
+    except Exception as exc:  # gseek errors are typed; gside's caller expects RuntimeError
+        raise RuntimeError(f"gseek sourmash gather failed: {exc}") from exc
+    rows: list[dict[str, Any]] = []
+    for record in result.records:
+        name = record.tags.get("reference_name") or record.reference_id
+        ani = (record.ani or 0.0) / 100.0
+        rows.append(
+            {
+                "name": name,
+                "f_unique_weighted": record.tags.get("f_unique_weighted", "0"),
+                "average_containment_ani": str(ani),
+            }
+        )
+    return rows
+
+
+def _mash_reference_id(item: Any) -> str:
+    if hasattr(item, "reference_id"):
+        return str(item.reference_id)
+    return str(item[0])
+
+
+def _mash_distance(item: Any) -> float:
+    if hasattr(item, "distance"):
+        return float(item.distance)
+    # legacy tuple is (reference_id, identity); identity = 1 - distance
+    return 1.0 - float(item[1])
+
+
+def log_mash_shadow(legacy: Sequence[Any], new: Sequence[Any]) -> None:
+    legacy_top = sorted(legacy, key=_mash_distance)[:10]
+    new_top = sorted(new, key=_mash_distance)[:10]
+    if [_mash_reference_id(item) for item in legacy_top] != [
+        _mash_reference_id(item) for item in new_top
+    ]:
+        logger.warning(
+            "gseek shadow mash differs: legacy_top=%s gseek_top=%s",
+            [_mash_reference_id(item) for item in legacy_top],
+            [_mash_reference_id(item) for item in new_top],
+        )
+
+
+def log_sourmash_shadow(legacy: Sequence[dict[str, Any]], new: Sequence[dict[str, Any]]) -> None:
+    legacy_names = [row.get("name", "") for row in legacy[:10]]
+    new_names = [row.get("name", "") for row in new[:10]]
+    if legacy_names != new_names:
+        logger.warning(
+            "gseek shadow sourmash differs: legacy_top=%s gseek_top=%s",
+            legacy_names,
+            new_names,
+        )
 
 
 def log_blast_shadow(legacy: Sequence[Hit], new: Sequence[Hit]) -> None:

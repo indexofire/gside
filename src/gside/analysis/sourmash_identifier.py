@@ -57,20 +57,11 @@ def _run(cmd: list[str]) -> str:
     return result.stdout
 
 
-def _gather_and_tax(
-    contigs: str | Path | Sequence[str | Path], db_dir: Path
-) -> list[dict[str, Any]]:
-    db_zip = db_dir / "gtdb-reps-k31.zip"
-    lineages = db_dir / "lineages.csv"
-    if not db_zip.exists() or not lineages.exists():
-        raise RuntimeError(
-            f"sourmash GTDB database not found in {db_dir} (run: gside db setup --tier sourmash)"
-        )
+def _gather_rows_legacy(files: Sequence[str | Path], db_zip: Path) -> list[dict[str, Any]]:
     with tempfile.TemporaryDirectory(prefix="gside-sourmash-") as tmp:
         work = Path(tmp)
         sig = work / "query.sig"
         gather_csv = work / "gather.csv"
-        files = [contigs] if isinstance(contigs, (str, Path)) else list(contigs)
         _run(
             [
                 "sourmash",
@@ -87,11 +78,47 @@ def _gather_and_tax(
             _run(["sourmash", "gather", str(sig), str(db_zip), "-o", str(gather_csv)])
         except RuntimeError:
             return []
-        rows = (
-            list(csv.DictReader(gather_csv.read_text().splitlines()))
-            if gather_csv.is_file()
-            else []
+        if not gather_csv.is_file():
+            return []
+        return list(csv.DictReader(gather_csv.read_text().splitlines()))
+
+
+def _gather_and_tax(
+    contigs: str | Path | Sequence[str | Path], db_dir: Path
+) -> list[dict[str, Any]]:
+    from gside.engine.gseek_bridge import (
+        engine_mode,
+        log_sourmash_shadow,
+        sourmash_gather,
+    )
+
+    db_zip = db_dir / "gtdb-reps-k31.zip"
+    lineages = db_dir / "lineages.csv"
+    if not db_zip.exists() or not lineages.exists():
+        raise RuntimeError(
+            f"sourmash GTDB database not found in {db_dir} (run: gside db setup --tier sourmash)"
         )
+    files = [contigs] if isinstance(contigs, (str, Path)) else list(contigs)
+    mode = engine_mode()
+    # gseek's sourmash adapter currently takes one query signature; preserve
+    # multi-file samples on the legacy path until it supports batching.
+    if mode == "gseek" and len(files) > 1:
+        mode = "legacy"
+
+    if mode == "gseek":
+        try:
+            rows = sourmash_gather(files, db_zip)
+        except RuntimeError:
+            return []
+    else:
+        rows = _gather_rows_legacy(files, db_zip)
+        if mode == "shadow":
+            try:
+                new_rows = sourmash_gather(files, db_zip)
+            except RuntimeError:
+                new_rows = []
+            log_sourmash_shadow(rows, new_rows)
+
     lineage_map = _lineage_map(lineages)
     out: list[dict[str, Any]] = []
     for row in rows:

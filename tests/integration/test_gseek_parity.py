@@ -10,6 +10,8 @@ not gain an optional-install dependency.
 
 from __future__ import annotations
 
+import random
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -21,6 +23,7 @@ from gseek.io import read_fasta  # noqa: E402
 from gside.analysis.multigene_identifier import identify_multigene  # noqa: E402
 from gside.analysis.read_screening import screen_reads  # noqa: E402
 from gside.config import which  # noqa: E402
+from gside.engine import gseek_bridge  # noqa: E402
 
 _REPO = Path(__file__).resolve().parents[2]
 _MARKERS = _REPO / "data" / "db" / "D1_marker" / "markers.fasta"
@@ -73,3 +76,56 @@ class TestGseekParity:
             current = new_by_gene[gene]
             assert current["identity"] == pytest.approx(old["identity"], abs=1.0)
             assert current["coverage"] == pytest.approx(old["coverage"], abs=2.0)
+
+
+_MASH_DB = _REPO / "data" / "db" / "D3_mash" / "mash.msh"
+_K12 = _REPO / "data" / "db" / "D2_ani" / "genomes" / "GCF_000005845.2_ASM584v2_genomic.fna"
+
+
+@pytest.mark.skipif(
+    not (_MASH_DB.is_file() and _K12.is_file()) or which("mash") is None,
+    reason="mash DB or binary missing",
+)
+def test_mash_refseq_matches_legacy(tmp_path, monkeypatch):
+    from gside.analysis.ani_identifier import identify_by_ani
+
+    monkeypatch.setenv("GSEEK_CACHE_DIR", str(tmp_path / "gseek-cache"))
+    monkeypatch.setenv("GSIDE_ENGINE", "legacy")
+    legacy = identify_by_ani(str(_K12), mode="mash_refseq").result
+    monkeypatch.setenv("GSIDE_ENGINE", "gseek")
+    new = identify_by_ani(str(_K12), mode="mash_refseq").result
+
+    assert new["species"] == legacy["species"]
+    assert new["confidence"] == legacy["confidence"]
+    assert new["top_hits"][0]["genome"] == legacy["top_hits"][0]["genome"]
+    assert new["identity"] == pytest.approx(legacy["identity"], abs=1e-3)
+
+
+@pytest.mark.skipif(which("sourmash") is None, reason="sourmash not available")
+def test_sourmash_external_signature_gather(tmp_path, monkeypatch):
+    random.seed(20261032)
+    sequence = "".join(random.choice("ACGT") for _ in range(5000))
+    target = tmp_path / "target.fa"
+    target.write_text(f">target\n{sequence}\n", encoding="utf-8")
+    query = tmp_path / "query.fa"
+    query.write_text(f">query\n{sequence[100:4900]}\n", encoding="utf-8")
+    reference = tmp_path / "refs.sig"
+    subprocess.run(
+        [
+            "sourmash",
+            "sketch",
+            "dna",
+            "-p",
+            "k=31,scaled=1000",
+            "-o",
+            str(reference),
+            str(target),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    monkeypatch.setenv("GSEEK_CACHE_DIR", str(tmp_path / "gseek-cache"))
+    rows = gseek_bridge.sourmash_gather(query, reference)
+    assert rows
+    assert 0.0 <= float(rows[0]["f_unique_weighted"]) <= 1.0

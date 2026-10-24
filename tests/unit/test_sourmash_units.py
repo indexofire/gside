@@ -265,3 +265,49 @@ class TestTempDirIntermediates:
         assert created, "intermediates must go through tempfile.TemporaryDirectory"
         for handle in created:
             assert not Path(handle.name).exists(), f"temp dir not cleaned up: {handle.name}"
+
+
+def test_gather_uses_gseek_engine_when_enabled(tmp_path, monkeypatch):
+    from gside.engine import gseek_bridge
+
+    db = tmp_path / "D4_sourmash"
+    db.mkdir()
+    _seed_db(db)
+    monkeypatch.setenv("GSIDE_ENGINE", "gseek")
+    monkeypatch.setattr(
+        gseek_bridge,
+        "sourmash_gather",
+        lambda files, db_zip: [
+            {
+                "name": "GCF_A Vibrio parahaemolyticus",
+                "f_unique_weighted": "0.9",
+                "average_containment_ani": "0.99",
+            }
+        ],
+    )
+    rows = sm._gather_and_tax("q.fna", db)
+    assert rows == [
+        {
+            "species": "s__Vibrio parahaemolyticus",
+            "f_unique_weighted": 0.9,
+            "ani": 99.0,
+        }
+    ]
+
+
+def test_gather_gseek_falls_back_for_multiple_files(tmp_path, monkeypatch):
+    db = tmp_path / "D4_sourmash"
+    db.mkdir()
+    _seed_db(db)
+    monkeypatch.setenv("GSIDE_ENGINE", "gseek")
+    monkeypatch.setattr(
+        sm,
+        "_gather_rows_legacy",
+        lambda files, db_zip: [{"name": "legacy", "f_unique_weighted": "0.1"}],
+    )
+    monkeypatch.setattr(
+        "gside.engine.gseek_bridge.sourmash_gather",
+        lambda *args, **kwargs: pytest.fail("multi-file should use legacy"),
+    )
+    rows = sm._gather_and_tax(["a.fna", "b.fna"], db)
+    assert rows[0]["species"] == "legacy"

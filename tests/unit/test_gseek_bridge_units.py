@@ -190,3 +190,77 @@ def test_resolver_reuses_pixi_paths(monkeypatch, tmp_path):
 def test_gseek_available_uses_find_spec(monkeypatch):
     monkeypatch.setattr(bridge.importlib.util, "find_spec", lambda name: object())
     assert bridge.gseek_available() is True
+
+
+class _FakeDistanceGseek:
+    def __init__(self, records):
+        self.records = records
+        self.calls = []
+
+    def distance(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(records=self.records)
+
+
+def test_mash_distance_maps_external_reference(monkeypatch):
+    record = SimpleNamespace(
+        query_id="query",
+        reference_id="GCF_1",
+        distance=0.01,
+        pvalue=0.0,
+        shared_hashes=990,
+        total_hashes=1000,
+    )
+    fake = _FakeDistanceGseek([record])
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
+    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
+
+    hits = bridge.mash_distance("q.fna", "refs.msh", threads=2, max_distance=1.0)
+    call = fake.calls[0]
+    assert call["backend"] == "mash"
+    assert call["reference"] == Path("refs.msh")
+    assert call["external_reference"] is True
+    assert call["params"] == {"max_distance": 1.0}
+    assert hits[0].reference_id == "GCF_1"
+    assert hits[0].distance == 0.01
+
+
+def test_sourmash_gather_maps_rows(monkeypatch):
+    record = SimpleNamespace(
+        reference_id="abc123",
+        ani=99.0,
+        tags={"reference_name": "GCF_1 Escherichia coli", "f_unique_weighted": "0.42"},
+    )
+    fake = _FakeDistanceGseek([record])
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
+    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
+
+    rows = bridge.sourmash_gather("q.fna", "gtdb.zip")
+    call = fake.calls[0]
+    assert call["backend"] == "sourmash"
+    assert call["external_reference"] is True
+    assert call["params"]["mode"] == "gather"
+    assert rows == [
+        {
+            "name": "GCF_1 Escherichia coli",
+            "f_unique_weighted": "0.42",
+            "average_containment_ani": "0.99",
+        }
+    ]
+
+
+def test_sourmash_gather_rejects_multiple_query_files(monkeypatch):
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: object())
+    with pytest.raises(RuntimeError, match="one query file"):
+        bridge.sourmash_gather(["a.fna", "b.fna"], "gtdb.zip")
+
+
+def test_log_mash_shadow_accepts_legacy_tuples_and_records(caplog):
+    from gside.engine.backends.kmer import KmerDistance
+
+    with caplog.at_level("WARNING"):
+        bridge.log_mash_shadow(
+            [("GCF_1", 0.99)],
+            [KmerDistance("q", "GCF_2", 0.01, 0.0, 990, 1000)],
+        )
+    assert "gseek shadow mash differs" in caplog.text
