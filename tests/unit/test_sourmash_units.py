@@ -310,3 +310,38 @@ def test_gather_gseek_handles_multiple_files(tmp_path, monkeypatch):
     rows = sm._gather_and_tax(["a.fna", "b.fna"], db)
     assert seen["files"] == ["a.fna", "b.fna"]
     assert rows[0]["species"] == "legacy"
+
+
+def test_gather_gseek_propagates_bridge_error(tmp_path, monkeypatch):
+    db = tmp_path / "D4_sourmash"
+    db.mkdir()
+    _seed_db(db)
+    monkeypatch.setenv("GSIDE_ENGINE", "gseek")
+    monkeypatch.setattr(
+        "gside.engine.gseek_bridge.sourmash_gather",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("bad reference")),
+    )
+    with pytest.raises(RuntimeError, match="bad reference"):
+        sm._gather_and_tax("q.fna", db)
+
+
+def test_gather_shadow_keeps_legacy_when_gseek_fails(tmp_path, monkeypatch, caplog):
+    db = tmp_path / "D4_sourmash"
+    db.mkdir()
+    _seed_db(db)
+    monkeypatch.setenv("GSIDE_ENGINE", "shadow")
+    monkeypatch.setattr(
+        sm,
+        "_gather_rows_legacy",
+        lambda files, db_zip: [
+            {"name": "GCF_A Vibrio parahaemolyticus", "f_unique_weighted": "0.9"}
+        ],
+    )
+    monkeypatch.setattr(
+        "gside.engine.gseek_bridge.sourmash_gather",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("bad reference")),
+    )
+    with caplog.at_level("WARNING"):
+        rows = sm._gather_and_tax("q.fna", db)
+    assert rows[0]["species"] == "s__Vibrio parahaemolyticus"
+    assert "gseek shadow sourmash failed" in caplog.text

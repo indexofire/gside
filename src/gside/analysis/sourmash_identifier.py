@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import subprocess
 import tempfile
 from collections.abc import Sequence
@@ -21,6 +22,8 @@ from gside.config import SPECIES_DB_DIR
 _FUW_HIGH = 0.90
 _FUW_MEDIUM = 0.70
 _MIXTURE_MEMBER = 0.10
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -101,18 +104,16 @@ def _gather_and_tax(
     files = [contigs] if isinstance(contigs, (str, Path)) else list(contigs)
     mode = engine_mode()
     if mode == "gseek":
-        try:
-            rows = sourmash_gather(files, db_zip)
-        except RuntimeError:
-            return []
+        rows = sourmash_gather(files, db_zip)
     else:
         rows = _gather_rows_legacy(files, db_zip)
         if mode == "shadow":
             try:
                 new_rows = sourmash_gather(files, db_zip)
-            except RuntimeError:
-                new_rows = []
-            log_sourmash_shadow(rows, new_rows)
+            except RuntimeError as exc:
+                logger.warning("gseek shadow sourmash failed: %s", exc)
+            else:
+                log_sourmash_shadow(rows, new_rows)
 
     lineage_map = _lineage_map(lineages)
     out: list[dict[str, Any]] = []

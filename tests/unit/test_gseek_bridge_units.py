@@ -287,3 +287,9 @@ def test_mash_distance_reads_sets_reads_flag(monkeypatch):
     assert call["query"] == (Path("r1.fq"), Path("r2.fq"))
     assert call["params"] == {"max_distance": 1.0, "reads": True}
     assert hits[0].reference_id == "GCF_1"
+
+
+def test_sourmash_gather_rejects_directory_reference(monkeypatch, tmp_path):
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: object())
+    with pytest.raises(RuntimeError, match="rocksdb directories"):
+        bridge.sourmash_gather("q.fna", tmp_path)

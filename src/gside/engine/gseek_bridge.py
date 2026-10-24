@@ -317,6 +317,12 @@ def sourmash_gather(
     """
     gseek = _require_gseek()
     files = [Path(contigs)] if isinstance(contigs, (str, Path)) else [Path(p) for p in contigs]
+    reference = Path(reference_db)
+    if reference.is_dir():
+        raise RuntimeError(
+            "gseek sourmash external reference must be a file (.sig/.zip); "
+            "sourmash rocksdb directories are not supported"
+        )
     rows: list[dict[str, Any]] = []
     # sourmash gather requires exactly one query signature, so batch multi-file
     # samples as one gseek run per file and merge the gather rows.
@@ -325,7 +331,7 @@ def sourmash_gather(
             result = gseek.distance(
                 backend="sourmash",
                 query=path,
-                reference=Path(reference_db),
+                reference=reference,
                 external_reference=True,
                 params={"mode": "gather", "k": 31, "scaled": 1000},
                 threads=threads,

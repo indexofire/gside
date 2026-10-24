@@ -48,6 +48,11 @@ The gseek path deliberately preserves gside semantics:
 
 - `panel` still uses the skani database directory (`panel.sketch`). gseek's
   external-reference contract accepts pre-built files, not a database directory.
+- sourmash **rocksdb directories** (`gtdb-k31.rocksdb`, used by the benchmark
+  harness for speed) are not accepted by gseek external references. Use the
+  GTDB zip/signature file, or keep `GSIDE_ENGINE=legacy`/`shadow` for that
+  override. gseek mode now reports an explicit error instead of silently
+  returning an empty partition.
 
 ## Verification
 
@@ -74,6 +79,28 @@ synthetic FASTQ generated from the `inva` marker:
 | 21 reads covering `inva` | `Salmonella_enterica` / high / `inva` 100.0 / 98.3 | identical | identical |
 | K12 assembly, `-m mash_refseq` | `Escherichia_coli` / high / identity 1.0 | identical | identical |
 
-`shadow` produced no difference warnings. Unit suite: 734 passed; integration:
-22 passed, 1 skipped; gseek parity: 5 passed; coverage 96.97%.
+`shadow` produced no difference warnings. Unit suite: 737 passed; integration:
+22 passed, 1 skipped; gseek parity: 5 passed; coverage 97.19%.
 
+
+
+## Real-data spot check (`~/temps/test`, 2026-10-24)
+
+Inputs: one RefSeq genome from each of *Acinetobacter baumannii*,
+*Campylobacter coli*, *Escherichia coli*, *Salmonella enterica*, and
+*Shigella flexneri*. Each was run with
+`gside scan <genome> -m marker+mash_refseq -f json` under all three engines.
+
+- legacy, gseek, and shadow JSON were **byte-identical** for all five genomes.
+- Example calls remained identical: `A. baumannii` marker `rpob-aba` 99.068 /
+  `oxa51` 97.39, mash 0.978914; `S. flexneri` marker `ipah` 100.0, mash
+  0.993922.
+- A 260,000-read (150 bp, ~10x) FASTQ from *A. baumannii* produced identical
+  marker (`Acinetobacter_baumannii`, high, `rpob-aba` 94.84 / `oxa51` 93.56)
+  and mash (`0.9789136`, high) results in all three modes.
+- A mini sourmash signature DB built from three RefSeq genomes produced
+  identical `species`, `confidence`, `f_unique_weighted`, `ani`, and
+  `gather_partition` for *A. baumannii* and *S. enterica* in all three modes.
+- The benchmark's **rocksdb directory** (`gtdb-k31.rocksdb`) is not a valid
+  gseek external reference. legacy still returns the full partition; gseek
+  reports an explicit error; shadow returns legacy and logs the error.
