@@ -15,6 +15,13 @@ def _fake_reference_digest(monkeypatch):
     monkeypatch.setattr(bridge, "_reference_digest", lambda path: (1, "a" * 64))
 
 
+@pytest.fixture(autouse=True)
+def _clear_resolver_cache():
+    bridge._resolver.cache_clear()
+    yield
+    bridge._resolver.cache_clear()
+
+
 def test_engine_mode_defaults_to_legacy(monkeypatch):
     monkeypatch.delenv("GSIDE_ENGINE", raising=False)
     assert bridge.engine_mode() == "legacy"
