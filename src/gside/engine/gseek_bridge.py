@@ -333,7 +333,14 @@ def sourmash_gather(
                 query=path,
                 reference=reference,
                 external_reference=True,
-                params={"mode": "gather", "k": 31, "scaled": 1000},
+                params={
+                    "mode": "gather",
+                    "k": 31,
+                    "scaled": 1000,
+                    # gside relies on sourmash's CLI default; gseek's default
+                    # is 50 bp, which admits extra low-weight partitions.
+                    "threshold_bp": 50000,
+                },
                 threads=threads,
                 resolver=_resolver(),
                 index="none",

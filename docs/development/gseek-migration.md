@@ -79,8 +79,8 @@ synthetic FASTQ generated from the `inva` marker:
 | 21 reads covering `inva` | `Salmonella_enterica` / high / `inva` 100.0 / 98.3 | identical | identical |
 | K12 assembly, `-m mash_refseq` | `Escherichia_coli` / high / identity 1.0 | identical | identical |
 
-`shadow` produced no difference warnings. Unit suite: 737 passed; integration:
-22 passed, 1 skipped; gseek parity: 5 passed; coverage 97.19%.
+`shadow` produced no difference warnings. Unit suite: 738 passed; integration: 27 passed, 1 skipped
+(with gseek installed; 5 are parity, 22 without gseek); coverage 97.19%.
 
 
 
@@ -101,6 +101,12 @@ Inputs: one RefSeq genome from each of *Acinetobacter baumannii*,
 - A mini sourmash signature DB built from three RefSeq genomes produced
   identical `species`, `confidence`, `f_unique_weighted`, `ani`, and
   `gather_partition` for *A. baumannii* and *S. enterica* in all three modes.
+- Full gside GTDB zip (3.7 GB) on *A. baumannii*: legacy and gseek JSON are
+  byte-identical (`species=Acinetobacter_baumannii`, high,
+  `f_unique_weighted=0.5978601252609603`, `ani=98.3`, same two-member
+  partition). gseek explicitly passes `threshold_bp=50000` to match the
+  legacy sourmash CLI default; the initial 50 bp default admitted extra
+  low-weight partitions.
 - The benchmark's **rocksdb directory** (`gtdb-k31.rocksdb`) is not a valid
   gseek external reference. legacy still returns the full partition; gseek
   reports an explicit error; shadow returns legacy and logs the error.

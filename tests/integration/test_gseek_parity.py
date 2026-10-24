@@ -104,13 +104,13 @@ def test_mash_refseq_matches_legacy(tmp_path, monkeypatch):
 @pytest.mark.skipif(which("sourmash") is None, reason="sourmash not available")
 def test_sourmash_external_signature_gather(tmp_path, monkeypatch):
     random.seed(20261032)
-    sequence = "".join(random.choice("ACGT") for _ in range(10000))
+    sequence = "".join(random.choice("ACGT") for _ in range(200_000))
     target = tmp_path / "target.fa"
     target.write_text(f">target\n{sequence}\n", encoding="utf-8")
     query = tmp_path / "query.fa"
-    query.write_text(f">query\n{sequence[100:4900]}\n", encoding="utf-8")
+    query.write_text(f">query\n{sequence[500:95_500]}\n", encoding="utf-8")
     query2 = tmp_path / "query2.fa"
-    query2.write_text(f">query2\n{sequence[5100:9900]}\n", encoding="utf-8")
+    query2.write_text(f">query2\n{sequence[100_000:195_000]}\n", encoding="utf-8")
     reference = tmp_path / "refs.sig"
     subprocess.run(
         [

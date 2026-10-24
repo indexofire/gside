@@ -293,3 +293,11 @@ def test_sourmash_gather_rejects_directory_reference(monkeypatch, tmp_path):
     monkeypatch.setattr(bridge, "_require_gseek", lambda: object())
     with pytest.raises(RuntimeError, match="rocksdb directories"):
         bridge.sourmash_gather("q.fna", tmp_path)
+
+
+def test_sourmash_gather_uses_legacy_threshold(monkeypatch):
+    fake = _FakeDistanceGseek([])
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
+    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
+    bridge.sourmash_gather("q.fna", "gtdb.zip")
+    assert fake.calls[0]["params"]["threshold_bp"] == 50000
