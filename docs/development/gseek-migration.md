@@ -23,12 +23,18 @@ pip install -e ../gseek
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
+> The mash/sourmash paths require gseek `external_reference` support, which is
+> not in gseek 0.1.0. Use the sibling checkout (`PYTHONPATH=../gseek/src`) or a
+> gseek build that contains it; the optional extra is pinned to `gseek>=0.2`.
+
 ## Migrated paths
 
 | Path | Legacy | gseek |
 | --- | --- | --- |
 | Marker BLAST | `BlastBackend` + `markers_blastdb` | `gseek.align(backend="blast", target=markers.fasta)` |
 | FASTQ marker screening | minimap2 PAF + local aggregation | `gseek.align(backend="minimap2", ...)` + same aggregation |
+| mash_refseq (assembly) | `MashBackend` against `mash.msh` | `gseek.distance(backend="mash", external_reference=True)` |
+| sourmash gather (single FASTA) | sketch/gather CSV parsing | `gseek.distance(backend="sourmash", external_reference=True)` |
 
 The gseek path deliberately preserves gside semantics:
 
@@ -40,10 +46,12 @@ The gseek path deliberately preserves gside semantics:
 
 ## Not migrated yet
 
-`panel` (skani), `mash_refseq`, and `sourmash` still use their prebuilt database
-formats (skani database directories, mash `.msh`, GTDB `.zip`). gseek's index
-model currently consumes FASTA and builds its own cache, so switching those
-paths needs an explicit external-index API or a gside-side re-sketch step.
+- `panel` still uses the skani database directory (`panel.sketch`). gseek's
+  external-reference contract accepts a single file, not a database directory.
+- `mash_refseq` on FASTQ reads keeps the legacy `mash sketch -m 2 -r` path;
+  only assembly FASTA queries go through gseek.
+- `sourmash` on multiple query files keeps the legacy path because gseek's
+  sourmash adapter accepts one query file per run.
 
 ## Verification
 
@@ -68,7 +76,8 @@ synthetic FASTQ generated from the `inva` marker:
 | --- | --- | --- | --- |
 | `GCF_000006745.1` assembly | `Vibrio_cholerae` / high / `ompw` 94.767 / 100.1 | identical | identical |
 | 21 reads covering `inva` | `Salmonella_enterica` / high / `inva` 100.0 / 98.3 | identical | identical |
+| K12 assembly, `-m mash_refseq` | `Escherichia_coli` / high / identity 1.0 | identical | identical |
 
-`shadow` produced no difference warnings. Unit suite: 724 passed; integration:
-22 passed, 1 skipped; gseek parity: 2 passed; coverage 97.64%.
+`shadow` produced no difference warnings. Unit suite: 732 passed; integration:
+22 passed, 1 skipped; gseek parity: 4 passed; coverage 97.07%.
 

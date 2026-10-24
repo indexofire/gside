@@ -35,8 +35,7 @@ gside scan --meta reads_R1.fq reads_R2.fq
 `marker`、`mash_refseq`、`sourmash` 接受 FASTA 或 FASTQ；`panel`/`gtdbtk`
 仅接受组装。
 
-可选引擎迁移：`GSIDE_ENGINE=legacy|gseek|shadow` 可把 marker BLAST 与 FASTQ
-marker screening 切到 [gseek](https://github.com/indexofire/gseek)，同时保留
+可选引擎迁移：`GSIDE_ENGINE=legacy|gseek|shadow` 可把 marker BLAST/FASTQ screening、mash 组装距离与 sourmash gather 切到 [gseek](https://github.com/indexofire/gseek)，同时保留
 legacy 结果。范围与验证见 [gseek 迁移](docs/development/gseek-migration.zh.md)。
 
 ### 分层仲裁
