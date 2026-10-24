@@ -23,8 +23,8 @@ pip install -e ../gseek
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
-> The mash/sourmash paths require gseek 0.2.0 (`external_reference`), which is
-> published on PyPI: `pip install gseek==0.2.0`. The optional extra is pinned
+> The mash/sourmash paths require gseek 0.3.0 (`external_reference`), which is
+> published on PyPI: `pip install gseek==0.3.0`. The optional extra is pinned
 > accordingly; the sibling checkout remains useful for local development.
 
 ## Migrated paths
@@ -46,13 +46,9 @@ The gseek path deliberately preserves gside semantics:
 
 ## Not migrated yet
 
-- `panel` still uses the skani database directory (`panel.sketch`). gseek's
-  external-reference contract accepts pre-built files, not a database directory.
-- sourmash **rocksdb directories** (`gtdb-k31.rocksdb`, used by the benchmark
-  harness for speed) are not accepted by gseek external references. Use the
-  GTDB zip/signature file, or keep `GSIDE_ENGINE=legacy`/`shadow` for that
-  override. gseek mode now reports an explicit error instead of silently
-  returning an empty partition.
+- `panel` still uses the skani database directory (`panel.sketch`). gseek
+  accepts sourmash rocksdb directories, but its skani adapter does not support
+  external database directories.
 
 ## Verification
 
@@ -79,8 +75,8 @@ synthetic FASTQ generated from the `inva` marker:
 | 21 reads covering `inva` | `Salmonella_enterica` / high / `inva` 100.0 / 98.3 | identical | identical |
 | K12 assembly, `-m mash_refseq` | `Escherichia_coli` / high / identity 1.0 | identical | identical |
 
-`shadow` produced no difference warnings. Unit suite: 738 passed; integration: 27 passed, 1 skipped
-(with gseek installed; 5 are parity, 22 without gseek); coverage 97.19%.
+`shadow` produced no difference warnings. Unit suite: 739 passed; integration: 27 passed, 1 skipped
+(with gseek installed; 5 are parity, 22 without gseek); coverage 97.30%.
 
 
 
@@ -107,6 +103,8 @@ Inputs: one RefSeq genome from each of *Acinetobacter baumannii*,
   partition). gseek explicitly passes `threshold_bp=50000` to match the
   legacy sourmash CLI default; the initial 50 bp default admitted extra
   low-weight partitions.
-- The benchmark's **rocksdb directory** (`gtdb-k31.rocksdb`) is not a valid
-  gseek external reference. legacy still returns the full partition; gseek
-  reports an explicit error; shadow returns legacy and logs the error.
+- The benchmark's **rocksdb directory** (`gtdb-k31.rocksdb`) is accepted by
+  gseek 0.3.0 as an external reference and hashed as a deterministic tree.
+  legacy, gseek, and shadow all returned the same full partition
+  (`Acinetobacter_baumannii`, high, `0.5978601252609603`, ANI 98.3); shadow
+  produced no difference warning.

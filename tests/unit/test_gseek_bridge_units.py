@@ -289,10 +289,12 @@ def test_mash_distance_reads_sets_reads_flag(monkeypatch):
     assert hits[0].reference_id == "GCF_1"
 
 
-def test_sourmash_gather_rejects_directory_reference(monkeypatch, tmp_path):
-    monkeypatch.setattr(bridge, "_require_gseek", lambda: object())
-    with pytest.raises(RuntimeError, match="rocksdb directories"):
-        bridge.sourmash_gather("q.fna", tmp_path)
+def test_sourmash_gather_accepts_directory_reference(monkeypatch, tmp_path):
+    fake = _FakeDistanceGseek([])
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
+    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
+    assert bridge.sourmash_gather("q.fna", tmp_path) == []
+    assert fake.calls[0]["reference"] == tmp_path
 
 
 def test_sourmash_gather_uses_legacy_threshold(monkeypatch):
@@ -301,3 +303,11 @@ def test_sourmash_gather_uses_legacy_threshold(monkeypatch):
     monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
     bridge.sourmash_gather("q.fna", "gtdb.zip")
     assert fake.calls[0]["params"]["threshold_bp"] == 50000
+
+
+def test_log_sourmash_shadow_ignores_row_order(caplog):
+    legacy = [{"name": "A"}, {"name": "B"}]
+    new = [{"name": "B"}, {"name": "A"}]
+    with caplog.at_level("WARNING"):
+        bridge.log_sourmash_shadow(legacy, new)
+    assert "differs" not in caplog.text

@@ -24,8 +24,8 @@ PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_pari
 ```
 
 
-> mash/sourmash 路径需要 gseek 0.2.0（`external_reference`），已发布 PyPI：
-> `pip install gseek==0.2.0`。optional extra 已固定为对应版本；sibling checkout
+> mash/sourmash 路径需要 gseek 0.3.0（`external_reference`），已发布 PyPI：
+> `pip install gseek==0.3.0`。optional extra 已固定为对应版本；sibling checkout
 > 仍可用于本地开发。
 
 ## 已迁移路径
@@ -47,12 +47,8 @@ gseek 路径显式保留 gside 语义：
 
 ## 尚未迁移
 
-- `panel` 仍使用 skani database 目录（`panel.sketch`）。gseek 的
-  external-reference 契约接受预构建文件，不接受数据库目录。
-- sourmash 的 **rocksdb 目录**（`gtdb-k31.rocksdb`，基准脚本用于加速）不能作为
-  gseek external reference。请使用 GTDB zip/signature 文件，或对该覆盖路径使用
-  `GSIDE_ENGINE=legacy`/`shadow`。gseek 模式现在会显式报错，而不是静默返回空
-  partition。
+- `panel` 仍使用 skani database 目录（`panel.sketch`）。gseek 支持 sourmash
+  rocksdb 目录，但 skani 适配器仍不支持 external 数据库目录。
 
 ## 验证
 
@@ -76,8 +72,8 @@ parity 测试是额外集成检查，在 gseek 成为 CI 可选依赖前不进�
 | 覆盖 `inva` 的 21 条 reads | `Salmonella_enterica` / high / `inva` 100.0 / 98.3 | 完全一致 | 完全一致 |
 | K12 组装，`-m mash_refseq` | `Escherichia_coli` / high / identity 1.0 | 完全一致 | 完全一致 |
 
-`shadow` 没有产生差异 warning。单测 738 passed；集成 27 passed / 1 skipped（安装 gseek 时；
-其中 5 个为 parity，未装 gseek 时 22 个）；覆盖率 97.19%。
+`shadow` 没有产生差异 warning。单测 739 passed；集成 27 passed / 1 skipped（安装 gseek 时；
+其中 5 个为 parity，未装 gseek 时 22 个）；覆盖率 97.30%。
 
 
 
@@ -101,6 +97,7 @@ coli*、*Escherichia coli*、*Salmonella enterica*、*Shigella flexneri*。分�
   0.5978601252609603`，`ani=98.3`，相同的两成员 partition）。gseek 显式传
   `threshold_bp=50000` 对齐 legacy sourmash CLI 默认值；最初的 50 bp 默认会多出
   低权重 partition。
-- benchmark 的 **rocksdb 目录**（`gtdb-k31.rocksdb`）不能作为 gseek external
-  reference：legacy 仍返回完整 partition；gseek 显式报错；shadow 返回 legacy
-  并记录该错误。
+- benchmark 的 **rocksdb 目录**（`gtdb-k31.rocksdb`）已可作为 gseek 0.3.0 的
+  external reference，并按确定性 tree hash 记录。legacy/gseek/shadow 均返回相同
+  的完整 partition（`Acinetobacter_baumannii`，high，0.5978601252609603，
+  ANI 98.3），shadow 无差异 warning。

@@ -318,11 +318,6 @@ def sourmash_gather(
     gseek = _require_gseek()
     files = [Path(contigs)] if isinstance(contigs, (str, Path)) else [Path(p) for p in contigs]
     reference = Path(reference_db)
-    if reference.is_dir():
-        raise RuntimeError(
-            "gseek sourmash external reference must be a file (.sig/.zip); "
-            "sourmash rocksdb directories are not supported"
-        )
     rows: list[dict[str, Any]] = []
     # sourmash gather requires exactly one query signature, so batch multi-file
     # samples as one gseek run per file and merge the gather rows.
@@ -387,8 +382,8 @@ def log_mash_shadow(legacy: Sequence[Any], new: Sequence[Any]) -> None:
 
 
 def log_sourmash_shadow(legacy: Sequence[dict[str, Any]], new: Sequence[dict[str, Any]]) -> None:
-    legacy_names = [row.get("name", "") for row in legacy[:10]]
-    new_names = [row.get("name", "") for row in new[:10]]
+    legacy_names = sorted(row.get("name", "") for row in legacy)
+    new_names = sorted(row.get("name", "") for row in new)
     if legacy_names != new_names:
         logger.warning(
             "gseek shadow sourmash differs: legacy_top=%s gseek_top=%s",
