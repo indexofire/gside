@@ -8,10 +8,10 @@
 
 The bridge is imported unconditionally (it has no gseek import at module load),
 so installations that never set ``GSIDE_ENGINE`` do not need gseek. Marker
-BLAST/FASTQ screening, mash assembly distances, and sourmash gather use gseek.
-The skani ``panel`` database directory and the mash read-sketch path remain on
-the legacy backend; gseek's external-reference support currently accepts a
-single pre-built file (``.msh``/``.sig``/``.zip``), not a database directory.
+BLAST/FASTQ screening, mash distances (assembly and reads), and sourmash gather
+use gseek. The skani ``panel`` database directory remains on the legacy backend;
+gseek's external-reference support accepts a pre-built file
+(``.msh``/``.sig``/``.zip``), not a database directory.
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ __all__ = [
     "log_screen_shadow",
     "log_sourmash_shadow",
     "mash_distance",
+    "mash_distance_reads",
     "record_to_hit",
     "screen_reads_gseek",
     "sourmash_gather",
@@ -239,30 +240,15 @@ def screen_reads_gseek(
     return aggregate_screen(result.records)
 
 
-def mash_distance(
-    query: str | Path,
-    reference_msh: str | Path,
-    *,
-    threads: int = 4,
-    max_distance: float = 1.0,
-) -> list[Any]:
-    """Run gseek mash against a pre-built ``.msh`` reference.
-
-    The query is FASTA/FASTQ; gseek sketches it with the default Mash settings
-    and passes the external reference straight to ``mash dist``.
-    """
+def _mash_records(gseek: Any, **kwargs: Any) -> list[Any]:
     from gside.engine.backends.kmer import KmerDistance
 
-    gseek = _require_gseek()
     result = gseek.distance(
         backend="mash",
-        query=Path(query),
-        reference=Path(reference_msh),
         external_reference=True,
-        params={"max_distance": max_distance},
-        threads=threads,
         resolver=_resolver(),
         index="none",
+        **kwargs,
     )
     return [
         KmerDistance(
@@ -276,6 +262,45 @@ def mash_distance(
         )
         for record in result.records
     ]
+
+
+def mash_distance(
+    query: str | Path,
+    reference_msh: str | Path,
+    *,
+    threads: int = 4,
+    max_distance: float = 1.0,
+) -> list[Any]:
+    """Run gseek mash against a pre-built ``.msh`` reference.
+
+    The query is FASTA/FASTQ; gseek sketches it with the default Mash settings
+    and passes the external reference straight to ``mash dist``.
+    """
+    return _mash_records(
+        _require_gseek(),
+        query=Path(query),
+        reference=Path(reference_msh),
+        params={"max_distance": max_distance},
+        threads=threads,
+    )
+
+
+def mash_distance_reads(
+    reads: str | Path | Sequence[str | Path],
+    reference_msh: str | Path,
+    *,
+    threads: int = 4,
+    max_distance: float = 1.0,
+) -> list[Any]:
+    """Run gseek mash on FASTQ reads with gside's ``-m 2 -r`` sketch flags."""
+    files = [Path(reads)] if isinstance(reads, (str, Path)) else [Path(p) for p in reads]
+    return _mash_records(
+        _require_gseek(),
+        query=tuple(files),
+        reference=Path(reference_msh),
+        params={"max_distance": max_distance, "reads": True},
+        threads=threads,
+    )
 
 
 def sourmash_gather(
@@ -292,32 +317,33 @@ def sourmash_gather(
     """
     gseek = _require_gseek()
     files = [Path(contigs)] if isinstance(contigs, (str, Path)) else [Path(p) for p in contigs]
-    if len(files) != 1:
-        raise RuntimeError("gseek sourmash gather currently supports one query file")
-    try:
-        result = gseek.distance(
-            backend="sourmash",
-            query=files[0],
-            reference=Path(reference_db),
-            external_reference=True,
-            params={"mode": "gather", "k": 31, "scaled": 1000},
-            threads=threads,
-            resolver=_resolver(),
-            index="none",
-        )
-    except Exception as exc:  # gseek errors are typed; gside's caller expects RuntimeError
-        raise RuntimeError(f"gseek sourmash gather failed: {exc}") from exc
     rows: list[dict[str, Any]] = []
-    for record in result.records:
-        name = record.tags.get("reference_name") or record.reference_id
-        ani = (record.ani or 0.0) / 100.0
-        rows.append(
-            {
-                "name": name,
-                "f_unique_weighted": record.tags.get("f_unique_weighted", "0"),
-                "average_containment_ani": str(ani),
-            }
-        )
+    # sourmash gather requires exactly one query signature, so batch multi-file
+    # samples as one gseek run per file and merge the gather rows.
+    for path in files:
+        try:
+            result = gseek.distance(
+                backend="sourmash",
+                query=path,
+                reference=Path(reference_db),
+                external_reference=True,
+                params={"mode": "gather", "k": 31, "scaled": 1000},
+                threads=threads,
+                resolver=_resolver(),
+                index="none",
+            )
+        except Exception as exc:  # gseek errors are typed; gside's caller expects RuntimeError
+            raise RuntimeError(f"gseek sourmash gather failed for {path}: {exc}") from exc
+        for record in result.records:
+            name = record.tags.get("reference_name") or record.reference_id
+            ani = (record.ani or 0.0) / 100.0
+            rows.append(
+                {
+                    "name": name,
+                    "f_unique_weighted": record.tags.get("f_unique_weighted", "0"),
+                    "average_containment_ani": str(ani),
+                }
+            )
     return rows
 
 

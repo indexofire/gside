@@ -295,3 +295,18 @@ def test_mash_dist_keeps_legacy_for_sketch_query(monkeypatch):
     )
     monkeypatch.setattr(ani, "_mash_dist_legacy", lambda q, m, threads: [("GCF_1", 0.99)])
     assert ani._mash_dist("reads.msh", Path("db.msh")) == [("GCF_1", 0.99)]
+
+
+def test_mash_dist_reads_uses_gseek_when_enabled(monkeypatch):
+    from gside.engine import gseek_bridge
+    from gside.engine.backends.kmer import KmerDistance
+
+    monkeypatch.setenv("GSIDE_ENGINE", "gseek")
+    monkeypatch.setattr(
+        gseek_bridge,
+        "mash_distance_reads",
+        lambda reads, msh, *, threads, max_distance: [
+            KmerDistance("q", "GCF_1", 0.02, 0.0, 980, 1000)
+        ],
+    )
+    assert ani._mash_dist_reads("reads.fq", Path("db.msh"), threads=2) == [("GCF_1", 0.98)]

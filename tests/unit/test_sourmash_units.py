@@ -295,19 +295,18 @@ def test_gather_uses_gseek_engine_when_enabled(tmp_path, monkeypatch):
     ]
 
 
-def test_gather_gseek_falls_back_for_multiple_files(tmp_path, monkeypatch):
+def test_gather_gseek_handles_multiple_files(tmp_path, monkeypatch):
     db = tmp_path / "D4_sourmash"
     db.mkdir()
     _seed_db(db)
     monkeypatch.setenv("GSIDE_ENGINE", "gseek")
-    monkeypatch.setattr(
-        sm,
-        "_gather_rows_legacy",
-        lambda files, db_zip: [{"name": "legacy", "f_unique_weighted": "0.1"}],
-    )
-    monkeypatch.setattr(
-        "gside.engine.gseek_bridge.sourmash_gather",
-        lambda *args, **kwargs: pytest.fail("multi-file should use legacy"),
-    )
+    seen = {}
+
+    def fake_gather(files, db_zip):
+        seen["files"] = files
+        return [{"name": "legacy", "f_unique_weighted": "0.1"}]
+
+    monkeypatch.setattr("gside.engine.gseek_bridge.sourmash_gather", fake_gather)
     rows = sm._gather_and_tax(["a.fna", "b.fna"], db)
+    assert seen["files"] == ["a.fna", "b.fna"]
     assert rows[0]["species"] == "legacy"

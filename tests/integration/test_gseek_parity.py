@@ -104,11 +104,13 @@ def test_mash_refseq_matches_legacy(tmp_path, monkeypatch):
 @pytest.mark.skipif(which("sourmash") is None, reason="sourmash not available")
 def test_sourmash_external_signature_gather(tmp_path, monkeypatch):
     random.seed(20261032)
-    sequence = "".join(random.choice("ACGT") for _ in range(5000))
+    sequence = "".join(random.choice("ACGT") for _ in range(10000))
     target = tmp_path / "target.fa"
     target.write_text(f">target\n{sequence}\n", encoding="utf-8")
     query = tmp_path / "query.fa"
     query.write_text(f">query\n{sequence[100:4900]}\n", encoding="utf-8")
+    query2 = tmp_path / "query2.fa"
+    query2.write_text(f">query2\n{sequence[5100:9900]}\n", encoding="utf-8")
     reference = tmp_path / "refs.sig"
     subprocess.run(
         [
@@ -126,6 +128,36 @@ def test_sourmash_external_signature_gather(tmp_path, monkeypatch):
         text=True,
     )
     monkeypatch.setenv("GSEEK_CACHE_DIR", str(tmp_path / "gseek-cache"))
-    rows = gseek_bridge.sourmash_gather(query, reference)
+    rows = gseek_bridge.sourmash_gather([query, query2], reference)
     assert rows
     assert 0.0 <= float(rows[0]["f_unique_weighted"]) <= 1.0
+
+
+@pytest.mark.skipif(
+    not (_MASH_DB.is_file() and _K12.is_file()) or which("mash") is None,
+    reason="mash DB or binary missing",
+)
+def test_mash_reads_matches_legacy(tmp_path, monkeypatch):
+    from gside.analysis.ani_identifier import identify_by_ani
+
+    genome = "".join(
+        line.strip() for line in _K12.read_text().splitlines() if not line.startswith(">")
+    )
+    rng = random.Random(20261033)
+    reads = tmp_path / "reads.fq"
+    with reads.open("w", encoding="utf-8") as handle:
+        for index in range(5000):
+            start = rng.randrange(0, len(genome) - 150)
+            sequence = genome[start : start + 150]
+            handle.write(f"@r{index}\n{sequence}\n+\n{'I' * 150}\n")
+
+    monkeypatch.setenv("GSEEK_CACHE_DIR", str(tmp_path / "gseek-cache"))
+    monkeypatch.setenv("GSIDE_ENGINE", "legacy")
+    legacy = identify_by_ani(str(reads), mode="mash_refseq").result
+    monkeypatch.setenv("GSIDE_ENGINE", "gseek")
+    new = identify_by_ani(str(reads), mode="mash_refseq").result
+
+    assert new["species"] == legacy["species"]
+    assert new["confidence"] == legacy["confidence"]
+    assert new["top_hits"][0]["genome"] == legacy["top_hits"][0]["genome"]
+    assert new["identity"] == pytest.approx(legacy["identity"], abs=1e-3)

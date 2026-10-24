@@ -100,11 +100,6 @@ def _gather_and_tax(
         )
     files = [contigs] if isinstance(contigs, (str, Path)) else list(contigs)
     mode = engine_mode()
-    # gseek's sourmash adapter currently takes one query signature; preserve
-    # multi-file samples on the legacy path until it supports batching.
-    if mode == "gseek" and len(files) > 1:
-        mode = "legacy"
-
     if mode == "gseek":
         try:
             rows = sourmash_gather(files, db_zip)

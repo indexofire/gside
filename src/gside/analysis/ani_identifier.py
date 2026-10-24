@@ -82,8 +82,8 @@ def _mash_dist(query: str | Path, msh: Path, threads: int = 4) -> list[tuple[str
     return _mash_dist_legacy(query, msh, threads)
 
 
-def _mash_dist_reads(
-    reads: str | Path | Sequence[str | Path], msh: Path, threads: int = 4
+def _mash_dist_reads_legacy(
+    reads: str | Path | Sequence[str | Path], msh: Path, threads: int
 ) -> list[tuple[str, float]]:
     """Sketch FASTQ reads (error-filtered) and compare against the mash DB.
 
@@ -110,6 +110,26 @@ def _mash_dist_reads(
             name="mash sketch failed",
         )
         return _mash_dist(sketch, msh, threads)
+
+
+def _mash_dist_reads(
+    reads: str | Path | Sequence[str | Path], msh: Path, threads: int = 4
+) -> list[tuple[str, float]]:
+    from gside.engine.gseek_bridge import (
+        engine_mode,
+        log_mash_shadow,
+        mash_distance_reads,
+    )
+
+    mode = engine_mode()
+    if mode in {"gseek", "shadow"}:
+        new = mash_distance_reads(reads, msh, threads=threads, max_distance=1.0)
+        if mode == "gseek":
+            return [(hit.reference_id, 1.0 - hit.distance) for hit in new]
+        legacy = _mash_dist_reads_legacy(reads, msh, threads)
+        log_mash_shadow(legacy, new)
+        return legacy
+    return _mash_dist_reads_legacy(reads, msh, threads)
 
 
 def _mash_species(ref_id: str) -> str:

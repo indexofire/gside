@@ -238,6 +238,7 @@ def test_sourmash_gather_maps_rows(monkeypatch):
     rows = bridge.sourmash_gather("q.fna", "gtdb.zip")
     call = fake.calls[0]
     assert call["backend"] == "sourmash"
+    assert call["query"] == Path("q.fna")
     assert call["external_reference"] is True
     assert call["params"]["mode"] == "gather"
     assert rows == [
@@ -249,10 +250,12 @@ def test_sourmash_gather_maps_rows(monkeypatch):
     ]
 
 
-def test_sourmash_gather_rejects_multiple_query_files(monkeypatch):
-    monkeypatch.setattr(bridge, "_require_gseek", lambda: object())
-    with pytest.raises(RuntimeError, match="one query file"):
-        bridge.sourmash_gather(["a.fna", "b.fna"], "gtdb.zip")
+def test_sourmash_gather_batches_multiple_query_files(monkeypatch):
+    fake = _FakeDistanceGseek([])
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
+    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
+    assert bridge.sourmash_gather(["a.fna", "b.fna"], "gtdb.zip") == []
+    assert [call["query"] for call in fake.calls] == [Path("a.fna"), Path("b.fna")]
 
 
 def test_log_mash_shadow_accepts_legacy_tuples_and_records(caplog):
@@ -264,3 +267,23 @@ def test_log_mash_shadow_accepts_legacy_tuples_and_records(caplog):
             [KmerDistance("q", "GCF_2", 0.01, 0.0, 990, 1000)],
         )
     assert "gseek shadow mash differs" in caplog.text
+
+
+def test_mash_distance_reads_sets_reads_flag(monkeypatch):
+    record = SimpleNamespace(
+        query_id="read",
+        reference_id="GCF_1",
+        distance=0.02,
+        pvalue=0.0,
+        shared_hashes=980,
+        total_hashes=1000,
+    )
+    fake = _FakeDistanceGseek([record])
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
+    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
+
+    hits = bridge.mash_distance_reads(["r1.fq", "r2.fq"], "refs.msh")
+    call = fake.calls[0]
+    assert call["query"] == (Path("r1.fq"), Path("r2.fq"))
+    assert call["params"] == {"max_distance": 1.0, "reads": True}
+    assert hits[0].reference_id == "GCF_1"
