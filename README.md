@@ -32,9 +32,10 @@ gside db status          # shows which tiers are ready
 ```
 
 Optional engine migration: `GSIDE_ENGINE=legacy|gseek|shadow` can route marker
-BLAST/FASTQ screening, mash distances, and sourmash gather through
-[gseek](https://github.com/indexofire/gseek) while keeping the legacy result.
-See [gseek migration](docs/development/gseek-migration.md) for scope and
+BLAST/FASTQ screening, mash distances, sourmash gather, and panel/skani through
+[gseek](https://github.com/indexofire/gseek). `legacy` remains the default and
+is retained on every migrated path; `shadow` runs both and returns the legacy
+result. See [gseek migration](docs/development/gseek-migration.md) for scope and
 verification.
 
 ## Species Identification (`gside scan`)

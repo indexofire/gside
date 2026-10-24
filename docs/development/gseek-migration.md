@@ -1,6 +1,7 @@
 # gseek engine migration
 
-`gside` can route its marker BLAST and FASTQ marker-screening paths through
+`gside` can route its marker BLAST/FASTQ screening, mash distance, sourmash
+gather, and panel/skani lookup through
 [`gseek`](https://github.com/indexofire/gseek) behind an explicit switch. The
 default remains the existing subprocess implementation; gseek is optional.
 
@@ -8,18 +9,32 @@ default remains the existing subprocess implementation; gseek is optional.
 
 ```bash
 GSIDE_ENGINE=legacy   # default: existing backends, no gseek import
-GSIDE_ENGINE=gseek    # use gseek's BLAST and minimap2 adapters
+GSIDE_ENGINE=gseek    # route all migrated paths through gseek
 GSIDE_ENGINE=shadow   # run both, log differences, return the legacy result
 ```
 
 `GSIDE_ENGINE` is read per call, so a process can be tested with either mode
 without restarting. Invalid values fail before any tool runs.
 
+## Legacy is retained
+
+This is a deliberate dual-path design, not a temporary migration leftover:
+
+- `legacy` is the default, so installations without gseek behave exactly as
+  before;
+- every migrated path keeps its legacy implementation and remains usable;
+- `shadow` runs both implementations, logs coarse differences, and returns the
+  legacy result;
+- legacy is the reference for parity tests and the fallback if gseek is
+  unavailable;
+- modes without a gseek adapter (`gtdbtk`, `kraken2`, `sylph`) are legacy-only.
+
 Install gseek for local testing:
 
 ```bash
-pip install -e ../gseek
-# or, without installing:
+pixi install -e dev            # dev feature includes gseek>=0.6
+# or: pip install -e ".[dev]"
+# or, without installing a release:
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
@@ -61,10 +76,10 @@ existing implementations.
   against the legacy path, plus FASTQ screening parity. Skipped when gseek is
   not importable.
 
-The migration branch must pass the usual gside gate (`ruff`, `pyright`,
-`pytest tests/unit --cov ...`). The parity test is an additional integration
-check and is not part of the default CI until gseek is an optional dependency
-there.
+The same gates apply on `main` (`ruff`, `pyright`, `pytest tests/unit --cov ...`,
+plus integration). The parity test is collected by the default test suite when
+gseek is installed; cases that need external binaries skip when those binaries
+are absent.
 
 
 ## Local verification (2026-10-24)

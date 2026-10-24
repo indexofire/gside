@@ -1,25 +1,37 @@
 # gseek 引擎迁移
 
-`gside` 可以通过显式开关，把 marker BLAST 与 FASTQ marker screening 两条路径
-切到 [`gseek`](https://github.com/indexofire/gseek)。默认仍走原有子进程实现，
+`gside` 可以通过显式开关，把 marker BLAST/FASTQ screening、mash distance、
+sourmash gather 与 panel/skani 四条路径切到
+[`gseek`](https://github.com/indexofire/gseek)。默认仍走原有子进程实现，
 gseek 是可选依赖。
 
 ## 开关
 
 ```bash
 GSIDE_ENGINE=legacy   # 默认：旧后端，不 import gseek
-GSIDE_ENGINE=gseek    # 使用 gseek 的 BLAST/minimap2 适配器
+GSIDE_ENGINE=gseek    # 所有已迁移路径走 gseek
 GSIDE_ENGINE=shadow   # 两条路径都跑，记录差异，返回 legacy 结果
 ```
 
 `GSIDE_ENGINE` 每次调用时读取，因此同一进程可在测试中切换模式；非法值会在
 任何外部工具启动前报错。
 
+## legacy 保留策略
+
+这是有意的双路径设计，不是迁移遗留：
+
+- `legacy` 是默认值，没有 gseek 的安装行为与之前完全一致；
+- 每个已迁移路径都保留 legacy 实现，仍可正常使用；
+- `shadow` 同时跑两套实现，记录粗粒度差异，并返回 legacy 结果；
+- legacy 是 parity 测试的基准，也是 gseek 不可用时的回退；
+- 没有 gseek 适配器的模式（`gtdbtk`、`kraken2`、`sylph`）只能走 legacy。
+
 本地安装 gseek：
 
 ```bash
-pip install -e ../gseek
-# 或者不安装，直接注入源码：
+pixi install -e dev            # dev feature 包含 gseek>=0.6
+# 或：pip install -e ".[dev]"
+# 或者不安装 release，直接注入源码：
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
@@ -58,8 +70,8 @@ gseek 路径显式保留 gside 语义：
 - `tests/integration/test_gseek_parity.py`：真实 marker DB/基因组对比 legacy，
   以及 FASTQ screening parity；gseek 不可导入时 skip。
 
-迁移分支必须通过 gside 常规门禁（`ruff`、`pyright`、`pytest tests/unit --cov`）。
-parity 测试是额外集成检查，在 gseek 成为 CI 可选依赖前不进入默认 CI。
+`main` 上执行同样的门禁（`ruff`、`pyright`、`pytest tests/unit --cov` 及集成）。
+安装 gseek 时，parity 测试会被默认测试套件收集；需要外部二进制的用例在缺失时 skip。
 
 
 ## 本地验证（2026-10-24）

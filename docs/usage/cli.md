@@ -286,7 +286,7 @@ Hidden compatibility aliases: `gside species` = `gside scan` without `--meta`;
 | `GSIDE_DATA_DIR` | all | Data root (default `<repo>/data`, else bundled package data) |
 | `GSIDE_DB_DIR` | all | Database root (default `<data>/db`) |
 | `GSIDE_PIXI_BIN` | all | Extra `bin/` for `blastn`/`minimap2`/`skani`/`mash`/… |
-| `GSIDE_ENGINE` | `scan` | `legacy` (default), `gseek`, or `shadow` engine for marker/mash/sourmash paths |
+| `GSIDE_ENGINE` | `scan` | `legacy` (default, retained), `gseek`, or `shadow` for marker/mash/sourmash/panel paths; `shadow` returns the legacy result |
 | `GSIDE_SOURMASH_SIG_SHA256` | `db setup` | Override the pinned sourmash signature digest |
 | `CHECKM2DB` | `validate` | Path to CheckM2's `uniref100.KO.1.dmnd` |
 | `GTDBTK_DATA_PATH` / `GTDBDB` | `validate`, `scan -m gtdbtk` | GTDB-Tk database directory |
