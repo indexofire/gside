@@ -21,11 +21,7 @@ from typing import Any, TextIO
 
 from gside.config import which
 from gside.engine._env import require_bin, run_checked
-from gside.engine.gseek_bridge import (
-    engine_mode,
-    log_screen_shadow,
-    screen_reads_gseek,
-)
+from gside.engine.gseek_bridge import engine, log_screen_shadow, screen_reads_gseek
 
 _FASTQ_SUFFIXES = (".fq", ".fastq")
 _SHORT_READ_CUTOFF = 300  # bp: below -> sr preset, at/above -> map-ont
@@ -182,14 +178,18 @@ def screen_reads(
     mean = sum(lengths) / len(lengths)
     preset = "sr" if mean < _SHORT_READ_CUTOFF else "map-ont"
 
-    mode = engine_mode()
-    if mode == "gseek":
-        return screen_reads_gseek(files, markers_fasta, threads=threads, preset=preset)
-    legacy = _screen_reads_legacy(files, markers_fasta, threads, preset)
-    if mode == "shadow":
-        new = screen_reads_gseek(files, markers_fasta, threads=threads, preset=preset)
-        log_screen_shadow(legacy, new)
-    return legacy
+    def legacy() -> list[dict[str, Any]]:
+        return _screen_reads_legacy(files, markers_fasta, threads, preset)
+
+    def compare(old: list[dict[str, Any]], new: list[dict[str, Any]]) -> bool:
+        log_screen_shadow(old, new)
+        return True
+
+    return engine().run(
+        legacy,
+        lambda: screen_reads_gseek(files, markers_fasta, threads=threads, preset=preset),
+        compare=compare,
+    )
 
 
 __all__ = ["is_fastq", "mean_read_length", "screen_reads"]

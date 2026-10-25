@@ -43,21 +43,20 @@ def _skani_search_legacy(query: str | Path, db: Path, threads: int) -> list[AniH
 
 
 def _skani_search(query: str | Path, db: Path, threads: int = 4) -> list[AniHit]:
-    from gside.engine.gseek_bridge import (
-        engine_mode,
-        log_skani_shadow,
-        skani_search,
-    )
+    from gside.engine.gseek_bridge import engine, log_skani_shadow, skani_search
 
-    mode = engine_mode()
-    if mode in {"gseek", "shadow"}:
-        new = skani_search(query, db, threads=threads)
-        if mode == "gseek":
-            return new
-        legacy = _skani_search_legacy(query, db, threads)
-        log_skani_shadow(legacy, new)
-        return legacy
-    return _skani_search_legacy(query, db, threads)
+    def legacy() -> list[AniHit]:
+        return _skani_search_legacy(query, db, threads)
+
+    def compare(old: list[AniHit], new: list[AniHit]) -> bool:
+        log_skani_shadow(old, new)
+        return True
+
+    return engine().run(
+        legacy,
+        lambda: skani_search(query, db, threads=threads),
+        compare=compare,
+    )
 
 
 def _mash_dist_legacy(query: str | Path, msh: Path, threads: int) -> list[tuple[str, float]]:
@@ -81,23 +80,32 @@ def _mash_dist_legacy(query: str | Path, msh: Path, threads: int) -> list[tuple[
 
 
 def _mash_dist(query: str | Path, msh: Path, threads: int = 4) -> list[tuple[str, float]]:
-    from gside.engine.gseek_bridge import (
-        engine_mode,
-        log_mash_shadow,
-        mash_distance,
-    )
+    from gside.engine.gseek_bridge import engine, log_mash_shadow, mash_distance
 
-    mode = engine_mode()
     # Read sketches are still produced by the legacy ``-m 2 -r`` path; only a
     # sequence query (assembly FASTA) is handed to gseek.
-    if mode in {"gseek", "shadow"} and Path(query).suffix.lower() != ".msh":
-        new = mash_distance(query, msh, threads=threads, max_distance=1.0)
-        if mode == "gseek":
-            return [(hit.reference_id, 1.0 - hit.distance) for hit in new]
-        legacy = _mash_dist_legacy(query, msh, threads)
-        log_mash_shadow(legacy, new)
-        return legacy
-    return _mash_dist_legacy(query, msh, threads)
+    if Path(query).suffix.lower() == ".msh":
+        return _mash_dist_legacy(query, msh, threads)
+
+    def legacy() -> list[tuple[str, float]]:
+        return _mash_dist_legacy(query, msh, threads)
+
+    def new() -> list[tuple[str, float]]:
+        return [
+            (hit.reference_id, 1.0 - hit.distance)
+            for hit in mash_distance(query, msh, threads=threads, max_distance=1.0)
+        ]
+
+    def compare(old: list[tuple[str, float]], new_rows: list[tuple[str, float]]) -> bool:
+        from gside.engine.backends.kmer import KmerDistance
+
+        log_mash_shadow(
+            old,
+            [KmerDistance("q", ref, 1.0 - identity, 0.0, 0, 0) for ref, identity in new_rows],
+        )
+        return True
+
+    return engine().run(legacy, new, compare=compare)
 
 
 def _mash_dist_reads_legacy(
@@ -133,21 +141,27 @@ def _mash_dist_reads_legacy(
 def _mash_dist_reads(
     reads: str | Path | Sequence[str | Path], msh: Path, threads: int = 4
 ) -> list[tuple[str, float]]:
-    from gside.engine.gseek_bridge import (
-        engine_mode,
-        log_mash_shadow,
-        mash_distance_reads,
-    )
+    from gside.engine.gseek_bridge import engine, log_mash_shadow, mash_distance_reads
 
-    mode = engine_mode()
-    if mode in {"gseek", "shadow"}:
-        new = mash_distance_reads(reads, msh, threads=threads, max_distance=1.0)
-        if mode == "gseek":
-            return [(hit.reference_id, 1.0 - hit.distance) for hit in new]
-        legacy = _mash_dist_reads_legacy(reads, msh, threads)
-        log_mash_shadow(legacy, new)
-        return legacy
-    return _mash_dist_reads_legacy(reads, msh, threads)
+    def legacy() -> list[tuple[str, float]]:
+        return _mash_dist_reads_legacy(reads, msh, threads)
+
+    def new() -> list[tuple[str, float]]:
+        return [
+            (hit.reference_id, 1.0 - hit.distance)
+            for hit in mash_distance_reads(reads, msh, threads=threads, max_distance=1.0)
+        ]
+
+    def compare(old: list[tuple[str, float]], new_rows: list[tuple[str, float]]) -> bool:
+        from gside.engine.backends.kmer import KmerDistance
+
+        log_mash_shadow(
+            old,
+            [KmerDistance("q", ref, 1.0 - identity, 0.0, 0, 0) for ref, identity in new_rows],
+        )
+        return True
+
+    return engine().run(legacy, new, compare=compare)
 
 
 def _mash_species(ref_id: str) -> str:

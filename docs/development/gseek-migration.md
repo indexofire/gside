@@ -14,7 +14,9 @@ GSIDE_ENGINE=shadow   # run both, log differences, return the legacy result
 ```
 
 `GSIDE_ENGINE` is read per call, so a process can be tested with either mode
-without restarting. Invalid values fail before any tool runs.
+without restarting. Invalid values fail before any tool runs. The selector,
+shadow comparison, and fallback are provided by `gseek.compat.Engine`; legacy
+mode still avoids importing gseek entirely.
 
 ## Legacy is retained
 
