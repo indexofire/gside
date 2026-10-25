@@ -37,15 +37,15 @@ pip-installed (editable). `pip install -e .[dev]` adds pytest/ruff/mypy/mkdocs.
 
 ```bash
 # Species identification (5 modes, default marker)
-pixi run -e dev python -m gside species contigs.fna --mode marker
-pixi run -e dev python -m gside species contigs.fna --mode all
+pixi run -e dev python -m gside scan contigs.fna --mode marker
+pixi run -e dev python -m gside scan contigs.fna --mode all
 
 # Database management
 pixi run -e dev python -m gside db status
 pixi run -e dev python -m gside db setup --tier panel   # panel (default) | mash | mini | all
 
 # After pip install -e ., the console script is also available
-gside species contigs.fna --mode panel
+gside scan contigs.fna --mode panel
 gside --version
 ```
 
@@ -171,7 +171,7 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 - Use `X | Y` union syntax over `Union[X, Y]`
 
 ### Error Handling
-- `gside species` **always exits 0** — per-method failures go into
+- `gside scan` **always exits 0** — per-method failures go into
   `methods.<mode>.error`, never raise through the CLI
 - `gside db setup` returns 1 only when a result message contains `"ERROR"`
 - Never silence exceptions with empty `except` blocks

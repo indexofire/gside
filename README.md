@@ -4,16 +4,33 @@
 [![Docs](https://github.com/indexofire/gside/actions/workflows/docs.yml/badge.svg)](https://github.com/indexofire/gside/actions)
 [![PyPI](https://img.shields.io/pypi/v/gside.svg)](https://pypi.org/project/gside/)
 
+[Englisth](README.md)|[简体中文](README.zh.md)
+
 A standalone CLI for multi-layer species identification from assembled contigs and metagenomic profiling from FASTQ reads.
 
-```bash
-pip install gside
+## Installation
 
-# Single-genome species identification
+```bash
+# With pixi (recommended — includes blastn, skani, mash, sourmash)
+curl -fsSL https://pixi.sh/install.sh | bash
+pixi install
+pip install -e .
+
+# From PyPI (Python 3.12, binaries not included)
+pip install gside
+```
+
+## Quickstart
+
+```bash
+# Strain genome species identification with all layers
 gside scan contigs.fna -m all
 
-# Metagenomic profiling
+# Metagenomic profiling with all layers
 gside scan --meta reads_R1.fq reads_R2.fq -m all
+
+# Megatenomic assembled genomes identification by gtdbtk
+gside scan MAG.fna -m gtdbtk
 ```
 
 `scan` infers FASTA vs FASTQ from the extension and rejects a mode that cannot
@@ -40,6 +57,8 @@ verification.
 
 ## Species Identification (`gside scan`)
 
+### Genome identification
+
 | Mode | Engine | Method | Database |
 |---|---|---|---|
 | `marker` (default) | blastn | Target-gene combination rules (42 rules, 139 reference sequences) | Bundled (mini tier) |
@@ -63,31 +82,7 @@ tier. Inputs: `marker`, `mash_refseq` and `sourmash` accept FASTA or FASTQ;
 
 Higher layers always outrank lower ones; within a layer, higher confidence wins.
 
-### Quick start
-
-```bash
-pixi install && pip install -e .
-
-# One genome (marker works out of the box)
-gside scan contigs.fna
-gside scan contigs.fna -m marker+sourmash
-gside scan contigs.fna -m all --auto-setup
-
-# Isolate sequencing reads (R1/R2 are one sample)
-gside scan reads.fq -m marker
-gside scan sample_R1.fq sample_R2.fq -m marker
-
-# Metagenomic community
-gside scan reads_R1.fq reads_R2.fq --meta
-
-# Genome quality (CheckM2 + GTDB-Tk)
-gside validate contigs.fna -o taxonomy
-
-# Batch + streaming output
-gside scan *.fna -m all -j 8 -t 4 -o results.tsv
-```
-
-## Metagenomic Profiling (`gside scan --meta`)
+### Metagenomic Profiling (`gside scan --meta`)
 
 | Mode | Engine | Input | Best for |
 |---|---|---|---|
@@ -95,10 +90,25 @@ gside scan *.fna -m all -j 8 -t 4 -o results.tsv
 | `sylph` | sylph | FASTQ only | ANI-anchored precision, species-level calls |
 | `all` | Both | FASTQ only (use `-m kraken2` for FASTA) | Merged profile |
 
+## Simple usages
+
 ```bash
-gside scan --meta reads_R1.fq reads_R2.fq            # kraken2 + sylph
-gside scan --meta reads_R1.fq reads_R2.fq -m kraken2
-gside scan --meta contigs.fna -m kraken2
+# One genome (marker works out of the box)
+gside scan contigs.fna
+# Marker + sourmash identification
+gside scan contigs.fna -m marker+sourmash
+# All modes included and auto download databases for identification
+gside scan contigs.fna -m all --auto-setup
+
+# Isolate sequencing reads (R1/R2 are one sample), SE and PE supported both
+gside scan reads.fq -m marker
+gside scan sample_R1.fq sample_R2.fq -m marker
+
+# Metagenomic community (kraken2 as default)
+gside scan reads_R1.fq reads_R2.fq --meta
+
+# Batch + streaming output
+gside scan *.fna -m panel+mash_refseq -j 8 -t 4 -o results.tsv
 ```
 
 ## Genome Quality (`gside validate`)
@@ -109,6 +119,7 @@ writes `validation.json` with tool versions, parameters, per-tool status and a
 quality verdict. Output directory is required:
 
 ```bash
+# Genome quality (CheckM2 + GTDB-Tk)
 gside validate contigs.fna -o taxonomy
 ```
 
@@ -118,6 +129,8 @@ external databases — see [Databases](docs/installation/databases.md).
 ## Agent-Friendly Design
 
 gside is built for AI agents as much as humans:
+
+### Json output
 
 ```bash
 # JSON on stdout (always exit 0; errors in methods.<mode>.error)
@@ -198,18 +211,6 @@ gside -V -J          Version as JSON
 `gside validate` additionally needs CheckM2 (~1.7GB) and GTDB-Tk
 (`GTDBTK_DATA_PATH`, ~57GB download) — see the docs.
 
-## Installation
-
-```bash
-# With pixi (recommended — includes blastn, skani, mash, sourmash)
-curl -fsSL https://pixi.sh/install.sh | bash
-pixi install
-pip install -e .
-
-# From PyPI (Python 3.12, binaries not included)
-pip install gside
-```
-
 ## Documentation
 
 - [Quick Start](https://indexofire.github.io/gside/)
@@ -217,7 +218,6 @@ pip install gside
 - [Identification Modes](https://indexofire.github.io/gside/usage/modes/)
 - [Metagenomic Profiling](https://indexofire.github.io/gside/usage/meta/)
 - [JSON Output Contract](https://indexofire.github.io/gside/reference/json-contract/)
-- [中文文档](README.zh.md)
 
 ## License
 
@@ -227,6 +227,7 @@ MIT
 
 | Tool | Purpose |
 |---|---|
+| [gseek](https://github.com/indexofire/gseek) | Unified, reproducible DNA alignment infrastructure for Python |
 | [gside](https://github.com/indexofire/gside) | Species identification + metagenomic profiling |
 | [gapit](https://github.com/indexofire/gapit) | Gene screening + phenotype designation (serogroup, toxigenicity) |
 | [gmlst](https://github.com/indexofire/gmlst) | MLST / cgMLST typing |
