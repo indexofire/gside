@@ -89,11 +89,7 @@ def _gather_rows_legacy(files: Sequence[str | Path], db_zip: Path) -> list[dict[
 def _gather_and_tax(
     contigs: str | Path | Sequence[str | Path], db_dir: Path
 ) -> list[dict[str, Any]]:
-    from gside.engine.gseek_bridge import (
-        engine_mode,
-        log_sourmash_shadow,
-        sourmash_gather,
-    )
+    from gside.engine.gseek_bridge import engine, log_sourmash_shadow, sourmash_gather
 
     db_zip = db_dir / "gtdb-reps-k31.zip"
     lineages = db_dir / "lineages.csv"
@@ -102,18 +98,16 @@ def _gather_and_tax(
             f"sourmash GTDB database not found in {db_dir} (run: gside db setup --tier sourmash)"
         )
     files = [contigs] if isinstance(contigs, (str, Path)) else list(contigs)
-    mode = engine_mode()
-    if mode == "gseek":
-        rows = sourmash_gather(files, db_zip)
-    else:
-        rows = _gather_rows_legacy(files, db_zip)
-        if mode == "shadow":
-            try:
-                new_rows = sourmash_gather(files, db_zip)
-            except RuntimeError as exc:
-                logger.warning("gseek shadow sourmash failed: %s", exc)
-            else:
-                log_sourmash_shadow(rows, new_rows)
+
+    def compare(old: list[dict[str, Any]], new: list[dict[str, Any]]) -> bool:
+        log_sourmash_shadow(old, new)
+        return True
+
+    rows = engine().run(
+        lambda: _gather_rows_legacy(files, db_zip),
+        lambda: sourmash_gather(files, db_zip),
+        compare=compare,
+    )
 
     lineage_map = _lineage_map(lineages)
     out: list[dict[str, Any]] = []

@@ -14,7 +14,8 @@ GSIDE_ENGINE=shadow   # 两条路径都跑，记录差异，返回 legacy 结果
 ```
 
 `GSIDE_ENGINE` 每次调用时读取，因此同一进程可在测试中切换模式；非法值会在
-任何外部工具启动前报错。
+任何外部工具启动前报错。选择、shadow 比较与回退由 `gseek.compat.Engine`
+提供；legacy 模式仍然完全不 import gseek。
 
 ## legacy 保留策略
 

@@ -20,11 +20,14 @@ import importlib
 import importlib.util
 import logging
 import os
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from .hits import Hit
+
+if TYPE_CHECKING:
+    from gseek.compat import Engine
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +36,7 @@ _VALID_MODES = frozenset({"legacy", "gseek", "shadow"})
 __all__ = [
     "aggregate_screen",
     "blast_hits",
+    "engine",
     "engine_mode",
     "gseek_available",
     "log_blast_shadow",
@@ -49,12 +53,45 @@ __all__ = [
 ]
 
 
-def engine_mode() -> str:
-    """Return the configured engine mode (``legacy`` by default)."""
+T = TypeVar("T")
+
+
+class _LegacyMode:
+    value = "legacy"
+
+
+class _LegacyEngine:
+    """No-gseek fallback; legacy installs never import the optional package."""
+
+    mode = _LegacyMode()
+
+    def run(
+        self,
+        legacy: Callable[[], T],
+        gseek: Callable[[], T],
+        *,
+        compare: Callable[[T, T], bool] | None = None,
+    ) -> T:
+        return legacy()
+
+
+def engine() -> _LegacyEngine | Engine:
+    """Return the shared switch, importing gseek only for gseek/shadow modes."""
     raw = os.environ.get("GSIDE_ENGINE", "legacy").strip().lower() or "legacy"
     if raw not in _VALID_MODES:
         raise RuntimeError(f"unknown GSIDE_ENGINE={raw!r}; expected one of {sorted(_VALID_MODES)}")
-    return raw
+    if raw == "legacy":
+        return _LegacyEngine()
+    try:
+        from gseek.compat import Engine
+    except ImportError as exc:
+        raise RuntimeError("GSIDE_ENGINE=gseek requires the optional gseek package") from exc
+    return Engine.from_env("GSIDE_ENGINE", logger=logger)
+
+
+def engine_mode() -> str:
+    """Return the configured engine mode (``legacy`` by default)."""
+    return engine().mode.value
 
 
 def gseek_available() -> bool:

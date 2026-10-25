@@ -344,4 +344,4 @@ def test_gather_shadow_keeps_legacy_when_gseek_fails(tmp_path, monkeypatch, capl
     with caplog.at_level("WARNING"):
         rows = sm._gather_and_tax("q.fna", db)
     assert rows[0]["species"] == "s__Vibrio parahaemolyticus"
-    assert "gseek shadow sourmash failed" in caplog.text
+    assert "gseek path failed" in caplog.text
