@@ -128,16 +128,20 @@ Database management.
 | `list` | Tiers with readiness, size and description |
 | `setup` | Install or update one tier |
 
-All three accept `-f/--format table|tsv|csv|json` (default `table`).
+`status` and `list` accept `-f/--format table|tsv|csv|json` (default `table`);
+`setup` accepts `-f/--format text|json` (default `text`). Human output uses
+bordered Rich tables; use `json`/`tsv`/`csv` for scripts.
 
 ### status
 
 ```bash
 gside db status
-# gside database status
-# ✅ D1_marker   tier=mini        path=data/db/D1_marker
-# ✅ D2_ani      tier=panel       path=data/db/D2_ani
-# ❌ D4_sourmash tier=sourmash    path=data/db/D4_sourmash
+# ┌─────────────┬───────┬────────────┬──────────────────────────┐
+# │ COMPONENT   │ READY │ TIER       │ PATH                     │
+# ├─────────────┼───────┼────────────┼──────────────────────────┤
+# │ D1_marker   │ ready │ mini       │ data/db/D1_marker        │
+# │ D4_sourmash │ missing │ sourmash │ data/db/D4_sourmash      │
+# └─────────────┴───────┴────────────┴──────────────────────────┘
 
 gside db status -f json    # {component: {ready, path, tier}}
 gside db status -f csv     # COMPONENT,READY,TIER,PATH
@@ -146,8 +150,8 @@ gside db status -f csv     # COMPONENT,READY,TIER,PATH
 ### list
 
 ```bash
-gside db list              # tier table
-gside db list -f tsv       # NAME	READY	SIZE	DESCRIPTION
+gside db list              # bordered tier table
+gside db list -f tsv       # TIER	READY	SIZE	DESCRIPTION
 ```
 
 ### setup
@@ -319,8 +323,11 @@ Hidden compatibility aliases: `gside species` = `gside scan` without `--meta`;
 
 ## gside --version
 
+There is no separate `gside version` subcommand. Use the root `-V/--version`
+flag; `-J` adds a JSON envelope.
+
 ```bash
-gside --version
+gside -V
 # gside, version 0.1.5
 
 gside --version --json     # or -V -J

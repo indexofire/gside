@@ -116,16 +116,20 @@ gside scan --meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 | `list` | tier 列表（就绪、大小、说明） |
 | `setup` | 安装/更新单个 tier |
 
-三者都接受 `-f/--format table|tsv|csv|json`（默认 `table`）。
+`status` 与 `list` 接受 `-f/--format table|tsv|csv|json`（默认 `table`）；
+`setup` 接受 `-f/--format text|json`（默认 `text`）。人类可读输出使用带边框的
+Rich 表格；脚本使用 `json`/`tsv`/`csv`。
 
 ### status
 
 ```bash
 gside db status
-# gside database status
-# ✅ D1_marker   tier=mini        path=data/db/D1_marker
-# ✅ D2_ani      tier=panel       path=data/db/D2_ani
-# ❌ D4_sourmash tier=sourmash    path=data/db/D4_sourmash
+# ┌─────────────┬─────────┬────────────┬──────────────────────────┐
+# │ COMPONENT   │ READY   │ TIER       │ PATH                     │
+# ├─────────────┼─────────┼────────────┼──────────────────────────┤
+# │ D1_marker   │ ready   │ mini       │ data/db/D1_marker        │
+# │ D4_sourmash │ missing │ sourmash   │ data/db/D4_sourmash      │
+# └─────────────┴─────────┴────────────┴──────────────────────────┘
 
 gside db status -f json    # {component: {ready, path, tier}}
 gside db status -f csv     # COMPONENT,READY,TIER,PATH
@@ -134,8 +138,8 @@ gside db status -f csv     # COMPONENT,READY,TIER,PATH
 ### list
 
 ```bash
-gside db list              # tier 表格
-gside db list -f tsv       # NAME	READY	SIZE	DESCRIPTION
+gside db list              # 带边框的 tier 表格
+gside db list -f tsv       # TIER	READY	SIZE	DESCRIPTION
 ```
 
 ### setup
@@ -298,8 +302,11 @@ CLI 命令并返回同样的 JSON 文本；失败返回 `isError` 包络，不�
 
 ## gside --version
 
+没有单独的 `gside version` 子命令。使用根命令的 `-V/--version`；`-J` 输出
+JSON。
+
 ```bash
-gside --version
+gside -V
 # gside, version 0.1.5
 
 gside --version --json     # 或 -V -J

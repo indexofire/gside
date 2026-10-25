@@ -881,7 +881,7 @@ packages:
 - pypi: ./
   name: gside
   version: 0.1.5
-  sha256: d1132d85a868492696bf69926da25a4834d5f9331a9716c7a05f473e87ffab9c
+  sha256: 24d986f1e5897a40466b7321aecacc15c59a6265afe60c338b2bda7561a69498
   requires_dist:
   - click>=8.0
   - pydantic>=2
