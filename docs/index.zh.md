@@ -1,102 +1,92 @@
-# gside：基因组物种鉴定引擎
+# gside 文档
 
-[![CI](https://github.com/indexofire/gside/actions/workflows/test.yml/badge.svg)](https://github.com/indexofire/gside/actions)
-[![PyPI](https://img.shields.io/pypi/v/gside.svg)](https://pypi.org/project/gside/)
+`gside` 是一个用于多层微生物物种鉴定与宏基因组谱分析的 Python 库和 CLI。本文档覆盖公共 Python API、`gside` 命令行、参考数据库、鉴定模式与 JSON 契约。
 
-独立 CLI：从组装 contigs 做多层物种鉴定，从 FASTQ reads 做宏基因组谱分析。
+## 从这里开始
 
-## 概述
+| 我想… | 阅读 |
+| --- | --- |
+| 安装并跑第一个样本 | [快速开始](installation/quick-start.zh.md) |
+| 在 Python 中调用鉴定引擎 | [Python API](usage/python-api.zh.md) |
+| 查所有 CLI 参数 | [CLI 参考](usage/cli.zh.md) |
+| 理解 marker/ANI/sketch/GTDB 模式 | [鉴定模式](usage/modes.zh.md) |
+| 做宏基因组群落分析 | [宏基因组谱分析](usage/meta.zh.md) |
+| 准备数据库 | [数据库](installation/databases.zh.md) |
+| 安全消费 JSON 输出 | [JSON 输出契约](reference/json-contract.zh.md) |
+| 把引擎迁移到 gseek | [gseek 迁移](development/gseek-migration.zh.md) |
 
-gside 将标准生信工具（blastn、skani、mash、sourmash、GTDB-Tk、Kraken2、sylph）封装在数据驱动规则之后，跨方法仲裁，输出单一 JSON 判定。**智能体优先设计**：结构化错误字段、自动安装、MCP 服务器、机器可读数据库状态。
+## gside 做什么
 
+```text
+组装 contigs ── marker / panel / mash / sourmash / GTDB-Tk ── 判定
+FASTQ reads ─── marker screening / kraken2 / sylph ─────────── 群落谱
+组装 contigs ── CheckM2 + GTDB-Tk ─────────────────────────── 组装质量
 ```
-底层生信工具   blastn / skani / mash / sourmash / gtdbtk / kraken2 / sylph
-                    ↑
-gside            物种鉴定引擎 + 宏基因组谱分析
-```
 
-## 物种鉴定层次
+两个接口共享同一批引擎：
 
-| 层次 | CLI mode | 底层引擎 | 原理 | 说明 |
-|---|---|---|---|---|
-| **L3** | `gtdbtk` | GTDB-Tk | 系统发育位置 | 最权威；外部数据库 |
-| **L2** | `panel` | skani | ANI 精选面板（291 基因组） | 需 panel 层 |
-| **L2** | `mash_refseq` | mash | MinHash 距离（RefSeq） | 需 mash 层 |
-| **L2** | `sourmash` | sourmash | GTDB gather | 需 GTDB 库 |
-| **L1** | `marker` | blastn | 靶基因规则（42 条，139 序列） | mini 层随包分发 |
-| **仲裁** | `all` | — | 全方法层级共识（L3 > L2 > L1） | 取最优 |
+- **Python 库** —— `gside.api` 暴露各鉴定函数与带类型结果，适合 notebook、流水线和测试。
+- **CLI** —— `gside scan` 增加分层仲裁、数据库安装、批处理、表格/JSON 输出与 MCP 服务器。
 
-## 宏基因组谱分析
-
-| 模式 | 引擎 | 输入 | 适用 |
-|---|---|---|---|
-| `kraken2` | Kraken2 + Bracken | FASTQ / FASTA | 快速筛查、contig 支持、丰度 |
-| `sylph` | sylph | 仅 FASTQ | ANI 精度、种级判定 |
-| `all` | 双引擎 | FASTQ / FASTA | 合并谱 |
-
-## 基因组质量（`gside validate`）
-
-CheckM2（完整度/污染度）+ GTDB-Tk（分类），写入 `validation.json`，含工具版本、
-参数与逐工具状态：
+## 安装概览
 
 ```bash
-gside validate contigs.fna -o taxonomy
+pip install gside          # Python 3.12；含 marker DB
+pixi install               # 含全部外部工具的 dev 环境
 ```
 
-两个数据库均为外部依赖（CheckM2 约 1.7GB；GTDB-Tk 下载约 57GB，细菌运行约
-140GB 内存）。见[数据库](installation/databases.md)。
+`blastn`、`skani`、`mash`、`sourmash`、`kraken2`、`sylph`、GTDB-Tk 等外部工具需另行安装。见[快速开始](installation/quick-start.zh.md)与[数据库](installation/databases.zh.md)。
 
-## 快速开始
+## 库示例
+
+```python
+from gside.api import identify_by_ani, identify_multigene
+
+marker = identify_multigene("contigs.fna", threads=4)
+panel = identify_by_ani("contigs.fna", mode="panel", threads=8)
+
+print(marker.species, marker.confidence)
+print(panel.to_dict()["result"]["species"])
+```
+
+完整函数/结果表见 [Python API](usage/python-api.zh.md)。
+
+## CLI 示例
 
 ```bash
-# 安装
-pixi install
-pip install -e .
-
-# 物种鉴定（marker 模式开箱即用）
-gside scan contigs.fna
-
-# 多方法鉴定 + 自动安装
+gside -V
 gside scan contigs.fna -m all --auto-setup
-
-# 并行批量处理
-gside scan *.fna -m all -j 8 -t 4 -o results.tsv
-
-# 宏基因组
 gside scan --meta reads_R1.fq reads_R2.fq
-
-# 数据库管理
+gside validate contigs.fna -o qc/
 gside db status
-gside db setup --tier all
+gside db list
 ```
 
-## 智能体友好设计
+`gside db status` 和 `gside db list` 在终端中输出带边框的 Rich 表格；供程序读取时使用 `-f json`、`-f tsv` 或 `-f csv`。
 
-- **stdout 纯 JSON** — species 恒 exit 0；单法错误在 `methods.<mode>.error`
-- **结构化缺库错误** — `suggested_command`、`missing_tier`、`estimated_size`
-- **自动安装** — `--auto-setup` 安装缺失层级，进度走 stderr
-- **机器可读状态** — `db status --format json`、`db list --format json`
-- **MCP 服务器** — `gside mcp` 向 Claude Desktop / MCP 客户端暴露工具
-- **流式输出** — tsv/md 逐输入即时写盘
+## 设计原则
 
-## 输出
+- **规则优先。** marker 组合、ANI 置信区间与分层仲裁都是数据驱动、可测试的。
+- **单一结构化结果。** 每个方法输出 JSON 信封；CLI 做共识但不丢弃逐方法证据。
+- **清晰失败。** 缺工具/数据库时给出可操作错误，包括建议安装命令和预估大小。
+- **默认可复现。** 结果记录数据库版本、工具版本与方法参数。
+- **可选加速。** `GSIDE_ENGINE=gseek` 可替换部分子进程路径，同时保留 legacy 与 shadow。
 
-所有模式向 stdout 输出统一 JSON，顶层字段为 `analysis_type`、`tool`、`version`、
-`contigs`、`methods`、`verdict`。详见
-[JSON 输出契约](reference/json-contract.zh.md)。
+## 目录结构
 
-## 文档
+```text
+src/gside/
+  api.py                 公共 Python facade
+  cli.py                 Click CLI
+  analysis/              鉴定引擎
+  engine/                后端 + 可选 gseek 桥
+  db.py                  数据库层与下载
+  mcp.py                 MCP 服务器
+docs/                    中英文文档
+data/db/D1_marker/       随包 marker 数据库
+tests/                   单元与 parity 测试
+```
 
-- [快速开始](installation/quick-start.zh.md)
-- [数据库](installation/databases.zh.md)
-- [标记基因库](installation/marker-database.zh.md)
-- [CLI 参考](usage/cli.zh.md)
-- [鉴定模式](usage/modes.zh.md)
-- [宏基因组](usage/meta.zh.md)
-- [分层设计](architecture/layers.zh.md)
-- [JSON 输出契约](reference/json-contract.zh.md)
-- English version available via the language switcher
+## 许可证
 
-## License
-
-MIT
+MIT。项目概览与生态链接见 [README](https://github.com/indexofire/gside)。

@@ -1,113 +1,106 @@
-# gside — Genome Species IDentification Engine
+# gside documentation
 
-[![CI](https://github.com/indexofire/gside/actions/workflows/test.yml/badge.svg)](https://github.com/indexofire/gside/actions)
-[![PyPI](https://img.shields.io/pypi/v/gside.svg)](https://pypi.org/project/gside/)
+`gside` is a Python library and CLI for multi-layer microbial species
+identification and metagenomic profiling. This documentation covers the public
+Python API, the `gside` command line, reference databases, identification
+modes, and the JSON contract.
 
-A standalone CLI for multi-layer species identification from assembled contigs and metagenomic profiling from FASTQ reads.
+## Start here
 
-## Overview
+| I want to… | Read |
+| --- | --- |
+| Install gside and run a first sample | [Quick start](installation/quick-start.md) |
+| Call identification engines from Python | [Python API](usage/python-api.md) |
+| Learn every CLI flag | [CLI reference](usage/cli.md) |
+| Understand marker/ANI/sketch/GTDB modes | [Identification modes](usage/modes.md) |
+| Profile a metagenomic community | [Metagenomic profiling](usage/meta.md) |
+| Prepare databases | [Databases](installation/databases.md) |
+| Consume JSON output safely | [JSON output contract](reference/json-contract.md) |
+| Migrate an engine to gseek | [gseek migration](development/gseek-migration.md) |
 
-gside wraps standard bioinformatics tools (blastn, minimap2, skani, mash,
-sourmash, GTDB-Tk, CheckM2, Kraken2, sylph) behind data-driven rules,
-arbitrates across methods, and prints a single JSON verdict per run. One
-command — `gside scan` — covers single genomes and communities; `gside
-validate` adds CheckM2/GTDB-Tk quality control. It is **agent-friendly by
-design**: structured error fields, auto-setup, MCP server, machine-readable
-database status.
+## What gside does
 
+```text
+assembled contigs ── marker / panel / mash / sourmash / GTDB-Tk ── verdict
+FASTQ reads ──────── marker screening / kraken2 / sylph ─────────── profile
+assembled contigs ── CheckM2 + GTDB-Tk ─────────────────────────── assembly QC
 ```
-Bioinformatics tools   blastn / skani / mash / sourmash / gtdbtk / kraken2 / sylph
-                         ↑
-gside engine            rules + backends + arbitration + metagenomic profiling
-```
 
-## Species Identification Layers
+Two interfaces share the same engines:
 
-| Layer | CLI mode | Engine | Method | Notes |
-|-------|----------|--------|--------|-------|
-| **L3** | `gtdbtk` | GTDB-Tk | Phylogenetic placement | Most authoritative; external DB |
-| **L2** | `panel` | skani | ANI against curated reference panel (291 genomes) | Requires panel tier |
-| **L2** | `mash_refseq` | mash | MinHash distance (RefSeq sketch) | Requires mash tier |
-| **L2** | `sourmash` | sourmash | GTDB gather (containment ANI) | Requires GTDB database |
-| **L1** | `marker` | blastn | Target gene combination rules (42 rules, 139 sequences) | Mini database bundled |
-| **Arbitration** | `all` | — | Run all methods, layer consensus (L3 > L2 > L1) | Best of all layers |
+- **Python library** — `gside.api` exposes individual identification functions
+  and typed results for notebooks, pipelines, and tests.
+- **CLI** — `gside scan` adds layered arbitration, database provisioning,
+  batch execution, table/JSON output, and an MCP server.
 
-`-m` accepts `+` combinations (`marker+sourmash`). `marker`, `mash_refseq`
-and `sourmash` accept FASTA or FASTQ; `panel`/`gtdbtk` need assemblies.
-
-## Metagenomic Profiling
-
-| Mode | Engine | Input | Best for |
-|------|--------|-------|----------|
-| `kraken2` | Kraken2 + Bracken | FASTQ / FASTA | Fast screening, contig support, abundance |
-| `sylph` | sylph | FASTQ only | ANI-anchored precision, species-level calls |
-| `all` | Both | FASTQ only (use `-m kraken2` for FASTA) | Merged profile |
-
-## Genome Quality (`gside validate`)
-
-CheckM2 (completeness/contamination) + GTDB-Tk (classification), written to
-`validation.json` with tool versions, parameters and per-tool status:
+## Installation at a glance
 
 ```bash
-gside validate contigs.fna -o taxonomy
+pip install gside          # Python 3.12; bundled marker DB
+pixi install               # dev environment with all external tools
 ```
 
-Both databases are external (CheckM2 ~1.7GB; GTDB-Tk ~57GB download,
-~140GB RAM for bacteria). See [Databases](installation/databases.md).
+External tools such as `blastn`, `skani`, `mash`, `sourmash`, `kraken2`,
+`sylph`, and GTDB-Tk are installed separately. See
+[Quick start](installation/quick-start.md) and [Databases](installation/databases.md).
 
-## Quick Start
+## Library example
+
+```python
+from gside.api import identify_by_ani, identify_multigene
+
+marker = identify_multigene("contigs.fna", threads=4)
+panel = identify_by_ani("contigs.fna", mode="panel", threads=8)
+
+print(marker.species, marker.confidence)
+print(panel.to_dict()["result"]["species"])
+```
+
+The full function/result table is in the [Python API](usage/python-api.md).
+
+## CLI example
 
 ```bash
-# Install
-pixi install
-pip install -e .
-
-# One genome (marker works out of the box)
-gside scan contigs.fna
-gside scan contigs.fna -m marker+sourmash
+gside -V
 gside scan contigs.fna -m all --auto-setup
-
-# Isolate reads / metagenomic community
-gside scan reads.fq -m marker
 gside scan --meta reads_R1.fq reads_R2.fq
-
-# Genome quality
-gside validate contigs.fna -o taxonomy
-
-# Batch + database management
-gside scan *.fna -m all -j 8 -t 4 -o results.tsv
+gside validate contigs.fna -o qc/
 gside db status
-gside db setup --tier all
+gside db list
 ```
 
-## Agent-Friendly Design
+`gside db status` and `gside db list` render bordered Rich tables in a terminal.
+Use `-f json`, `-f tsv`, or `-f csv` when another program will read them.
 
-- **JSON on stdout** — `scan` always exits 0; per-method errors in `methods.<mode>.error`
-- **Structured missing-database errors** — `suggested_command`, `missing_tier`, `estimated_size`
-- **Auto-setup** — `--auto-setup` installs missing tiers, progress on stderr
-- **Machine-readable status** — `db status --format json`, `db list --format json`
-- **MCP server** — `gside mcp` exposes `species`/`meta`/`db_*` tools to agents
-- **Streaming output** — tsv/csv/md rows flushed per input as they complete
+## Design principles
 
-## Output
+- **Rules over ad-hoc thresholds.** Marker combinations, ANI confidence bands,
+  and layer arbitration are data-driven and testable.
+- **One structured result.** Every method emits a JSON envelope; the CLI adds
+  consensus without discarding per-method evidence.
+- **Fail clearly.** Missing tools/databases produce actionable errors, including
+  a suggested setup command and estimated download size.
+- **Reproducible by default.** Database versions, tool versions, and method
+  parameters are recorded in results.
+- **Optional acceleration.** `GSIDE_ENGINE=gseek` can replace selected subprocess
+  paths while keeping legacy and shadow modes available.
 
-Every mode prints unified JSON to stdout. Species payloads carry
-`analysis_type`, `tool`, `version`, `contigs`, `methods`, and `verdict`;
-meta payloads replace `contigs` with `input`; `validate` emits
-`gside.validate/1`. See the [JSON Output Contract](reference/json-contract.md).
+## Project layout
 
-## Documentation
-
-- [Quick Start](installation/quick-start.md)
-- [Databases](installation/databases.md)
-- [Marker Database](installation/marker-database.md)
-- [CLI Reference](usage/cli.md)
-- [Identification Modes](usage/modes.md)
-- [Metagenomic Profiling](usage/meta.md)
-- [Layered Design](architecture/layers.md)
-- [JSON Output Contract](reference/json-contract.md)
-- 中文版可通过页面语言切换器访问
+```text
+src/gside/
+  api.py                 public Python facade
+  cli.py                 Click CLI
+  analysis/              identification engines
+  engine/                backends + optional gseek bridge
+  db.py                  database tiers and downloads
+  mcp.py                 MCP server
+docs/                    English/Chinese documentation
+data/db/D1_marker/       bundled marker database
+tests/                   unit and parity tests
+```
 
 ## License
 
-MIT
+MIT. See [README](https://github.com/indexofire/gside) for the project overview
+and ecosystem links.

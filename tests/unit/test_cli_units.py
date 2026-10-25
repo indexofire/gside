@@ -400,14 +400,17 @@ class TestDbOutputFormats:
         assert result.exit_code == 0
         assert json.loads(result.output) == self._STATUS
 
-    def test_status_table_default_keeps_icons_and_hint(self, monkeypatch):
+    def test_status_table_default_has_borders_and_hint(self, monkeypatch):
         import gside.db as dbmod
 
         monkeypatch.setattr(dbmod, "db_status", lambda: self._STATUS)
         result = CliRunner().invoke(main, ["db", "status"])
         assert result.exit_code == 0
-        assert "✅" in result.output and "❌" in result.output
-        assert "Run 'gside db setup --tier <tier>' to provision" in result.output
+        assert "gside database status" in result.output
+        assert "│ COMPONENT" in result.output
+        assert "┌" in result.output and "└" in result.output
+        assert "ready" in result.output and "missing" in result.output
+        assert "gside db setup --tier <tier>" in result.output
 
     def test_list_tsv(self, monkeypatch):
         import gside.db as dbmod
@@ -506,6 +509,10 @@ class TestRemainingBranches:
 
 
 class TestVersionJson:
+    def test_version_is_a_root_flag_not_a_subcommand(self):
+        result = CliRunner().invoke(main, ["version"])
+        assert result.exit_code == 2
+
     def test_version_text_unchanged(self):
         result = CliRunner().invoke(main, ["-V"])
         assert result.exit_code == 0

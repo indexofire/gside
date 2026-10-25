@@ -53,6 +53,7 @@ nav:
     - Databases: installation/databases.md
     - Marker Database: installation/marker-database.md
   - Usage:
+    - Python API: usage/python-api.md
     - CLI Reference: usage/cli.md
     - Identification Modes: usage/modes.md
     - Metagenomic Profiling: usage/meta.md

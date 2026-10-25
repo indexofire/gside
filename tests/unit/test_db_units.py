@@ -262,12 +262,22 @@ class TestFormatTiers:
         expected = capsys.readouterr().out
         assert db.format_tiers("table") + "\n" == expected
 
-    def test_table_has_header_and_ready_column(self):
-        lines = db.format_tiers("table").splitlines()
-        assert lines[0].split() == ["NAME", "READY", "SIZE", "DESCRIPTION"]
-        assert len(lines) == 1 + len(db._TIERS)
-        ready_values = {ln.split()[1] for ln in lines[1:]}
-        assert ready_values <= {"ready", "missing"}
+    def test_table_has_bordered_header_and_all_tiers(self):
+        text = db.format_tiers("table")
+        assert "gside database tiers" in text
+        assert "│ TIER" in text
+        assert "│ READY" in text
+        assert "│ SIZE" in text
+        assert "│ DESCRIPTION" in text
+        assert "┌" in text and "└" in text
+        for name in db._TIERS:
+            assert f"│ {name}" in text
+        ready_values = {
+            line.split("│")[2].strip()
+            for line in text.splitlines()
+            if line.startswith("│ ") and "│" in line
+        }
+        assert ready_values <= {"ready", "missing", "READY"}
 
     def test_tsv_rows(self):
         lines = db.format_tiers("tsv").splitlines()

@@ -28,6 +28,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from rich import box
+from rich.console import Console
+from rich.table import Table
+
 from .config import SPECIES_DB_DIR, which
 
 _MANIFEST_DIR = SPECIES_DB_DIR / "D2_ani" / "manifests"
@@ -563,16 +567,20 @@ def format_status(fmt: str) -> str:
             for name, info in status.items()
         )
         return out.getvalue().rstrip("\n")
-    name_w = max((len(n) for n in status), default=8)
-    tier_w = max((len(i["tier"]) for i in status.values()), default=4)
-    lines = ["gside database status", "─" * 55]
-    for name, info in status.items():
-        icon = "✅" if info["ready"] else "❌"
-        lines.append(
-            f"  {icon} {name:<{name_w}}  tier={info['tier']:<{tier_w}}  path={info['path']}"
-        )
-    lines += ["", "  Run 'gside db setup --tier <tier>' to provision"]
-    return "\n".join(lines)
+    return _render_table(
+        "gside database status",
+        ("COMPONENT", "READY", "TIER", "PATH"),
+        [
+            (
+                name,
+                "ready" if info["ready"] else "missing",
+                str(info["tier"]),
+                str(info["path"]),
+            )
+            for name, info in status.items()
+        ],
+        caption="Use: gside db setup --tier <tier>",
+    )
 
 
 def format_tiers(fmt: str) -> str:
@@ -604,13 +612,41 @@ def format_tiers(fmt: str) -> str:
         writer.writerow(["NAME", "READY", "SIZE", "DESCRIPTION"])
         writer.writerows(rows)
         return out.getvalue().rstrip("\n")
-    return _table_with_header(rows)
+    return _render_table(
+        "gside database tiers",
+        ("TIER", "READY", "SIZE", "DESCRIPTION"),
+        rows,
+        caption="Tiers marked ready can be used without downloading.",
+    )
 
 
-def _table_with_header(rows: list[tuple[str, str, str, str]]) -> str:
-    lines = [f"  {'NAME':8} {'READY':8} {'SIZE':28} DESCRIPTION"]
-    lines += [f"  {name:8} {ready:8} {size:28} {desc}" for name, ready, size, desc in rows]
-    return "\n".join(lines)
+def _render_table(
+    title: str,
+    columns: tuple[str, ...],
+    rows: list[tuple[str, str, str, str]],
+    *,
+    caption: str | None = None,
+) -> str:
+    table = Table(
+        title=title,
+        caption=caption,
+        box=box.SQUARE,
+        header_style="bold cyan",
+        show_lines=False,
+        padding=(0, 1),
+    )
+    for column in columns:
+        table.add_column(column)
+    for row in rows:
+        table.add_row(*row)
+    buffer = io.StringIO()
+    Console(
+        file=buffer,
+        force_terminal=False,
+        color_system=None,
+        width=120,
+    ).print(table)
+    return buffer.getvalue().rstrip("\n")
 
 
 def run_db_command(args: list[str]) -> int:
