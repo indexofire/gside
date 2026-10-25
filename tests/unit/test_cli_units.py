@@ -215,16 +215,18 @@ class TestDbCommands:
         assert result.exit_code == 0
         assert "sourmash" in result.output
 
-    def test_bare_db_invokes_status(self, monkeypatch):
+    def test_bare_db_shows_help(self):
         from click.testing import CliRunner
 
-        import gside.db as dbmod
-
-        seen = []
-        monkeypatch.setattr(dbmod, "run_db_command", lambda args: seen.append(args) or 0)
         result = CliRunner().invoke(main, ["db"])
         assert result.exit_code == 0
-        assert seen == [["status"]]
+        assert "Usage:" in result.output
+        assert "Commands:" in result.output
+        assert "database status" not in result.output
+
+        explicit = CliRunner().invoke(main, ["db", "-h"])
+        assert explicit.exit_code == 0
+        assert explicit.output == result.output
 
     def test_setup_ok_and_error(self, tmp_path, monkeypatch):
         from click.testing import CliRunner
