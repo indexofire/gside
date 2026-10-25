@@ -38,6 +38,16 @@ def _db_dir_option(func: Any) -> Any:
     )(func)
 
 
+def _marker_db_option(func: Any) -> Any:
+    """``--marker-db`` — use a custom marker database directory."""
+    return click.option(
+        "--marker-db",
+        type=click.Path(exists=True, file_okay=False),
+        default=None,
+        help="Custom marker database directory (markers.fasta + marker_rules.yaml).",
+    )(func)
+
+
 def _format_option(choices: list[str], help_text: str) -> Any:
     """``-f/--format`` factory so every command spells the flag identically."""
 
@@ -301,6 +311,7 @@ def _scan_dispatch(
     mode: str | None,
     meta: bool,
     db_dir: str | None,
+    marker_db: str | None,
     output_format: str,
     output: str | None,
     jobs: int,
@@ -320,6 +331,20 @@ def _scan_dispatch(
         grouped = _group_read_samples(paths)
         for sample in grouped:
             _validate_scan(sample, resolved, meta=False)
+        if marker_db is None:
+            sys.exit(
+                _run_species(
+                    grouped,
+                    resolved,
+                    db_dir,
+                    output_format,
+                    output,
+                    jobs,
+                    threads,
+                    no_header,
+                    auto_setup,
+                )
+            )
         sys.exit(
             _run_species(
                 grouped,
@@ -331,6 +356,7 @@ def _scan_dispatch(
                 threads,
                 no_header,
                 auto_setup,
+                marker_db=marker_db,
             )
         )
 
@@ -436,6 +462,7 @@ def _scan_options(*, meta_preset: bool | None, with_samples: bool, modes: list[s
             )
         decorators += [
             _db_dir_option,
+            _marker_db_option,
             _format_option(["json", "tsv", "md", "csv"], "Output format (rows for tsv/md/csv)."),
             click.option(
                 "-o",
@@ -495,6 +522,7 @@ def scan_cmd(
     mode: str | None,
     meta: bool,
     db_dir: str | None,
+    marker_db: str | None,
     output_format: str,
     output: str | None,
     jobs: int,
@@ -514,6 +542,7 @@ def scan_cmd(
         mode,
         meta,
         db_dir,
+        marker_db,
         output_format,
         output,
         jobs,
@@ -530,6 +559,7 @@ def species_alias(
     files: tuple[str, ...],
     mode: str | None,
     db_dir: str | None,
+    marker_db: str | None,
     output_format: str,
     output: str | None,
     jobs: int,
@@ -539,7 +569,17 @@ def species_alias(
 ) -> None:
     """Compatibility alias for ``gside scan`` without --meta (single organism)."""
     _scan_dispatch(
-        files, mode, False, db_dir, output_format, output, jobs, threads, no_header, auto_setup
+        files,
+        mode,
+        False,
+        db_dir,
+        marker_db,
+        output_format,
+        output,
+        jobs,
+        threads,
+        no_header,
+        auto_setup,
     )
 
 
@@ -549,6 +589,7 @@ def meta_alias(
     files: tuple[str, ...],
     mode: str | None,
     db_dir: str | None,
+    marker_db: str | None,
     output_format: str,
     output: str | None,
     jobs: int,
@@ -563,6 +604,7 @@ def meta_alias(
         mode,
         True,
         db_dir,
+        marker_db,
         output_format,
         output,
         jobs,
@@ -580,7 +622,7 @@ def meta_alias(
 )
 @click.pass_context
 def db_group(ctx: click.Context) -> None:
-    """Manage reference databases (status/setup/list)."""
+    """Manage reference databases (status/setup/list/validate)."""
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
         ctx.exit(0)
@@ -658,6 +700,47 @@ def db_list_cmd(output_format: str) -> None:
     from .db import format_tiers
 
     print(format_tiers(output_format))
+
+
+@db_group.command("validate", context_settings=HELP_SETTINGS)
+@click.argument(
+    "path",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@click.option(
+    "-f",
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    show_default=True,
+    help="Output format.",
+)
+def db_validate_cmd(path: Path, output_format: str) -> None:
+    """Validate a custom marker database."""
+    from gside.marker_db import MarkerDatabase
+
+    try:
+        database = MarkerDatabase.from_path(path)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    errors = database.validate()
+    payload = {**database.to_dict(), "errors": errors}
+    if output_format == "json":
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        print(f"Marker database: {database.name}")
+        print(f"  path:    {database.root}")
+        print(f"  version: {database.version}")
+        if database.description:
+            print(f"  about:   {database.description}")
+        if errors:
+            print("  errors:")
+            for error in errors:
+                print(f"    - {error}")
+        else:
+            print("  status:  valid")
+    sys.exit(1 if errors else 0)
 
 
 @main.command("validate", context_settings=HELP_SETTINGS)
@@ -756,6 +839,7 @@ def _run_species(
     no_header: bool = False,
     auto_setup: bool = False,
     quiet: bool = False,
+    marker_db: str | None = None,
 ) -> int:
     from gside.progress import species_progress
 
@@ -763,9 +847,15 @@ def _run_species(
 
     def identify(sample: list[str]) -> dict[str, Any]:
         target: str | list[str] = sample[0] if len(sample) == 1 else sample
-        payload = _identify_one(target, mode, db_dir, threads)
+        if marker_db is None:
+            payload = _identify_one(target, mode, db_dir, threads)
+        else:
+            payload = _identify_one(target, mode, db_dir, threads, marker_db)
         if auto_setup:
-            payload = _auto_setup_retry(target, payload, mode, db_dir, threads)
+            if marker_db is None:
+                payload = _auto_setup_retry(target, payload, mode, db_dir, threads)
+            else:
+                payload = _auto_setup_retry(target, payload, mode, db_dir, threads, marker_db)
         return payload
 
     if jobs > 1:
@@ -966,6 +1056,7 @@ def _auto_setup_retry(
     mode: str,
     db_dir: str | None,
     threads: int,
+    marker_db: str | None = None,
 ) -> dict[str, Any]:
     """--auto-setup: install each missing tier once, retry that method once."""
     methods = payload.get("methods", {})
@@ -978,7 +1069,11 @@ def _auto_setup_retry(
         except Exception as e:  # noqa: BLE001 — CLI boundary: setup failure keeps the error entry
             logger.warning("auto-setup of tier %s failed: %s", tier, e)
             continue
-        retry = _identify_one(contigs, m, db_dir, threads)
+        retry = (
+            _identify_one(contigs, m, db_dir, threads)
+            if marker_db is None
+            else _identify_one(contigs, m, db_dir, threads, marker_db)
+        )
         methods[m] = retry["methods"].get(m, method_payload)
     payload["verdict"] = _verdict_for(methods)
     return payload
@@ -1048,7 +1143,11 @@ def _verdict_for(results: dict[str, Any]) -> dict[str, Any]:
 
 
 def _identify_one(
-    contigs: str | list[str], mode: str, db_dir: str | None, threads: int = 4
+    contigs: str | list[str],
+    mode: str,
+    db_dir: str | None,
+    threads: int = 4,
+    marker_db: str | None = None,
 ) -> dict[str, Any]:
     files = list(contigs) if isinstance(contigs, (list, tuple)) else [contigs]
     primary = files[0]
@@ -1064,7 +1163,17 @@ def _identify_one(
             if m == "marker":
                 from gside.analysis.multigene_identifier import identify_multigene
 
-                results[m] = identify_multigene(reads, threads=threads).to_dict()
+                marker_path = marker_db
+                if marker_path is None and db_dir:
+                    candidate = Path(db_dir) / "D1_marker"
+                    if candidate.is_dir():
+                        marker_path = str(candidate)
+                if marker_path is None:
+                    results[m] = identify_multigene(reads, threads=threads).to_dict()
+                else:
+                    results[m] = identify_multigene(
+                        reads, threads=threads, marker_db=marker_path
+                    ).to_dict()
             elif m in ("panel", "mash_refseq"):
                 from gside.analysis.ani_identifier import identify_by_ani
 

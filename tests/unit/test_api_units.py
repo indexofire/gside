@@ -16,6 +16,7 @@ def test_api_all_is_unique() -> None:
 
 def test_api_covers_each_engine_family() -> None:
     assert "identify_multigene" in api.__all__
+    assert "MarkerDatabase" in api.__all__
     assert "identify_by_ani" in api.__all__
     assert "identify_by_sourmash" in api.__all__
     assert "identify_by_gtdbtk" in api.__all__

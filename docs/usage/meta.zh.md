@@ -86,7 +86,7 @@ JSON（默认）——单文档：
 {
   "analysis_type": "metagenomic_profiling",
   "tool": "gside",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "input": {"files": ["reads_1.fastq", "reads_2.fastq"], "type": "fastq_paired"},
   "methods": {
     "kraken2": {"method": "kraken2_bracken", "database": {}, "result": {

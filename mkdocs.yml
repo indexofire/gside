@@ -55,6 +55,7 @@ nav:
   - Usage:
     - Python API: usage/python-api.md
     - CLI Reference: usage/cli.md
+    - Custom Databases: usage/custom-databases.md
     - Identification Modes: usage/modes.md
     - Metagenomic Profiling: usage/meta.md
   - Architecture:

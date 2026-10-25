@@ -1062,3 +1062,61 @@ class TestValidateContract:
         result = CliRunner().invoke(main, ["validate", str(source), "-o", str(tmp_path / "tax")])
         assert result.exit_code == 1
         assert '"status": "partial"' in result.output
+
+
+class TestCustomMarkerDb:
+    def test_scan_forwards_marker_db_option(self, monkeypatch, tmp_path):
+        import gside.cli as climod
+
+        seen = {}
+
+        def fake(*args, **kwargs):
+            seen["args"] = args
+            seen["kwargs"] = kwargs
+            return 0
+
+        monkeypatch.setattr(climod, "_run_species", fake)
+        (tmp_path / "db").mkdir()
+        result = CliRunner().invoke(
+            main, ["scan", "sample.fna", "--marker-db", str(tmp_path / "db")]
+        )
+        assert result.exit_code == 0, result.output
+        assert seen["kwargs"]["marker_db"] == str(tmp_path / "db")
+
+    def test_db_dir_falls_back_to_D1_marker(self, monkeypatch, tmp_path):
+        import types
+
+        from gside.analysis import multigene_identifier as mg
+
+        seen = {}
+
+        def fake_marker(contigs, threads=4, marker_db=None):
+            seen["marker_db"] = marker_db
+            return types.SimpleNamespace(to_dict=lambda: {"species": "X"})
+
+        monkeypatch.setattr(mg, "identify_multigene", fake_marker)
+        (tmp_path / "D1_marker").mkdir()
+        cli._identify_one("sample.fna", "marker", str(tmp_path))
+        assert seen["marker_db"] == str(tmp_path / "D1_marker")
+
+    def test_db_validate_reports_errors(self, tmp_path):
+        db = tmp_path / "bad-db"
+        db.mkdir()
+        (db / "markers.fasta").write_text(">bad\nACGT\n")
+        (db / "marker_rules.yaml").write_text("rules: []\n")
+        result = CliRunner().invoke(main, ["db", "validate", str(db)])
+        assert result.exit_code == 1
+        assert "errors:" in result.output
+
+    def test_db_validate_json_valid(self, tmp_path):
+        db = tmp_path / "db"
+        db.mkdir()
+        (db / "markers.fasta").write_text(">markers~~~geneA~~~refA\nACGT\n")
+        (db / "marker_rules.yaml").write_text(
+            "rules:\n- species: X\n  genes: [geneA]\n  min_hits: 1\n"
+        )
+        result = CliRunner().invoke(main, ["db", "validate", str(db), "-f", "json"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["errors"] == []
+        assert payload["schema"] == "gside.marker-db/1"

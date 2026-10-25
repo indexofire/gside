@@ -880,8 +880,8 @@ packages:
   requires_python: '>=3.12'
 - pypi: ./
   name: gside
-  version: 0.1.5
-  sha256: 24d986f1e5897a40466b7321aecacc15c59a6265afe60c338b2bda7561a69498
+  version: 0.2.0
+  sha256: 88b396d2ad60caa710f4657ee8303c21a684d65ef933dcd6c8ab64b204407036
   requires_dist:
   - click>=8.0
   - pydantic>=2

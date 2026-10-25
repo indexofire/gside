@@ -11,7 +11,7 @@
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": {
@@ -52,7 +52,7 @@
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": { ... },
@@ -181,7 +181,7 @@ marker 注册标签本身即契约形式：`Salmonella_enterica`、
 {
   "analysis_type": "metagenomic_profiling",
   "tool": "gside",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "input": {"files": ["reads_R1.fq", "reads_R2.fq"], "type": "fastq_paired"},
   "methods": {
     "kraken2": {"method": "kraken2_bracken", "database": {"name": "D5_kraken2", "path": "..."},
@@ -227,7 +227,7 @@ marker 注册标签本身即契约形式：`Salmonella_enterica`、
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.1.5", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.0", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},

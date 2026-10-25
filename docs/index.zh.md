@@ -12,6 +12,7 @@
 | 理解 marker/ANI/sketch/GTDB 模式 | [鉴定模式](usage/modes.zh.md) |
 | 做宏基因组群落分析 | [宏基因组谱分析](usage/meta.zh.md) |
 | 准备数据库 | [数据库](installation/databases.zh.md) |
+| 使用自定义 marker 数据库 | [自定义 marker 数据库](usage/custom-databases.zh.md) |
 | 安全消费 JSON 输出 | [JSON 输出契约](reference/json-contract.zh.md) |
 | 把引擎迁移到 gseek | [gseek 迁移](development/gseek-migration.zh.md) |
 

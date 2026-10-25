@@ -95,6 +95,28 @@ print(result.species, result.confidence)
 print(result.to_dict()["detected_markers"])
 ```
 
+### Custom marker databases
+
+```python
+from gside.api import identify_multigene
+from gside.marker_db import MarkerDatabase
+
+db = MarkerDatabase.from_path("my-markers")
+errors = db.validate()          # [] when valid
+result = identify_multigene("contigs.fna", marker_db=db)
+```
+
+Or from the CLI:
+
+```bash
+gside db validate my-markers
+gside scan contigs.fna -m marker --marker-db my-markers
+```
+
+A custom marker database uses the same algorithm as `mini`; only
+`markers.fasta`, `marker_rules.yaml`, and optional `metadata.yaml` change.
+See [Custom marker databases](docs/usage/custom-databases.md).
+
 ### ANI against the curated panel or RefSeq mash
 
 ```python
