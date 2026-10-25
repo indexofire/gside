@@ -8,6 +8,10 @@ to a verifiable NCBI/RefSeq accession and was validated by blast against the
 291-genome panel. Sub-species typing is gapit's job — the V. cholerae
 O1/O139 serogroup database lives there (`gapit screen --db vc_serogroup`).
 
+For a user-provided marker database, see
+[Custom marker databases](../usage/custom-databases.md). The algorithm is the
+same; only the FASTA/rules change.
+
 ## How marker identification works
 
 **FASTA**: the path below. **FASTQ**: minimap2 maps reads to the same

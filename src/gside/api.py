@@ -19,11 +19,13 @@ from gside.analysis.read_screening import screen_reads
 from gside.analysis.sourmash_identifier import SourmashIdResult, identify_by_sourmash
 from gside.analysis.sylph_identifier import SylphResult, identify_by_sylph
 from gside.analysis.taxonomic_validator import ValidateResult, validate_genome
+from gside.marker_db import MarkerDatabase
 
 __all__ = [
     "AniIdResult",
     "GtdbkResult",
     "Kraken2Result",
+    "MarkerDatabase",
     "MultiGeneResult",
     "SourmashIdResult",
     "SylphResult",

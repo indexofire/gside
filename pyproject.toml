@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gside"
-version = "0.1.5"
+version = "0.2.0"
 description = "Genome Species Identification Engine — Python library and CLI for multi-layer species identification and metagenomic profiling"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

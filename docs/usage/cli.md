@@ -82,6 +82,7 @@ applies.
 | `-m`, `--mode` | option | `marker` / `all` | Method (defaults to `marker`, or `all` with `--meta`) |
 | `--meta` | flag | off | Treat the input as a metagenomic community |
 | `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
+| `--marker-db` | option | — | Custom marker DB directory (`markers.fasta` + `marker_rules.yaml`); see [Custom marker databases](custom-databases.md) |
 | `-f`, `--format` | option | `json` | `json` / `tsv` / `md` / `csv` |
 | `-o`, `--output PATH` | option | stdout | Write the report to PATH (row formats stream as samples complete; json once at the end) |
 | `-j`, `--jobs N` | option | `1` | Concurrent samples (isolate batch, positional `--meta` batch, or `--samples`) |
@@ -128,6 +129,7 @@ help (the same as `gside db -h`) and exits 0.
 | `status` | Readiness of every component (name, tier, path) |
 | `list` | Tiers with readiness, size and description |
 | `setup` | Install or update one tier |
+| `validate` | Validate a custom marker database |
 
 `status` and `list` accept `-f/--format table|tsv|csv|json` (default `table`);
 `setup` accepts `-f/--format text|json` (default `text`). Human output uses
@@ -246,7 +248,7 @@ it still exits 0 when both tools ran. Configure the tools with `CHECKM2DB` and
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.1.5", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.0", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},
@@ -329,8 +331,8 @@ flag; `-J` adds a JSON envelope.
 
 ```bash
 gside -V
-# gside, version 0.1.5
+# gside, version 0.2.0
 
 gside --version --json     # or -V -J
-# {"tool": "gside", "version": "0.1.5"}
+# {"tool": "gside", "version": "0.2.0"}
 ```

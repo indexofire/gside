@@ -15,6 +15,7 @@ modes, and the JSON contract.
 | Understand marker/ANI/sketch/GTDB modes | [Identification modes](usage/modes.md) |
 | Profile a metagenomic community | [Metagenomic profiling](usage/meta.md) |
 | Prepare databases | [Databases](installation/databases.md) |
+| Use my own marker database | [Custom marker databases](usage/custom-databases.md) |
 | Consume JSON output safely | [JSON output contract](reference/json-contract.md) |
 | Migrate an engine to gseek | [gseek migration](development/gseek-migration.md) |
 

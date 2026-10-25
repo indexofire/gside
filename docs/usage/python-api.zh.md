@@ -33,6 +33,8 @@ API 处于 1.0 之前：可能新增可选参数，但现有位置参数与结�
 from gside.api import identify_multigene
 
 result = identify_multigene("contigs.fna", threads=4)
+# 自定义 marker DB：
+# result = identify_multigene("contigs.fna", marker_db="my-markers")
 
 print(result.species)
 print(result.confidence)          # high / medium / low

@@ -16,6 +16,7 @@ import yaml
 
 from gside.analysis.read_screening import is_fastq, screen_reads
 from gside.config import SPECIES_DB_DIR
+from gside.marker_db import MarkerDatabase, resolve_marker_db
 
 _MARKERS_FASTA = SPECIES_DB_DIR / "D1_marker" / "markers.fasta"
 _MARKER_RULES = SPECIES_DB_DIR / "D1_marker" / "marker_rules.yaml"
@@ -34,6 +35,7 @@ class MultiGeneResult:
     matched_rule: str = ""
     method: str = "multigene"
     database_version: str = "unknown"
+    database_name: str = "species_markers_v2"
     notes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -41,7 +43,7 @@ class MultiGeneResult:
             "species": self.species,
             "confidence": self.confidence,
             "method": self.method,
-            "database": {"name": "species_markers_v2", "version": self.database_version},
+            "database": {"name": self.database_name, "version": self.database_version},
             "detected_markers": self.detected_markers,
             "matched_rule": self.matched_rule,
             "notes": self.notes,
@@ -55,21 +57,38 @@ class MultiGeneResult:
         return f"Identified as {self.species} based on: {', '.join(markers)}"
 
 
-def _db_version() -> str:
+def _coerce_marker_db(
+    marker_db: str | Path | MarkerDatabase | None,
+) -> MarkerDatabase | None:
+    if marker_db is None:
+        return resolve_marker_db(None)
+    if isinstance(marker_db, MarkerDatabase):
+        return marker_db
+    return MarkerDatabase.from_path(marker_db)
+
+
+def _db_version(marker_db: MarkerDatabase | None = None) -> str:
+    if marker_db is not None:
+        return marker_db.version
     try:
         return hashlib.sha256(_MARKERS_FASTA.read_bytes()).hexdigest()[:8]
     except OSError:
         return "unknown"
 
 
-def _load_rules() -> list[dict[str, Any]]:
-    if not _MARKER_RULES.is_file():
+def _load_rules(marker_db: MarkerDatabase | None = None) -> list[dict[str, Any]]:
+    path = marker_db.rules if marker_db is not None else _MARKER_RULES
+    if not path.is_file():
         return []
-    data = yaml.safe_load(_MARKER_RULES.read_text())
+    data = yaml.safe_load(path.read_text())
     return list(data.get("rules", []))
 
 
-def _legacy_blast_hits(contigs_fasta: str, threads: int) -> list[Any]:
+def _legacy_blast_hits(
+    contigs_fasta: str,
+    threads: int,
+    marker_db: MarkerDatabase | None = None,
+) -> list[Any]:
     from gside.config import which
     from gside.engine._env import require_bin
     from gside.engine.backends.blast import BlastBackend
@@ -80,7 +99,10 @@ def _legacy_blast_hits(contigs_fasta: str, threads: int) -> list[Any]:
         resolver=which,
     )
 
-    db = str(SPECIES_DB_DIR / "D1_marker" / "markers_blastdb")
+    if marker_db is not None:
+        db = str(marker_db.ensure_blast_db())
+    else:
+        db = str(SPECIES_DB_DIR / "D1_marker" / "markers_blastdb")
     backend = BlastBackend(binary=blastn, threads=threads)
     return backend.find(
         query=Path(contigs_fasta),
@@ -90,16 +112,22 @@ def _legacy_blast_hits(contigs_fasta: str, threads: int) -> list[Any]:
     )
 
 
-def _blast_contigs(contigs_fasta: str, threads: int = 4) -> list[dict[str, Any]]:
+def _blast_contigs(
+    contigs_fasta: str,
+    threads: int = 4,
+    marker_db: MarkerDatabase | None = None,
+) -> list[dict[str, Any]]:
     from gside.engine.gseek_bridge import blast_hits, engine, log_blast_shadow
 
+    markers_fasta = marker_db.fasta if marker_db is not None else _MARKERS_FASTA
+
     def legacy() -> list[Any]:
-        return _legacy_blast_hits(contigs_fasta, threads)
+        return _legacy_blast_hits(contigs_fasta, threads, marker_db)
 
     def new() -> list[Any]:
         return blast_hits(
             Path(contigs_fasta),
-            _MARKERS_FASTA,
+            markers_fasta,
             evalue=1e-10,
             word_size=11,
             threads=threads,
@@ -234,18 +262,34 @@ def _pick_rule(
     return best_species, best_conf, best_rule
 
 
-def identify_multigene(contigs_fasta: str | list[str], threads: int = 4) -> MultiGeneResult:
-    """Identify from an assembly or one/more FASTQ files (mates combined)."""
+def identify_multigene(
+    contigs_fasta: str | list[str],
+    threads: int = 4,
+    marker_db: str | Path | MarkerDatabase | None = None,
+) -> MultiGeneResult:
+    """Identify from an assembly or one/more FASTQ files (mates combined).
+
+    Pass ``marker_db`` to use a custom marker database directory, or set
+    ``GSIDE_MARKER_DB``. Without either, the bundled ``D1_marker`` database is
+    used.
+    """
+    db = _coerce_marker_db(marker_db)
+    markers_fasta = db.fasta if db is not None else _MARKERS_FASTA
     files = [contigs_fasta] if isinstance(contigs_fasta, str) else list(contigs_fasta)
     if is_fastq(files[0]):
         reads: str | list[str] = files[0] if len(files) == 1 else files
-        raw_hits = screen_reads(reads, _MARKERS_FASTA, threads)
+        raw_hits = screen_reads(reads, markers_fasta, threads)
+    elif db is not None:
+        raw_hits = _blast_contigs(files[0], threads, db)
     else:
         raw_hits = _blast_contigs(files[0], threads)
-    rules = _load_rules()
+    rules = _load_rules(db) if db is not None else _load_rules()
     significant = _best_per_gene(raw_hits, _MIN_IDENTITY, _MIN_COVERAGE)
 
-    result = MultiGeneResult(database_version=_db_version())
+    result = MultiGeneResult(
+        database_version=_db_version(db) if db is not None else _db_version(),
+        database_name=db.name if db is not None else "species_markers_v2",
+    )
     result.all_hits = list(_best_per_gene(raw_hits).values())
     result.species, result.confidence, result.matched_rule = _pick_rule(
         rules, _hits_by_gene(raw_hits), significant, _priority_species(rules)

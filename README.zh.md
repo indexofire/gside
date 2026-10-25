@@ -81,6 +81,27 @@ print(result.species, result.confidence)
 print(result.to_dict()["detected_markers"])
 ```
 
+### 自定义 marker 数据库
+
+```python
+from gside.api import identify_multigene
+from gside.marker_db import MarkerDatabase
+
+db = MarkerDatabase.from_path("my-markers")
+errors = db.validate()          # 有效时为 []
+result = identify_multigene("contigs.fna", marker_db=db)
+```
+
+或使用 CLI：
+
+```bash
+gside db validate my-markers
+gside scan contigs.fna -m marker --marker-db my-markers
+```
+
+自定义 marker 数据库与 `mini` 使用同一算法，只替换 `markers.fasta`、
+`marker_rules.yaml` 和可选 `metadata.yaml`。见[自定义 marker 数据库](docs/usage/custom-databases.zh.md)。
+
 ### 精选面板 / RefSeq mash 的 ANI
 
 ```python

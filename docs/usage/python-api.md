@@ -37,6 +37,8 @@ are resolved from `PATH` and `GSIDE_PIXI_BIN`; see
 from gside.api import identify_multigene
 
 result = identify_multigene("contigs.fna", threads=4)
+# custom marker DB:
+# result = identify_multigene("contigs.fna", marker_db="my-markers")
 
 print(result.species)
 print(result.confidence)          # high / medium / low
