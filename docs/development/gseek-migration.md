@@ -32,14 +32,14 @@ This is a deliberate dual-path design, not a temporary migration leftover:
 Install gseek for local testing:
 
 ```bash
-pixi install -e dev            # dev feature includes gseek>=0.9
+pixi install -e dev            # dev feature includes gseek>=0.9.1
 # or: pip install -e ".[dev]"
 # or, without installing a release:
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
-> The mash/sourmash paths require gseek 0.9.0 (`external_reference`), which is
-> published on PyPI: `pip install gseek==0.9.0`. The optional extra is pinned
+> The mash/sourmash paths require gseek 0.9.1 (`external_reference`), which is
+> published on PyPI: `pip install gseek==0.9.1`. The optional extra is pinned
 > accordingly. Development/test environments install it via the `dev` extra
 > (`pip install -e ".[dev]"`) and the pixi `dev` feature; the sibling checkout
 > remains useful for working on gseek itself.
@@ -124,7 +124,7 @@ Inputs: one RefSeq genome from each of *Acinetobacter baumannii*,
   legacy sourmash CLI default; the initial 50 bp default admitted extra
   low-weight partitions.
 - The benchmark's **rocksdb directory** (`gtdb-k31.rocksdb`) is accepted by
-  gseek 0.9.0 as an external reference and hashed as a deterministic tree.
+  gseek 0.9.1 as an external reference and hashed as a deterministic tree.
   legacy, gseek, and shadow all returned the same full partition
   (`Acinetobacter_baumannii`, high, `0.5978601252609603`, ANI 98.3); shadow
   produced no difference warning.

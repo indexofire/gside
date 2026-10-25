@@ -31,7 +31,7 @@ gside = { path = ".", editable = true }
 pyright = ">=1.1"
 
 [feature.dev.pypi-dependencies]
-gseek = ">=0.9"
+gseek = ">=0.9.1"
 mkdocs = ">=1.6"
 mkdocs-material = ">=9.0"
 mkdocs-static-i18n = ">=1.2"
