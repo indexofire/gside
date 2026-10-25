@@ -30,15 +30,15 @@ GSIDE_ENGINE=shadow   # 两条路径都跑，记录差异，返回 legacy 结果
 本地安装 gseek：
 
 ```bash
-pixi install -e dev            # dev feature 包含 gseek>=0.9.1
+pixi install -e dev            # dev feature 包含 gseek>=0.10.0
 # 或：pip install -e ".[dev]"
 # 或者不安装 release，直接注入源码：
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
 
-> mash/sourmash 路径需要 gseek 0.9.1（`external_reference`），已发布 PyPI：
-> `pip install gseek==0.9.1`。optional extra 已固定为对应版本。开发/测试环境
+> mash/sourmash 路径需要 gseek 0.10.0（`external_reference`），已发布 PyPI：
+> `pip install gseek==0.10.0`。optional extra 已固定为对应版本。开发/测试环境
 > 通过 `dev` extra（`pip install -e ".[dev]"`）和 pixi `dev` feature 安装；
 > sibling checkout 仅用于修改 gseek 本身。
 
@@ -113,7 +113,7 @@ coli*、*Escherichia coli*、*Salmonella enterica*、*Shigella flexneri*。分�
   0.5978601252609603`，`ani=98.3`，相同的两成员 partition）。gseek 显式传
   `threshold_bp=50000` 对齐 legacy sourmash CLI 默认值；最初的 50 bp 默认会多出
   低权重 partition。
-- benchmark 的 **rocksdb 目录**（`gtdb-k31.rocksdb`）已可作为 gseek 0.9.1 的
+- benchmark 的 **rocksdb 目录**（`gtdb-k31.rocksdb`）已可作为 gseek 0.10.0 的
   external reference，并按确定性 tree hash 记录。legacy/gseek/shadow 均返回相同
   的完整 partition（`Acinetobacter_baumannii`，high，0.5978601252609603，
   ANI 98.3），shadow 无差异 warning。
