@@ -582,9 +582,8 @@ def meta_alias(
 def db_group(ctx: click.Context) -> None:
     """Manage reference databases (status/setup/list)."""
     if ctx.invoked_subcommand is None:
-        from .db import run_db_command
-
-        sys.exit(run_db_command(["status"]))
+        click.echo(ctx.get_help())
+        ctx.exit(0)
 
 
 @db_group.command("status", context_settings=HELP_SETTINGS)

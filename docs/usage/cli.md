@@ -120,7 +120,8 @@ gside scan --meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 
 ## gside db
 
-Database management.
+Database management. Running `gside db` without a subcommand prints this
+help (the same as `gside db -h`) and exits 0.
 
 | Subcommand | Purpose |
 |---|---|

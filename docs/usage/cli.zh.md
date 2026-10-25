@@ -108,7 +108,7 @@ gside scan --meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 
 ## gside db
 
-数据库管理。
+数据库管理。`gside db` 不带子命令时显示本帮助（等价于 `gside db -h`）并以 0 退出。
 
 | 子命令 | 用途 |
 |---|---|
