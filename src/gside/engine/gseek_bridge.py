@@ -44,12 +44,14 @@ __all__ = [
     "log_skani_shadow",
     "log_screen_shadow",
     "log_sourmash_shadow",
+    "log_sylph_shadow",
     "mash_distance",
     "mash_distance_reads",
     "record_to_hit",
     "screen_reads_gseek",
     "skani_search",
     "sourmash_gather",
+    "sylph_profile",
 ]
 
 
@@ -494,6 +496,78 @@ def skani_search(
             )
         )
     return hits
+
+
+def log_sylph_shadow(legacy: Sequence[Any], new: Sequence[Any]) -> None:
+    def key(rows: Sequence[Any]) -> list[tuple[str, float, float, float]]:
+        return sorted(
+            (
+                str(row.get("name", row.get("genome_file", ""))),
+                round(float(row.get("ani", 0.0)), 3),
+                round(float(row.get("abundance", 0.0)), 4),
+                round(float(row.get("coverage", 0.0)), 3),
+            )
+            for row in rows
+        )
+
+    legacy_keys, new_keys = key(legacy), key(new)
+    if legacy_keys != new_keys:
+        logger.warning(
+            "gseek shadow sylph differs: legacy=%d gseek=%d only_legacy=%d only_gseek=%d",
+            len(legacy_keys),
+            len(new_keys),
+            len(set(legacy_keys) - set(new_keys)),
+            len(set(new_keys) - set(legacy_keys)),
+        )
+
+
+def sylph_profile(
+    reads: str | Path | Sequence[str | Path],
+    reference_db: str | Path,
+    *,
+    threads: int = 4,
+) -> list[dict[str, Any]]:
+    """Run gseek's sylph backend against a pre-built ``.syldb``/``.syl2db``.
+
+    Returns rows shaped like the legacy profile parser *before* species-name
+    mapping (``genome_file``, ``ani``, ``abundance``, ``coverage``): the
+    metadata mapping and ANI-confidence thresholds stay in gside.
+    """
+    gseek = _require_gseek()
+    files = [Path(reads)] if isinstance(reads, (str, Path)) else [Path(p) for p in reads]
+    reference = Path(reference_db)
+    size, digest = _reference_digest(reference)
+    result = gseek.distance(
+        backend="sylph",
+        query=files,
+        reference=reference,
+        external_reference=True,
+        external_sha256=digest,
+        external_size=size,
+        threads=threads,
+        resolver=_resolver(),
+        index="none",
+        record_manifest=False,
+    )
+    rows: list[dict[str, Any]] = []
+    for record in result.records:
+        tags = record.tags
+        abundance_raw = tags.get("taxonomic_abundance", "0") or "0"
+        try:
+            abundance = float(abundance_raw) / 100.0
+        except ValueError:
+            abundance = 0.0
+        rows.append(
+            {
+                "genome_file": str(tags.get("genome_file", "")),
+                "ani": float(record.ani or 0.0),
+                "abundance": abundance,
+                # gseek stores Eff_cov as a 0..1 fraction; gside keeps percent.
+                "coverage": float(record.aligned_fraction or 0.0) * 100.0,
+            }
+        )
+    rows.sort(key=lambda row: row["abundance"], reverse=True)
+    return rows
 
 
 def log_skani_shadow(legacy: Sequence[Any], new: Sequence[Any]) -> None:

@@ -66,14 +66,37 @@ def _find_sketch(work: Path) -> Path:
     return candidates[0]
 
 
+def _rows_to_species(
+    rows: list[dict[str, Any]], taxa_map: dict[str, str] | None
+) -> list[dict[str, Any]]:
+    """Raw profile rows → species rows (name mapping + ANI confidence)."""
+    mapping = taxa_map or {}
+    species = []
+    for row in rows:
+        raw_name = row.get("genome_file", "")
+        stem = Path(raw_name).stem
+        name = mapping.get(raw_name, mapping.get(stem, _species_from_genome_file(raw_name)))
+        ani = float(row.get("ani", 0.0))
+        species.append(
+            {
+                "name": name,
+                "ani": ani,
+                "abundance": float(row.get("abundance", 0.0)),
+                "coverage": float(row.get("coverage", 0.0)),
+                "confidence": ani_confidence(ani),
+            }
+        )
+    species.sort(key=lambda s: s["abundance"], reverse=True)
+    return species
+
+
 def _parse_profile(path: Path, taxa_map: dict[str, str] | None = None) -> list[dict[str, Any]]:
     """sylph profile TSV → species rows sorted by taxonomic abundance descending."""
-    mapping = taxa_map or {}
     lines = [ln for ln in path.read_text().splitlines() if ln.strip()]
     if len(lines) < 2:
         return []
     header = lines[0].split("\t")
-    species: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for line in lines[1:]:
         row = dict(zip(header, line.split("\t"), strict=False))
         try:
@@ -82,20 +105,16 @@ def _parse_profile(path: Path, taxa_map: dict[str, str] | None = None) -> list[d
             coverage = float(row.get("Eff_cov", 0.0))
         except ValueError:
             continue
-        raw_name = row.get("Genome_file", "")
-        stem = Path(raw_name).stem
-        name = mapping.get(raw_name, mapping.get(stem, _species_from_genome_file(raw_name)))
-        species.append(
+        rows.append(
             {
-                "name": name,
+                "genome_file": row.get("Genome_file", ""),
                 "ani": ani,
                 "abundance": abundance,
                 "coverage": coverage,
-                "confidence": ani_confidence(ani),
             }
         )
-    species.sort(key=lambda s: s["abundance"], reverse=True)
-    return species
+    rows.sort(key=lambda r: r["abundance"], reverse=True)
+    return _rows_to_species(rows, taxa_map)
 
 
 def identify_by_sylph(
@@ -120,28 +139,52 @@ def identify_by_sylph(
             f"sylph database not found in {base} (run: gside db setup --tier meta_sylph)"
         )
     db_file = dbs[0]
+    taxa_map = _load_taxa_map(base)
 
-    with tempfile.TemporaryDirectory(prefix="gside-sylph-") as tmp:
-        work = Path(tmp)
-        # sylph v1: read sketches ignore -o (genomes only) — they go to a
-        # folder given via -d; paired reads must ride the -1/-2 flags.
-        sketch_dir = work / "sketches"
-        sketch_cmd = [sylph_bin, "sketch", "-t", str(threads)]
-        if len(inputs) == 2:
-            sketch_cmd += ["-1", inputs[0], "-2", inputs[1]]
-        else:
-            sketch_cmd += inputs
-        sketch_cmd += ["-d", str(sketch_dir)]
-        run_checked(sketch_cmd, timeout=3600, name="sylph sketch failed")
+    def legacy() -> list[dict[str, Any]]:
+        with tempfile.TemporaryDirectory(prefix="gside-sylph-") as tmp:
+            work = Path(tmp)
+            # sylph v1: read sketches ignore -o (genomes only) — they go to a
+            # folder given via -d; paired reads must ride the -1/-2 flags.
+            sketch_dir = work / "sketches"
+            sketch_cmd = [sylph_bin, "sketch", "-t", str(threads)]
+            if len(inputs) == 2:
+                sketch_cmd += ["-1", inputs[0], "-2", inputs[1]]
+            else:
+                sketch_cmd += inputs
+            sketch_cmd += ["-d", str(sketch_dir)]
+            run_checked(sketch_cmd, timeout=3600, name="sylph sketch failed")
 
-        profile = work / "profile.tsv"
-        run_checked(
-            [sylph_bin, "profile", "-d", str(db_file), str(_find_sketch(work)), "-o", str(profile)],
-            timeout=600,
-            name="sylph profile failed",
-        )
-        taxa_map = _load_taxa_map(base)
-        species = _parse_profile(profile, taxa_map)
+            profile = work / "profile.tsv"
+            run_checked(
+                [
+                    sylph_bin,
+                    "profile",
+                    "-d",
+                    str(db_file),
+                    str(_find_sketch(work)),
+                    "-o",
+                    str(profile),
+                ],
+                timeout=600,
+                name="sylph profile failed",
+            )
+            return _parse_profile(profile, taxa_map)
+
+    def new() -> list[dict[str, Any]]:
+        from gside.engine.gseek_bridge import sylph_profile
+
+        return _rows_to_species(sylph_profile(files, db_file, threads=threads), taxa_map)
+
+    def compare(old: list[dict[str, Any]], new_rows: list[dict[str, Any]]) -> bool:
+        from gside.engine.gseek_bridge import log_sylph_shadow
+
+        log_sylph_shadow(old, new_rows)
+        return True
+
+    from gside.engine.gseek_bridge import engine
+
+    species = engine().run(legacy, new, compare=compare)
 
     return SylphResult(
         database={"name": "D6_sylph", "path": str(db_file)},
