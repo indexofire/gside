@@ -48,8 +48,12 @@ plugins:
 theme:
   name: material
   language: en
+  # Desktop: top tabs + section landing pages + right-hand TOC. The primary
+  # sidebar is hidden by stylesheets/extra.css; tablet/mobile keep the drawer.
   features:
     - navigation.tabs
+    - navigation.indexes
+    - navigation.path
     - navigation.sections
     - navigation.top
     - search.suggest
@@ -72,19 +76,30 @@ theme:
 nav:
   - Home: index.md
   - Installation:
+    - installation/index.md
     - Quick Start: installation/quick-start.md
     - Databases: installation/databases.md
     - Marker Database: installation/marker-database.md
   - Usage:
+    - usage/index.md
     - Python API: usage/python-api.md
     - CLI Reference: usage/cli.md
     - Custom Databases: usage/custom-databases.md
     - Identification Modes: usage/modes.md
     - Metagenomic Profiling: usage/meta.md
   - Architecture:
+    - architecture/index.md
     - Layered Design: architecture/layers.md
   - Reference:
+    - reference/index.md
     - Marker Rules Format: reference/marker-rules.md
     - JSON Output Contract: reference/json-contract.md
   - Development:
+    - development/index.md
     - gseek Migration: development/gseek-migration.md
+
+markdown_extensions:
+  - md_in_html
+
+extra_css:
+  - stylesheets/extra.css

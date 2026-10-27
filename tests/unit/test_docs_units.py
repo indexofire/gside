@@ -16,6 +16,10 @@ def _read(*parts: str) -> str:
     return (_DOCS.joinpath(*parts)).read_text(encoding="utf-8")
 
 
+def _mkdocs_config() -> dict:
+    return yaml.safe_load((_REPO / "mkdocs.yml").read_text(encoding="utf-8"))
+
+
 class TestCliModesDocumented:
     def test_species_modes(self):
         from gside.cli import MODES
@@ -62,7 +66,7 @@ class TestDatabaseDocs:
 
 class TestBilingualDocs:
     def _i18n(self) -> dict:
-        config = yaml.safe_load((_REPO / "mkdocs.yml").read_text(encoding="utf-8"))
+        config = _mkdocs_config()
         for plugin in config["plugins"]:
             if isinstance(plugin, dict) and "i18n" in plugin:
                 return plugin["i18n"]
@@ -88,6 +92,36 @@ class TestBilingualDocs:
             and not page.with_name(f"{page.stem}.zh.md").exists()
         ]
         assert not missing
+
+
+class TestHorizontalDocsLayout:
+    sections = ("Installation", "Usage", "Architecture", "Reference", "Development")
+
+    def test_navigation_indexes_and_path_are_enabled(self):
+        features = _mkdocs_config()["theme"]["features"]
+        assert "navigation.indexes" in features
+        assert "navigation.path" in features
+
+    def test_each_tab_uses_its_section_landing_page(self):
+        nav = _mkdocs_config()["nav"]
+        for section in self.sections:
+            entry = next(item[section] for item in nav if section in item)
+            assert entry[0] == f"{section.lower()}/index.md"
+
+    def test_section_landing_pages_are_bilingual(self):
+        for section in self.sections:
+            directory = _DOCS / section.lower()
+            assert (directory / "index.md").is_file()
+            assert (directory / "index.zh.md").is_file()
+
+    def test_desktop_primary_sidebar_is_hidden(self):
+        config = _mkdocs_config()
+        assert config["extra_css"] == ["stylesheets/extra.css"]
+        assert "md_in_html" in config["markdown_extensions"]
+        css = (_DOCS / "stylesheets" / "extra.css").read_text(encoding="utf-8")
+        assert "@media screen and (min-width: 76.25em)" in css
+        assert ".md-sidebar--primary" in css
+        assert "display: none" in css
 
 
 class TestGseekFloor:
