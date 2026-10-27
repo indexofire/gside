@@ -12,7 +12,7 @@ authors = [{ name = "indexofire", email = "indexofire@gmail.com" }]
 license = "MIT"
 dependencies = [
     "click>=8.0",
-    "gseek>=0.10.0",
+    "gseek>=0.10.2",
     "pydantic>=2",
     "pyyaml>=6.0",
     "rich>=13",

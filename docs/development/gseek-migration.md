@@ -41,11 +41,12 @@ pixi install -e dev
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
-> The mash/sourmash paths require gseek 0.10.0 (`external_reference`), which is
-> published on PyPI: `pip install gseek==0.10.0`. The runtime dependency is
-> pinned accordingly. Development/test environments install it through the
-> package dependencies (or the pixi environment); the sibling checkout remains
-> useful for working on gseek itself.
+> The mash/sourmash paths require gseek 0.10.0 (`external_reference`); the
+> sylph profiling path requires gseek 0.10.2 (the `sylph` backend). The runtime
+> dependency floor is 0.10.2, published on PyPI:
+> `pip install gseek==0.10.2`. Development/test environments install it through
+> the package dependencies (or the pixi environment); the sibling checkout
+> remains useful for working on gseek itself.
 
 ## Migrated paths
 
@@ -56,6 +57,7 @@ PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_pari
 | mash_refseq (assembly/reads) | `MashBackend` against `mash.msh` | `gseek.distance(backend="mash", external_reference=True)` |
 | sourmash gather | sketch/gather CSV parsing | `gseek.distance(backend="sourmash", external_reference=True)`, one run per query file |
 | panel (skani) | `SkaniBackend` + `panel.sketch` DB | `gseek.distance(backend="skani", external_reference=True)` against the pre-built DB directory |
+| meta sylph | `sylph sketch` + `sylph profile` + TSV parsing | `gseek.distance(backend="sylph", external_reference=True)` |
 
 The gseek path deliberately preserves gside semantics:
 
@@ -67,8 +69,8 @@ The gseek path deliberately preserves gside semantics:
 
 ## Not routed through gseek
 
-All gseek-backed gside modes are migrated (marker, mash, sourmash, panel).
-Modes without a gseek adapter (`gtdbtk`, `kraken2`, `sylph`) remain on their
+All gseek-backed gside modes are migrated (marker, mash, sourmash, panel,
+sylph). Modes without a gseek adapter (`gtdbtk`, `kraken2`) remain on their
 existing implementations.
 
 ## Verification

@@ -170,7 +170,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.7-hb78ec9c_7.conda
       - pypi: https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/15/a6/622c5bdb049fafcda85b3638b7564a4d2135f0a23961e88bce7c20e7e46f/gseek-0.10.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/12/27/89bbd615b79a621bfc40a1a9bf21369e05b43771872a500a53fa67f8e54e/gseek-0.10.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b3/81/4da04ced5a082363ecfa159c010d200ecbd959ae410c10c0264a38cac0f5/markdown_it_py-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/35/ea/a56b9fe5066f3537b7882f77e9c5dfb26d8c2eefdaed9b5fc73d57b4dc22/pydantic-2.14.1-py3-none-any.whl
@@ -362,7 +362,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d1/36/6c45f15be4eca4ac1062c6a55a323286494c99726a7e58951fe85967ac08/coverage-7.16.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/f7/ec/67fbef5d497f86283db54c22eec6f6140243aae73265799baaaa19cd17fb/ghp_import-2.1.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/15/a6/622c5bdb049fafcda85b3638b7564a4d2135f0a23961e88bce7c20e7e46f/gseek-0.10.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/12/27/89bbd615b79a621bfc40a1a9bf21369e05b43771872a500a53fa67f8e54e/gseek-0.10.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
@@ -865,10 +865,10 @@ packages:
   purls: []
   size: 102835
   timestamp: 1786118485753
-- pypi: https://files.pythonhosted.org/packages/15/a6/622c5bdb049fafcda85b3638b7564a4d2135f0a23961e88bce7c20e7e46f/gseek-0.10.0-py3-none-any.whl
+- pypi: https://files.pythonhosted.org/packages/12/27/89bbd615b79a621bfc40a1a9bf21369e05b43771872a500a53fa67f8e54e/gseek-0.10.2-py3-none-any.whl
   name: gseek
-  version: 0.10.0
-  sha256: 43de6da346073fb6366ee577a4554c775b51098370b5aa36f469c89cb99f6a05
+  version: 0.10.2
+  sha256: 12c32cc4e2343607ff245bce5ddbac307e37794e9a0d3e7145285815643610ec
   requires_dist:
   - hypothesis>=6.100 ; extra == 'dev'
   - pre-commit>=3.7 ; extra == 'dev'
@@ -883,10 +883,10 @@ packages:
 - pypi: ./
   name: gside
   version: 0.2.0
-  sha256: 1743bb0700b9533850554e6bcbe66ac5f733711804935a3a2c38ce6ef09072ec
+  sha256: 5ebbd26edf36b821b81d799d0760243f1c052cc1ec0531266914786071402dd7
   requires_dist:
   - click>=8.0
-  - gseek>=0.10.0
+  - gseek>=0.10.2
   - pydantic>=2
   - pyyaml>=6.0
   - rich>=13

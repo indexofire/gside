@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import re
+import tomllib
 from pathlib import Path
+
+import yaml
 
 _REPO = Path(__file__).resolve().parents[2]
 _DOCS = _REPO / "docs"
@@ -54,6 +58,50 @@ class TestDatabaseDocs:
     def test_marker_paths(self):
         en = _read("reference/marker-rules.md")
         assert "data/db/D1_marker/marker_rules.yaml" in en
+
+
+class TestBilingualDocs:
+    def _i18n(self) -> dict:
+        config = yaml.safe_load((_REPO / "mkdocs.yml").read_text(encoding="utf-8"))
+        for plugin in config["plugins"]:
+            if isinstance(plugin, dict) and "i18n" in plugin:
+                return plugin["i18n"]
+        raise AssertionError("mkdocs.yml has no i18n plugin")
+
+    def test_language_selector_is_generated_by_static_i18n(self):
+        i18n = self._i18n()
+        assert i18n["reconfigure_material"] is True
+        assert i18n["reconfigure_search"] is True
+
+    def test_chinese_navigation_titles_are_translated(self):
+        languages = {lang["locale"]: lang for lang in self._i18n()["languages"]}
+        translations = languages["zh"]["nav_translations"]
+        assert translations["Home"] == "首页"
+        assert translations["Usage"] == "使用"
+        assert translations["Development"] == "开发"
+
+    def test_every_english_page_has_a_chinese_pair(self):
+        missing = [
+            str(page.relative_to(_DOCS))
+            for page in _DOCS.rglob("*.md")
+            if not page.name.endswith(".zh.md")
+            and not page.with_name(f"{page.stem}.zh.md").exists()
+        ]
+        assert not missing
+
+
+class TestGseekFloor:
+    def test_pyproject_and_pixi_floors_agree(self):
+        pyproject = tomllib.loads((_REPO / "pyproject.toml").read_text(encoding="utf-8"))
+        floor_pyproject = next(
+            dep.split(">=", 1)[1]
+            for dep in pyproject["project"]["dependencies"]
+            if dep.startswith("gseek>=")
+        )
+        pixi = (_REPO / "pixi.toml").read_text(encoding="utf-8")
+        floor_pixi = re.search(r'^gseek = ">=([^"]+)"', pixi, re.MULTILINE).group(1)
+        assert floor_pyproject == floor_pixi
+        assert tuple(map(int, floor_pyproject.split("."))) >= (0, 10, 2)
 
 
 class TestCoverageFloorConsistency:
