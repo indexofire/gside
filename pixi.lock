@@ -170,6 +170,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/zstd-1.5.7-hb78ec9c_7.conda
       - pypi: https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/15/a6/622c5bdb049fafcda85b3638b7564a4d2135f0a23961e88bce7c20e7e46f/gseek-0.10.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b3/81/4da04ced5a082363ecfa159c010d200ecbd959ae410c10c0264a38cac0f5/markdown_it_py-4.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/35/ea/a56b9fe5066f3537b7882f77e9c5dfb26d8c2eefdaed9b5fc73d57b4dc22/pydantic-2.14.1-py3-none-any.whl
@@ -882,13 +883,13 @@ packages:
 - pypi: ./
   name: gside
   version: 0.2.0
-  sha256: 6a585daefa67746f656e15aa7ca2677d4fbac73b969cfbbe63a1e41966cb2a95
+  sha256: 1743bb0700b9533850554e6bcbe66ac5f733711804935a3a2c38ce6ef09072ec
   requires_dist:
   - click>=8.0
+  - gseek>=0.10.0
   - pydantic>=2
   - pyyaml>=6.0
   - rich>=13
-  - gseek>=0.10.0 ; extra == 'dev'
   - pytest>=8.0 ; extra == 'dev'
   - pytest-cov>=5.0 ; extra == 'dev'
   - ruff>=0.5 ; extra == 'dev'
@@ -896,7 +897,6 @@ packages:
   - mkdocs>=1.6 ; extra == 'dev'
   - mkdocs-material>=9.0 ; extra == 'dev'
   - mkdocs-static-i18n>=1.2 ; extra == 'dev'
-  - gseek>=0.10.0 ; extra == 'gseek'
   requires_python: '>=3.12,<3.13'
 - conda: https://conda.anaconda.org/conda-forge/linux-64/gsl-2.8-h3cd6761_2.conda
   sha256: 433d1b1570afa09f469fa5cfb633a2d860fe270639ffa6ba7a354088ab5aba23

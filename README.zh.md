@@ -29,7 +29,7 @@ contigs / reads
 - **两种群落模式。** Kraken2 + Bracken、sylph，或两者合并。
 - **组装质量评估。** CheckM2 完整度/污染度 + GTDB-Tk 分类。
 - **面向自动化。** 稳定 JSON 信封、结构化缺库错误、`--auto-setup`、机器可读数据库状态和 MCP 服务器。
-- **可选 gseek 引擎。** `GSIDE_ENGINE=legacy|gseek|shadow` 可把 marker BLAST、read screening、mash、sourmash 和 panel/skani 切到 [gseek](https://github.com/indexofire/gseek)；默认仍是 legacy。
+- **默认使用 gseek 引擎。** marker BLAST、read screening、mash、sourmash 和 panel/skani 均通过 [gseek](https://github.com/indexofire/gseek) 运行；`GSIDE_ENGINE=legacy|shadow` 保留用于调试与 parity 对比。
 
 ## 安装
 
@@ -53,11 +53,11 @@ pixi install
 pixi run gside -V
 ```
 
-可选 gseek 引擎：
+引擎调试：
 
 ```bash
-pip install "gside[gseek]"
-# 或使用 dev pixi 环境
+GSIDE_ENGINE=legacy gside scan contigs.fna -m marker   # 旧子进程路径
+GSIDE_ENGINE=shadow gside scan contigs.fna -m marker   # 两套都跑，返回 legacy
 ```
 
 如果工具不在当前环境，可指定其目录：
@@ -281,7 +281,7 @@ pixi run pytest         # 单元测试
 pixi run docs-build     # 严格 MkDocs 构建
 ```
 
-测试覆盖 CLI、数据库输出、分层仲裁、结果契约以及可选 gseek shadow 路径。缺少外部工具时，相关集成测试会自动跳过。
+测试覆盖 CLI、数据库输出、分层仲裁、结果契约以及 gseek/legacy parity 路径。缺少外部工具时，相关集成测试会自动跳过。
 
 ## 目录结构
 
@@ -290,7 +290,7 @@ src/gside/
   api.py                 公共 Python facade
   cli.py                 Click CLI
   analysis/              各鉴定引擎
-  engine/                工具后端与可选 gseek 桥
+  engine/                工具后端与 gseek 桥
   db.py                  数据库层/下载
   mcp.py                 MCP 服务器
 docs/                    中英文双语文档

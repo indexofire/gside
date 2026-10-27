@@ -1,7 +1,8 @@
-"""Unit tests for the optional gseek bridge (no gseek import required)."""
+"""Unit tests for the gseek bridge (no gseek import required)."""
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -22,9 +23,16 @@ def _clear_resolver_cache():
     bridge._resolver.cache_clear()
 
 
-def test_engine_mode_defaults_to_legacy(monkeypatch):
+def test_engine_mode_defaults_to_gseek(monkeypatch):
     monkeypatch.delenv("GSIDE_ENGINE", raising=False)
-    assert bridge.engine_mode() == "legacy"
+    assert bridge.engine_mode() == "gseek"
+
+
+def test_engine_without_gseek_package_gives_actionable_error(monkeypatch):
+    monkeypatch.delenv("GSIDE_ENGINE", raising=False)
+    monkeypatch.setitem(sys.modules, "gseek.compat", None)
+    with pytest.raises(RuntimeError, match="requires the gseek package"):
+        bridge.engine()
 
 
 @pytest.mark.parametrize("mode", ["legacy", "gseek", "shadow", " GSEEK "])
@@ -173,7 +181,7 @@ def test_require_gseek_without_package_gives_actionable_error(monkeypatch):
         raise ImportError(name)
 
     monkeypatch.setattr(bridge, "importlib", SimpleNamespace(import_module=missing))
-    with pytest.raises(RuntimeError, match="requires the optional gseek"):
+    with pytest.raises(RuntimeError, match="gseek is required"):
         bridge._require_gseek()
 
 

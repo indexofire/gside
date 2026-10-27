@@ -37,9 +37,9 @@ contigs / reads
 - **Assembly QC.** CheckM2 completeness/contamination plus GTDB-Tk taxonomy.
 - **Machine-friendly.** Stable JSON envelopes, structured missing-database
   errors, `--auto-setup`, machine-readable database status, and an MCP server.
-- **Optional gseek engines.** `GSIDE_ENGINE=legacy|gseek|shadow` can route
-  marker BLAST, read screening, mash, sourmash, and panel/skani through
-  [gseek](https://github.com/indexofire/gseek). Legacy stays the default.
+- **gseek by default.** Marker BLAST, read screening, mash, sourmash, and
+  panel/skani run through [gseek](https://github.com/indexofire/gseek).
+  `GSIDE_ENGINE=legacy|shadow` remains available for debugging and parity checks.
 
 ## Installation
 
@@ -65,11 +65,11 @@ pixi install
 pixi run gside -V
 ```
 
-Optional gseek engine:
+Engine debugging:
 
 ```bash
-pip install "gside[gseek]"
-# or use the dev pixi environment
+GSIDE_ENGINE=legacy gside scan contigs.fna -m marker   # old subprocess path
+GSIDE_ENGINE=shadow gside scan contigs.fna -m marker   # run both, return legacy
 ```
 
 If tools live outside the active environment, point gside at their directory:
@@ -305,7 +305,7 @@ pixi run docs-build     # strict MkDocs build
 ```
 
 The test suite covers the CLI, database formatting, layer arbitration, result
-contracts, and optional gseek shadow paths. External-tool tests skip when the
+contracts, and gseek/legacy parity paths. External-tool tests skip when the
 required binary is absent.
 
 ## Project layout
@@ -315,7 +315,7 @@ src/gside/
   api.py                 public Python facade
   cli.py                 Click CLI
   analysis/              identification engines
-  engine/                tool backends and optional gseek bridge
+  engine/                tool backends and gseek bridge
   db.py                  database tiers/downloads
   mcp.py                 MCP server
 docs/                    bilingual English/Chinese documentation

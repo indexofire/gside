@@ -26,12 +26,12 @@ minimap2 = ">=2.31,<3"
 
 [pypi-dependencies]
 gside = { path = ".", editable = true }
+gseek = ">=0.10.0"
 
 [feature.dev.dependencies]
 pyright = ">=1.1"
 
 [feature.dev.pypi-dependencies]
-gseek = ">=0.10.0"
 mkdocs = ">=1.6"
 mkdocs-material = ">=9.0"
 mkdocs-static-i18n = ">=1.2"

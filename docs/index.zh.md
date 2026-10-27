@@ -71,7 +71,7 @@ gside db list
 - **单一结构化结果。** 每个方法输出 JSON 信封；CLI 做共识但不丢弃逐方法证据。
 - **清晰失败。** 缺工具/数据库时给出可操作错误，包括建议安装命令和预估大小。
 - **默认可复现。** 结果记录数据库版本、工具版本与方法参数。
-- **可选加速。** `GSIDE_ENGINE=gseek` 可替换部分子进程路径，同时保留 legacy 与 shadow。
+- **默认使用 gseek。** marker BLAST、read screening、mash、sourmash 与 panel/skani 均走 gseek；`GSIDE_ENGINE=legacy|shadow` 保留用于调试和 parity 对比。
 
 ## 目录结构
 
@@ -80,7 +80,7 @@ src/gside/
   api.py                 公共 Python facade
   cli.py                 Click CLI
   analysis/              鉴定引擎
-  engine/                后端 + 可选 gseek 桥
+  engine/                后端 + gseek 桥
   db.py                  数据库层与下载
   mcp.py                 MCP 服务器
 docs/                    中英文文档

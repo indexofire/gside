@@ -104,8 +104,9 @@ gside db validate my-markers -f json
 
 ## BLAST 数据库
 
-legacy marker 路径使用 BLAST。若 `markers_blastdb.nhr` / `.nin` 不存在，gside 会在
-首次使用时于数据库目录构建：
+默认的 gseek marker 路径直接对 `markers.fasta` 做比对。legacy BLAST 路径使用
+`markers_blastdb`；若 `markers_blastdb.nhr` / `.nin` 不存在，gside 会在首次使用时
+于数据库目录构建：
 
 ```bash
 makeblastdb -in my-markers/markers.fasta -dbtype nucl -out my-markers/markers_blastdb
@@ -169,5 +170,5 @@ result = identify_multigene("sample.fna", marker_db="my-markers")
 
 - 自定义数据库仅支持 `marker` 模式。
 - 不参与 `db list` / `db status` / `db setup`。
-- gseek shadow 路径使用同一个自定义 FASTA；legacy BLAST 路径使用自定义索引。
+- 默认 gseek 路径与 shadow 对比使用同一个自定义 FASTA；legacy BLAST 路径使用自定义索引。
 - marker rules 不能改变算法行为，只负责从 gene 命中里选择物种。

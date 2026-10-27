@@ -1,16 +1,16 @@
 # gseek engine migration
 
-`gside` can route its marker BLAST/FASTQ screening, mash distance, sourmash
+`gside` routes its marker BLAST/FASTQ screening, mash distance, sourmash
 gather, and panel/skani lookup through
-[`gseek`](https://github.com/indexofire/gseek) behind an explicit switch. The
-default remains the existing subprocess implementation; gseek is optional.
+[`gseek`](https://github.com/indexofire/gseek). gseek is a runtime dependency
+and the default engine; `legacy` and `shadow` remain selectable for debugging.
 
 ## Switch
 
 ```bash
-GSIDE_ENGINE=legacy   # default: existing backends, no gseek import
-GSIDE_ENGINE=gseek    # route all migrated paths through gseek
-GSIDE_ENGINE=shadow   # run both, log differences, return the legacy result
+GSIDE_ENGINE=gseek    # default: route all migrated paths through gseek
+GSIDE_ENGINE=legacy   # debug: existing subprocess backends
+GSIDE_ENGINE=shadow   # debug: run both, log differences, return legacy
 ```
 
 `GSIDE_ENGINE` is read per call, so a process can be tested with either mode
@@ -18,33 +18,34 @@ without restarting. Invalid values fail before any tool runs. The selector,
 shadow comparison, and fallback are provided by `gseek.compat.Engine`; legacy
 mode still avoids importing gseek entirely.
 
-## Legacy is retained
+## Legacy and shadow are debug modes
 
-This is a deliberate dual-path design, not a temporary migration leftover:
+The gseek path is the production default. The dual-path design is retained on
+purpose:
 
-- `legacy` is the default, so installations without gseek behave exactly as
-  before;
+- `legacy` runs the original subprocess implementation for debugging and
+  side-by-side comparisons;
 - every migrated path keeps its legacy implementation and remains usable;
 - `shadow` runs both implementations, logs coarse differences, and returns the
   legacy result;
-- legacy is the reference for parity tests and the fallback if gseek is
-  unavailable;
-- modes without a gseek adapter (`gtdbtk`, `kraken2`, `sylph`) are legacy-only.
+- legacy is the reference for parity tests;
+- modes without a gseek adapter (`gtdbtk`, `kraken2`, `sylph`) do not use the
+  switch.
 
-Install gseek for local testing:
+gseek is installed with the package; for local development:
 
 ```bash
-pixi install -e dev            # dev feature includes gseek>=0.10.0
+pixi install -e dev
 # or: pip install -e ".[dev]"
 # or, without installing a release:
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
 > The mash/sourmash paths require gseek 0.10.0 (`external_reference`), which is
-> published on PyPI: `pip install gseek==0.10.0`. The optional extra is pinned
-> accordingly. Development/test environments install it via the `dev` extra
-> (`pip install -e ".[dev]"`) and the pixi `dev` feature; the sibling checkout
-> remains useful for working on gseek itself.
+> published on PyPI: `pip install gseek==0.10.0`. The runtime dependency is
+> pinned accordingly. Development/test environments install it through the
+> package dependencies (or the pixi environment); the sibling checkout remains
+> useful for working on gseek itself.
 
 ## Migrated paths
 
@@ -64,7 +65,7 @@ The gseek path deliberately preserves gside semantics:
   historical `blastn` defaults;
 - tool discovery uses the same `GSIDE_PIXI_BIN`/pixi/PATH order.
 
-## Not migrated yet
+## Not routed through gseek
 
 All gseek-backed gside modes are migrated (marker, mash, sourmash, panel).
 Modes without a gseek adapter (`gtdbtk`, `kraken2`, `sylph`) remain on their
@@ -79,9 +80,8 @@ existing implementations.
   not importable.
 
 The same gates apply on `main` (`ruff`, `pyright`, `pytest tests/unit --cov ...`,
-plus integration). The parity test is collected by the default test suite when
-gseek is installed; cases that need external binaries skip when those binaries
-are absent.
+plus integration). The parity test is collected by the default test suite;
+cases that need external binaries skip when those binaries are absent.
 
 
 ## Local verification (2026-10-24)

@@ -1,46 +1,43 @@
 # gseek 引擎迁移
 
-`gside` 可以通过显式开关，把 marker BLAST/FASTQ screening、mash distance、
-sourmash gather 与 panel/skani 四条路径切到
-[`gseek`](https://github.com/indexofire/gseek)。默认仍走原有子进程实现，
-gseek 是可选依赖。
+`gside` 把 marker BLAST/FASTQ screening、mash distance、sourmash gather 与
+panel/skani 四条路径交给 [`gseek`](https://github.com/indexofire/gseek)。
+gseek 是运行时依赖和默认引擎；`legacy` 与 `shadow` 保留用于调试。
 
 ## 开关
 
 ```bash
-GSIDE_ENGINE=legacy   # 默认：旧后端，不 import gseek
-GSIDE_ENGINE=gseek    # 所有已迁移路径走 gseek
-GSIDE_ENGINE=shadow   # 两条路径都跑，记录差异，返回 legacy 结果
+GSIDE_ENGINE=gseek    # 默认：所有已迁移路径走 gseek
+GSIDE_ENGINE=legacy   # 调试：旧子进程后端
+GSIDE_ENGINE=shadow   # 调试：两条路径都跑，记录差异，返回 legacy 结果
 ```
 
 `GSIDE_ENGINE` 每次调用时读取，因此同一进程可在测试中切换模式；非法值会在
 任何外部工具启动前报错。选择、shadow 比较与回退由 `gseek.compat.Engine`
 提供；legacy 模式仍然完全不 import gseek。
 
-## legacy 保留策略
+## legacy 与 shadow 是调试模式
 
-这是有意的双路径设计，不是迁移遗留：
+gseek 路径是生产默认值，双路径设计仍有意保留：
 
-- `legacy` 是默认值，没有 gseek 的安装行为与之前完全一致；
+- `legacy` 运行原有子进程实现，用于调试和并排对比；
 - 每个已迁移路径都保留 legacy 实现，仍可正常使用；
 - `shadow` 同时跑两套实现，记录粗粒度差异，并返回 legacy 结果；
-- legacy 是 parity 测试的基准，也是 gseek 不可用时的回退；
-- 没有 gseek 适配器的模式（`gtdbtk`、`kraken2`、`sylph`）只能走 legacy。
+- legacy 是 parity 测试的基准；
+- 没有 gseek 适配器的模式（`gtdbtk`、`kraken2`、`sylph`）不使用该开关。
 
-本地安装 gseek：
+gseek 随包安装；本地开发：
 
 ```bash
-pixi install -e dev            # dev feature 包含 gseek>=0.10.0
+pixi install -e dev
 # 或：pip install -e ".[dev]"
 # 或者不安装 release，直接注入源码：
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
-
 > mash/sourmash 路径需要 gseek 0.10.0（`external_reference`），已发布 PyPI：
-> `pip install gseek==0.10.0`。optional extra 已固定为对应版本。开发/测试环境
-> 通过 `dev` extra（`pip install -e ".[dev]"`）和 pixi `dev` feature 安装；
-> sibling checkout 仅用于修改 gseek 本身。
+> `pip install gseek==0.10.0`。运行时依赖已固定为对应版本；开发/测试环境通过
+> 包依赖（或 pixi 环境）安装，sibling checkout 仅用于修改 gseek 本身。
 
 ## 已迁移路径
 
@@ -59,7 +56,7 @@ gseek 路径显式保留 gside 语义：
   `blastn` 默认行为；
 - 工具发现仍使用 `GSIDE_PIXI_BIN`/pixi/PATH 的顺序。
 
-## 尚未迁移
+## 不走 gseek 的模式
 
 所有由 gseek 后端覆盖的 gside 模式均已迁移（marker、mash、sourmash、panel）。
 没有 gseek 适配器的模式（`gtdbtk`、`kraken2`、`sylph`）保持原有实现。
@@ -72,7 +69,7 @@ gseek 路径显式保留 gside 语义：
   以及 FASTQ screening parity；gseek 不可导入时 skip。
 
 `main` 上执行同样的门禁（`ruff`、`pyright`、`pytest tests/unit --cov` 及集成）。
-安装 gseek 时，parity 测试会被默认测试套件收集；需要外部二进制的用例在缺失时 skip。
+parity 测试会被默认测试套件收集；需要外部二进制的用例在缺失时 skip。
 
 
 ## 本地验证（2026-10-24）

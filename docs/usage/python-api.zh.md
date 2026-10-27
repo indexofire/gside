@@ -144,9 +144,9 @@ CLI 层字段与错误语义见 [JSON 输出契约](../reference/json-contract.z
 已迁移路径可用 `GSIDE_ENGINE` 切换内部实现：
 
 ```bash
-GSIDE_ENGINE=legacy   # 默认
-GSIDE_ENGINE=gseek    # 在已实现路径使用 gseek
-GSIDE_ENGINE=shadow   # 同时运行、比较并返回 legacy
+GSIDE_ENGINE=gseek    # 默认：在已实现路径使用 gseek
+GSIDE_ENGINE=legacy   # 调试：旧子进程实现
+GSIDE_ENGINE=shadow   # 调试：同时运行、比较并返回 legacy
 ```
 
 范围与验证见 [gseek 迁移](../development/gseek-migration.zh.md)。

@@ -1,16 +1,16 @@
-"""Optional gseek bridge for gside's marker BLAST and FASTQ screening.
+"""gseek bridge for gside's marker BLAST and FASTQ screening.
 
 ``GSIDE_ENGINE`` selects the implementation:
 
-- ``legacy`` (default): existing subprocess backends.
-- ``gseek``: use gseek's BLAST/minimap2 adapters.
+- ``gseek`` (default): use gseek's BLAST/minimap2 adapters.
+- ``legacy``: existing subprocess backends, kept for debugging.
 - ``shadow``: run both, log differences, return the legacy result.
 
+Marker BLAST/FASTQ screening, mash distances (assembly and reads), sourmash
+gather, and skani panel searches use gseek. gseek external references accept
+pre-built files and database directories (sourmash rocksdb, skani sketch DB).
 The bridge is imported unconditionally (it has no gseek import at module load),
-so installations that never set ``GSIDE_ENGINE`` do not need gseek. Marker
-BLAST/FASTQ screening, mash distances (assembly and reads), sourmash gather, and
-skani panel searches use gseek. gseek external references accept pre-built
-files and database directories (sourmash rocksdb, skani sketch DB).
+so ``legacy`` remains usable when gseek is not installed.
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ class _LegacyMode:
 
 
 class _LegacyEngine:
-    """No-gseek fallback; legacy installs never import the optional package."""
+    """Debug-only subprocess engine; never imports gseek."""
 
     mode = _LegacyMode()
 
@@ -79,7 +79,7 @@ class _LegacyEngine:
 
 def engine() -> _LegacyEngine | Engine:
     """Return the shared switch, importing gseek only for gseek/shadow modes."""
-    raw = os.environ.get("GSIDE_ENGINE", "legacy").strip().lower() or "legacy"
+    raw = os.environ.get("GSIDE_ENGINE", "gseek").strip().lower() or "gseek"
     if raw not in _VALID_MODES:
         raise RuntimeError(f"unknown GSIDE_ENGINE={raw!r}; expected one of {sorted(_VALID_MODES)}")
     if raw == "legacy":
@@ -87,27 +87,29 @@ def engine() -> _LegacyEngine | Engine:
     try:
         from gseek.compat import Engine
     except ImportError as exc:
-        raise RuntimeError("GSIDE_ENGINE=gseek requires the optional gseek package") from exc
-    return Engine.from_env("GSIDE_ENGINE", logger=logger)
+        raise RuntimeError(
+            f"GSIDE_ENGINE={raw} requires the gseek package; install it with `pip install gseek`"
+        ) from exc
+    return Engine(raw, env_var="GSIDE_ENGINE", logger=logger)
 
 
 def engine_mode() -> str:
-    """Return the configured engine mode (``legacy`` by default)."""
+    """Return the configured engine mode (``gseek`` by default)."""
     return engine().mode.value
 
 
 def gseek_available() -> bool:
-    """True when the optional gseek package can be imported."""
+    """True when the gseek package can be imported."""
     return importlib.util.find_spec("gseek") is not None
 
 
 def _require_gseek() -> Any:
     try:
         return importlib.import_module("gseek")
-    except ImportError as exc:  # pragma: no cover - depends on optional install
+    except ImportError as exc:  # pragma: no cover - depends on package install
         raise RuntimeError(
-            "GSIDE_ENGINE=gseek requires the optional gseek package; "
-            "install it with `pip install -e ../gseek` (or `pip install gseek`)"
+            "gseek is required for the gseek/shadow engines; "
+            "install it with `pip install gseek` (or use GSIDE_ENGINE=legacy)"
         ) from exc
 
 

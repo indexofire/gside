@@ -108,8 +108,9 @@ Exit code is `0` for a valid DB and `1` when errors are reported.
 
 ## BLAST database
 
-The legacy marker path uses BLAST. If `markers_blastdb.nhr` / `.nin` is missing,
-gside builds it in the database directory on first use:
+The default gseek marker path aligns against `markers.fasta` directly. The
+legacy BLAST path uses `markers_blastdb`; if `markers_blastdb.nhr` / `.nin` is
+missing, gside builds it in the database directory on first use:
 
 ```bash
 makeblastdb -in my-markers/markers.fasta -dbtype nucl -out my-markers/markers_blastdb
@@ -175,7 +176,7 @@ downstream JSON remains traceable.
 
 - Custom databases are supported for the `marker` mode only.
 - They do not participate in `db list` / `db status` or `db setup`.
-- The gseek shadow path uses the same custom FASTA; the legacy BLAST path uses
-  the custom BLAST index.
+- The default gseek path and the shadow comparison use the same custom FASTA;
+  the legacy BLAST path uses the custom BLAST index.
 - Marker rules cannot create new algorithm behavior; they only select species
   from gene hits.

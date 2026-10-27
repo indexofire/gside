@@ -83,8 +83,9 @@ Use `-f json`, `-f tsv`, or `-f csv` when another program will read them.
   a suggested setup command and estimated download size.
 - **Reproducible by default.** Database versions, tool versions, and method
   parameters are recorded in results.
-- **Optional acceleration.** `GSIDE_ENGINE=gseek` can replace selected subprocess
-  paths while keeping legacy and shadow modes available.
+- **gseek by default.** Marker BLAST, read screening, mash, sourmash, and
+  panel/skani run through gseek; `GSIDE_ENGINE=legacy|shadow` is kept for
+  debugging and parity checks.
 
 ## Project layout
 
@@ -93,7 +94,7 @@ src/gside/
   api.py                 public Python facade
   cli.py                 Click CLI
   analysis/              identification engines
-  engine/                backends + optional gseek bridge
+  engine/                backends + gseek bridge
   db.py                  database tiers and downloads
   mcp.py                 MCP server
 docs/                    English/Chinese documentation

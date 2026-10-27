@@ -272,7 +272,7 @@ CLI 命令并返回同样的 JSON 文本；失败返回 `isError` 包络，不�
 | `GSIDE_DATA_DIR` | 全部 | 数据根目录（默认 `<repo>/data`，否则用包内数据） |
 | `GSIDE_DB_DIR` | 全部 | 数据库根目录（默认 `<data>/db`） |
 | `GSIDE_PIXI_BIN` | 全部 | 额外 `bin/`（`blastn`/`minimap2`/`skani`/`mash`…） |
-| `GSIDE_ENGINE` | `scan` | marker/mash/sourmash/panel 路径引擎：`legacy`（默认，保留）/`gseek`/`shadow`；`shadow` 返回 legacy 结果 |
+| `GSIDE_ENGINE` | `scan` | marker/mash/sourmash/panel 路径引擎：`gseek`（默认），调试时可用 `legacy`/`shadow`；`shadow` 返回 legacy 结果 |
 | `GSIDE_SOURMASH_SIG_SHA256` | `db setup` | 覆盖 sourmash 签名摘要 |
 | `CHECKM2DB` | `validate` | CheckM2 的 `uniref100.KO.1.dmnd` 路径 |
 | `GTDBTK_DATA_PATH` / `GTDBDB` | `validate`、`scan -m gtdbtk` | GTDB-Tk 数据库目录 |

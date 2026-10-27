@@ -159,9 +159,9 @@ Do not share mutable result objects between workers.
 Set `GSIDE_ENGINE` to select the internal implementation for migrated paths:
 
 ```bash
-GSIDE_ENGINE=legacy   # default
-GSIDE_ENGINE=gseek    # use gseek where implemented
-GSIDE_ENGINE=shadow   # run both, compare, return legacy
+GSIDE_ENGINE=gseek    # default: use gseek where implemented
+GSIDE_ENGINE=legacy   # debug: old subprocess implementation
+GSIDE_ENGINE=shadow   # debug: run both, compare, return legacy
 ```
 
 Scope and validation details are in [gseek migration](../development/gseek-migration.md).

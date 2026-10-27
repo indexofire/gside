@@ -170,8 +170,8 @@ def screen_reads(
     Paired mates are processed in one minimap2 invocation, so per-gene
     breadth is the union of intervals from both files.
 
-    ``GSIDE_ENGINE`` switches between the legacy subprocess path (default),
-    gseek's minimap2 adapter, and a shadow comparison.
+    ``GSIDE_ENGINE`` switches between gseek's minimap2 adapter (default), the
+    legacy subprocess path, and a shadow comparison.
     """
     files = [reads] if isinstance(reads, (str, Path)) else list(reads)
     lengths = [mean_read_length(f) for f in files] or [0.0]
