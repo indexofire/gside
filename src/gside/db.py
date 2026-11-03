@@ -240,7 +240,24 @@ def _setup_component(component: str, install: Callable[[Path], str], source: str
 def _install_panel(dst: Path) -> str:
     """Panel install chain: pre-built GitHub Release sketch, else manifest build."""
     result = _try_download_panel_release(dst)
-    return result if result else _build_panel_from_manifest(dst)
+    if result:
+        if not result.startswith("ERROR"):
+            _publish_taxa_map(dst)
+        return result
+    return _build_panel_from_manifest(dst)
+
+
+def _publish_taxa_map(dst: Path) -> None:
+    """Copy the tracked ``manifests/metadata.tsv`` next to the sketch.
+
+    The panel taxa map is read from ``<D2_ani>/metadata.tsv`` at scan time;
+    the manifest build publishes it, so the pre-built release download must
+    do the same or every panel hit maps to ``Unknown``.
+    """
+    metadata = _MANIFEST_DIR / "metadata.tsv"
+    target = dst / "metadata.tsv"
+    if metadata.is_file() and not target.is_file():
+        shutil.copy2(metadata, target)
 
 
 def _file_md5(path: Path) -> str:

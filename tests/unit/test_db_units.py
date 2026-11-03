@@ -531,6 +531,15 @@ class TestSetupDownloadPaths:
         monkeypatch.setattr(db, "_try_download_panel_release", lambda dst: "downloaded!")
         assert db_setup("panel")["D2_ani"] == "downloaded!"
 
+    def test_panel_release_publishes_taxa_map(self, root, monkeypatch, tmp_path):
+        manifests = tmp_path / "manifests"
+        manifests.mkdir()
+        (manifests / "metadata.tsv").write_text("fna\tspecies\nGCF_1.fna\tSpecies one\n")
+        monkeypatch.setattr(db, "_MANIFEST_DIR", manifests)
+        monkeypatch.setattr(db, "_try_download_panel_release", lambda dst: "downloaded!")
+        db_setup("panel")
+        assert (root / "D2_ani" / "metadata.tsv").is_file()
+
     def test_mash_download_path(self, root, monkeypatch):
         monkeypatch.setattr(db, "_download_mash_zenodo", lambda dst: "dl!")
         assert db_setup("mash")["D3_mash"] == "dl!"
