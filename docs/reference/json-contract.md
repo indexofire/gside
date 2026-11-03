@@ -107,9 +107,10 @@ separate samples. The top-level JSON shape depends on the sample count:
 
 For a paired sample, `contigs` is the first mate (both were analyzed).
 
-The `--format tsv` and `--format md` options are alternatives to the default
-`json`: they render one row per input file (TSV or Markdown table) instead of
-nested objects.
+Every output format — `json`, `tsv`, `csv` and `md` — is **streamed**: each
+sample is written (to stdout or `-o`) as soon as it finishes, and a JSON array
+is closed only after the last sample. `--format tsv`/`md`/`csv` render one row
+per sample instead of nested objects.
 
 ## Field Reference
 
@@ -157,10 +158,11 @@ gapit's job, not gside's.
 | gtdbtk | `Vibrio cholerae` | `Vibrio_cholerae` |
 
 Marker registry labels are already in contract form: `Salmonella_enterica`,
-`Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`, `Shigella_flexneri`,
-`Shigella_sonnei`, `Shigella_dysenteriae`, `Shigella_boydii`; genus-level
-`Shigella` is used only when no species marker is detected. Strain/accession text is never glued
-into `species` (a dot would break the downstream matcher); it goes to `strain`.
+`Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`. Shigella is
+deliberately genus-level only — species/serotype discrimination belongs to
+gapit and is called out in `methods.marker.notes`. Strain/accession text is
+never glued into `species` (a dot would break the downstream matcher); it goes
+to `strain`.
 Species-group placeholders (`Campylobacter sp.`) and `Unknown` are emitted as
 `Unknown`.
 

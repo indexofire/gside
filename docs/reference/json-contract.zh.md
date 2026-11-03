@@ -101,8 +101,9 @@
 - **1 个文件**：单个 JSON 对象，即上文示例的结构
 - **多个文件**：JSON **数组**，每个输入文件对应一个对象，按输入顺序排列
 
-`--format tsv` 与 `--format md` 是默认 `json` 之外的两种输出格式：每个输入
-文件渲染一行（TSV 或 Markdown 表格），而非嵌套对象。
+所有输出格式——`json`、`tsv`、`csv`、`md`——都是**流式**的：每个样本一完成
+就写入（stdout 或 `-o`），JSON 数组在最后一个样本后才闭合。`--format
+tsv`/`md`/`csv` 每个样本渲染一行，而非嵌套对象。
 
 ## 字段说明
 
@@ -149,9 +150,8 @@ DEC/EIEC、志贺菌血清型等致病型/血清型分型属于 gapit，不在 g
 | gtdbtk | `Vibrio cholerae` | `Vibrio_cholerae` |
 
 marker 注册标签本身即契约形式：`Salmonella_enterica`、
-`Vibrio_parahaemolyticus`、`Escherichia_coli`、`Shigella`、
-`Shigella_flexneri`、`Shigella_sonnei`、`Shigella_dysenteriae`、
-`Shigella_boydii`；属级 `Shigella` 仅在无种特异标记时输出。菌株/登录号
+`Vibrio_parahaemolyticus`、`Escherichia_coli`、`Shigella`。志贺菌有意只到
+属级——种/血清型分型属于 gapit，并在 `methods.marker.notes` 中注明。菌株/登录号
 文本绝不拼进 `species`（点号会破坏下游匹配），统一放入 `strain`。
 种组占位（`Campylobacter sp.`）与 `Unknown` 一律输出 `Unknown`。
 

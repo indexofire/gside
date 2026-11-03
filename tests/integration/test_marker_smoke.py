@@ -54,3 +54,16 @@ class TestSpeciesMarker:
         q.write_text(f">mapa_q\n{_gene_seq('markers~~~mapa~~~')}\n")
         r = identify_multigene(str(q)).to_dict()
         assert r["species"] == "Unknown"
+
+    def test_shigella_genus_call_points_to_gapit(self, tmp_path):
+        """uidA+ipaH (lacY-negative) reports genus Shigella with a gapit note."""
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        uida = _gene_seq("markers~~~uida~~~")
+        ipah = _gene_seq("markers~~~ipah~~~")
+        q = tmp_path / "shigella.fna"
+        q.write_text(f">uida_q\n{uida}\n>ipah_q\n{ipah}\n")
+        r = identify_multigene(str(q)).to_dict()
+        assert r["species"] == "Shigella"
+        assert r["confidence"] == "high"
+        assert any("gapit" in note.lower() for note in r["notes"])

@@ -922,6 +922,22 @@ def _csv_line(cells: list[str]) -> str:
     return buf.getvalue()
 
 
+def _json_stream(payload_source: Iterator[dict[str, Any]], single: bool) -> Iterator[str]:
+    """Stream a JSON document incrementally, one payload at a time.
+
+    A single input yields one object; a batch yields ``[obj, obj, ...]`` with
+    each object emitted as soon as it completes, so ``-o`` can be streamed too.
+    """
+    if single:
+        yield json.dumps(next(payload_source), ensure_ascii=False, indent=2) + "\n"
+        return
+    yield "[\n"
+    for index, payload in enumerate(payload_source):
+        text = json.dumps(payload, ensure_ascii=False, indent=2)
+        yield ("" if index == 0 else ",\n") + text + "\n"
+    yield "]\n"
+
+
 def _emit_species(
     payload_source: Iterator[dict[str, Any]],
     n_inputs: int,
@@ -931,9 +947,7 @@ def _emit_species(
     bar: Any = None,
 ) -> int:
     if output_format == "json":
-        payloads = list(payload_source)
-        report: Any = payloads[0] if n_inputs == 1 else payloads
-        return _write_json_document(report, output, bar)
+        return _emit_chunks(_json_stream(payload_source, n_inputs == 1), output, bar)
 
     markdown = output_format == "md"
     is_csv = output_format == "csv"
@@ -1393,15 +1407,22 @@ def _emit_meta(
 
 
 def _emit_meta_batch(
-    payloads: list[dict[str, Any]],
+    payload_source: Iterator[dict[str, Any]],
     output_format: str,
     output: str | None,
     no_header: bool = False,
+    bar: Any = None,
 ) -> int:
     if output_format == "json":
-        return _write_json_document(payloads, output)
-    text = _render_meta_table(payloads, output_format, no_header, with_sample=True)
-    return _write_text_document(text, output)
+        return _emit_chunks(_json_stream(payload_source, False), output, bar)
+
+    def chunks() -> Iterator[str]:
+        if not no_header:
+            yield _render_meta_table([], output_format, False, with_sample=True)
+        for payload in payload_source:
+            yield _render_meta_table([payload], output_format, True, with_sample=True)
+
+    return _emit_chunks(chunks(), output, bar)
 
 
 def _meta_payload(
@@ -1497,19 +1518,27 @@ def _run_meta_samples(
             from concurrent.futures import ThreadPoolExecutor
 
             with ThreadPoolExecutor(max_workers=jobs) as pool:
-                payloads = [first, *pool.map(identify, rest)]
-        else:
-            payloads = [first, *(identify(sample) for sample in rest)]
-        return _emit_meta_batch(payloads, output_format, output, no_header)
+
+                def auto_source() -> Iterator[dict[str, Any]]:
+                    yield first
+                    yield from pool.map(identify, rest)
+
+                return _emit_meta_batch(auto_source(), output_format, output, no_header)
+        return _emit_meta_batch(
+            (payload for payload in (first, *(identify(sample) for sample in rest))),
+            output_format,
+            output,
+            no_header,
+        )
 
     if jobs > 1:
         from concurrent.futures import ThreadPoolExecutor
 
         with ThreadPoolExecutor(max_workers=jobs) as pool:
-            payloads = list(pool.map(identify, samples))
-    else:
-        payloads = [identify(sample) for sample in samples]
-    return _emit_meta_batch(payloads, output_format, output, no_header)
+            return _emit_meta_batch(pool.map(identify, samples), output_format, output, no_header)
+    return _emit_meta_batch(
+        (identify(sample) for sample in samples), output_format, output, no_header
+    )
 
 
 if __name__ == "__main__":

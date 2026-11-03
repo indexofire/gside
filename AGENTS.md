@@ -96,9 +96,11 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-10-23): **726 tests**, total coverage **99.5%**
-— all modules 100% except: ani 94%, multigene 99%, sourmash 99%,
-db 99%, kraken2 99%.
+Baseline (2026-11-03): **812 tests**, total coverage **97.1%**
+— all modules 100% except: marker_db 77%, ani 92%, gseek_bridge 93%,
+sylph 95%, sourmash 96%, multigene 97%, kraken2/db/cli 99%.
+(marker_db + gseek_bridge landed with the gseek migration and are still
+catching up on tests; do not let the total drop below 97.1%.)
 Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
 raise it every time coverage climbs.
 
@@ -285,5 +287,5 @@ testpaths = ["tests"]
 - **Metagenomic tiers auto-download**: `db setup --tier meta` pulls Ben Langmead's Standard-8 (5.5GB, includes Bracken 50-300mer) and verifies each extracted file against the published md5 list; readiness needs `database150mers.kmer_distrib`. `--tier meta_sylph` pulls the 14GB two-stage GTDB r226 `.syl2db` (MD5 pinned). sylph accepts both `.syldb` and `.syl2db`; `.syl2db` is preferred and needs sylph >= 1.0.
 - **DB download verification**: panel pins SHA256, mash MD5 (Zenodo only publishes MD5), sourmash lineages + signature SHA256, sylph DB MD5 (GCS `x-goog-hash`). Kraken2 is verified per extracted file against the published `.md5` manifest. The sourmash signature zip has no upstream digest; `SOURMASH_SIG_SHA256` was pinned after a locally verified download (complete size, zip integrity, 143,385 k=31 DNA signatures, CC0) and `GSIDE_SOURMASH_SIG_SHA256` overrides it at setup time. Tar extraction uses `filter="data"`. All pinned artifacts live in the GitHub release tag `db-v0.1` (panel) — re-pin `PANEL_SHA256` whenever the release asset is replaced.
 - **`engine/` holds only live backends**: marker → `BlastBackend`, panel → `SkaniBackend`, mash_refseq/sourmash → `MashBackend`/`SourmashBackend` (analysis resolves binaries via `require_bin` and injects them with `binary=`; backends pass their module-level `which` as `resolver=` so tests can monkeypatch discovery). Shared scaffolding is `engine/_env.py` (`require_bin`/`run_checked`).
-- **Species name contract is `Genus_species`**: every tier emits the underscored label via `analysis/species_name.py` (`apply_species_name`) and keeps the tool string in `species_raw`, the strain in `strain`. The normalizer strips GTDB `s__` ranks, a leading `GCF_/GCA_` accession (sourmash names look like `GCF_... Campylobacter jejuni`), and GTDB disambiguation suffixes (`Campylobacter_D jejuni` → `Campylobacter_jejuni`, `Vibrio_A cholerae` → `Vibrio_cholerae`); `sp.`/`sp036004205`/`unidentified`/`Unknown` collapse to `Unknown`. marker labels are already contract form (`Salmonella_enterica`, `Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`, `Shigella_flexneri`) and pass through untouched — never "reduce" them to two tokens. bacmap's `canonical_from_verdict` only accepts `[A-Za-z]+(?:_[A-Za-z0-9]+)+`, so a spaced or dotted label breaks it.
+- **Species name contract is `Genus_species`**: every tier emits the underscored label via `analysis/species_name.py` (`apply_species_name`) and keeps the tool string in `species_raw`, the strain in `strain`. The normalizer strips GTDB `s__` ranks, a leading `GCF_/GCA_` accession (sourmash names look like `GCF_... Campylobacter jejuni`), and GTDB disambiguation suffixes (`Campylobacter_D jejuni` → `Campylobacter_jejuni`, `Vibrio_A cholerae` → `Vibrio_cholerae`); `sp.`/`sp036004205`/`unidentified`/`Unknown` collapse to `Unknown`. marker labels are already contract form (`Salmonella_enterica`, `Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`) and pass through untouched — never "reduce" them to two tokens. bacmap's `canonical_from_verdict` only accepts `[A-Za-z]+(?:_[A-Za-z0-9]+)+`, so a spaced or dotted label breaks it.
 - **FASTA header contract**: `>markers~~~<gene>~~~<desc> role=<primary|confirm|typing|virulence>`; parser takes `split("~~~")[1]` — the `markers` prefix itself is never validated.

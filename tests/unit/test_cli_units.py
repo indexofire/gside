@@ -361,8 +361,13 @@ class TestSpeciesOutputOption:
 
 class TestDbOutputFormats:
     _STATUS = {
-        "D1_marker": {"ready": True, "path": "/p/D1_marker", "tier": "mini"},
-        "D2_ani": {"ready": False, "path": "/p/D2_ani", "tier": "panel"},
+        "D1_marker": {
+            "ready": True,
+            "path": "/p/D1_marker",
+            "tier": "mini",
+            "inputs": "FASTA/FASTQ",
+        },
+        "D2_ani": {"ready": False, "path": "/p/D2_ani", "tier": "panel", "inputs": "FASTA"},
     }
 
     _TIERS = {
@@ -380,9 +385,9 @@ class TestDbOutputFormats:
         result = CliRunner().invoke(main, ["db", "status", "--format", "tsv"])
         assert result.exit_code == 0
         lines = result.output.splitlines()
-        assert lines[0] == "COMPONENT\tREADY\tTIER\tPATH"
-        assert lines[1] == "D1_marker\tready\tmini\t/p/D1_marker"
-        assert lines[2] == "D2_ani\tmissing\tpanel\t/p/D2_ani"
+        assert lines[0] == "COMPONENT\tREADY\tTIER\tINPUTS\tPATH"
+        assert lines[1] == "D1_marker\tready\tmini\tFASTA/FASTQ\t/p/D1_marker"
+        assert lines[2] == "D2_ani\tmissing\tpanel\tFASTA\t/p/D2_ani"
         assert "✅" not in result.output
         assert "db setup" not in result.output
 
@@ -392,7 +397,7 @@ class TestDbOutputFormats:
         monkeypatch.setattr(dbmod, "db_status", lambda: self._STATUS)
         result = CliRunner().invoke(main, ["db", "status", "-f", "tsv"])
         assert result.exit_code == 0
-        assert result.output.splitlines()[0] == "COMPONENT\tREADY\tTIER\tPATH"
+        assert result.output.splitlines()[0] == "COMPONENT\tREADY\tTIER\tINPUTS\tPATH"
 
     def test_status_json_roundtrip(self, monkeypatch):
         import gside.db as dbmod
@@ -422,8 +427,8 @@ class TestDbOutputFormats:
         result = CliRunner().invoke(main, ["db", "list", "--format", "tsv"])
         assert result.exit_code == 0
         assert result.output.splitlines() == [
-            "NAME\tREADY\tSIZE\tDESCRIPTION",
-            "mini\tready\t~1MB\tMarker rules + sequences (bundled)",
+            "NAME\tREADY\tSIZE\tINPUTS\tDESCRIPTION",
+            "mini\tready\t~1MB\tFASTA/FASTQ\tMarker rules + sequences (bundled)",
         ]
 
     def test_list_json(self, monkeypatch):
@@ -433,7 +438,12 @@ class TestDbOutputFormats:
         monkeypatch.setattr(dbmod, "db_status", lambda: self._STATUS)
         result = CliRunner().invoke(main, ["db", "list", "-f", "json"])
         assert result.exit_code == 0
-        assert json.loads(result.output) == {"mini": {**self._TIERS["mini"], "ready": True}}
+        payload = json.loads(result.output)
+        assert payload["mini"]["inputs"] == "FASTA/FASTQ"
+        assert {k: v for k, v in payload["mini"].items() if k != "inputs"} == {
+            **self._TIERS["mini"],
+            "ready": True,
+        }
 
 
 class TestDbSetupShortFlags:
@@ -589,6 +599,29 @@ class TestStreamingOutput:
         cli._run_species(["a.fna", "b.fna"], "marker", None, "tsv", None)
         assert "a.fna" in seen["mid"]
         assert "b.fna" not in seen["mid"]
+
+    def test_output_json_streams_per_input(self, monkeypatch, tmp_path):
+        seen_during_run = {}
+
+        def fake_identify(contigs, mode, db_dir, threads=4):
+            if contigs == "b.fna":
+                seen_during_run["mid"] = (tmp_path / "out.json").read_text()
+            return _payload(contigs)
+
+        monkeypatch.setattr(cli, "_identify_one", fake_identify)
+        cli._run_species(["a.fna", "b.fna"], "marker", None, "json", str(tmp_path / "out.json"))
+        assert seen_during_run["mid"].lstrip().startswith("[")
+        assert "a.fna" in seen_during_run["mid"]
+        assert not seen_during_run["mid"].rstrip().endswith("]")
+        report = json.loads((tmp_path / "out.json").read_text())
+        assert [payload["contigs"] for payload in report] == ["a.fna", "b.fna"]
+
+    def test_output_json_single_input_is_one_object(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        cli._run_species(["a.fna"], "marker", None, "json", str(tmp_path / "out.json"))
+        report = json.loads((tmp_path / "out.json").read_text())
+        assert isinstance(report, dict)
+        assert report["contigs"] == "a.fna"
 
     def test_midbatch_failure_persists_prefix(self, monkeypatch, tmp_path):
         def fake_identify(contigs, mode, db_dir, threads=4):

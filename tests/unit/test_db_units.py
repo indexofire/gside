@@ -242,9 +242,9 @@ class TestFormatStatus:
         _touch(root / "D1_marker" / "markers.fasta")
         text = db.format_status("tsv")
         lines = text.splitlines()
-        assert lines[0] == "COMPONENT\tREADY\tTIER\tPATH"
-        assert lines[1].startswith("D1_marker\tready\tmini\t")
-        assert lines[2].split("\t")[:3] == ["D2_ani", "missing", "panel"]
+        assert lines[0] == "COMPONENT\tREADY\tTIER\tINPUTS\tPATH"
+        assert lines[1].startswith("D1_marker\tready\tmini\tFASTA/FASTQ\t")
+        assert lines[2].split("\t")[:4] == ["D2_ani", "missing", "panel", "FASTA"]
         assert "✅" not in text
         assert "Run 'gside" not in text
 
@@ -268,6 +268,7 @@ class TestFormatTiers:
         assert "│ TIER" in text
         assert "│ READY" in text
         assert "│ SIZE" in text
+        assert "│ INPUTS" in text
         assert "│ DESCRIPTION" in text
         assert "┌" in text and "└" in text
         for name in db._TIERS:
@@ -275,15 +276,15 @@ class TestFormatTiers:
         ready_values = {
             line.split("│")[2].strip()
             for line in text.splitlines()
-            if line.startswith("│ ") and "│" in line
+            if line.startswith("│ ") and line.split("│")[1].strip()
         }
         assert ready_values <= {"ready", "missing", "READY"}
 
     def test_tsv_rows(self):
         lines = db.format_tiers("tsv").splitlines()
-        assert lines[0] == "NAME\tREADY\tSIZE\tDESCRIPTION"
+        assert lines[0] == "NAME\tREADY\tSIZE\tINPUTS\tDESCRIPTION"
         assert len(lines) == 1 + len(db._TIERS)
-        assert lines[1].split("\t")[:3] == ["mini", "ready", "~1MB"]
+        assert lines[1].split("\t")[:4] == ["mini", "ready", "~1MB", "FASTA/FASTQ"]
 
     def test_tsv_ready_aggregates_tier_items(self, root):
         _touch(root / "D2_ani" / "panel.sketch" / "sketches.db")
@@ -301,7 +302,7 @@ class TestFormatTiers:
 
     def test_csv_quotes_commas(self):
         lines = db.format_tiers("csv").splitlines()
-        assert lines[0] == "NAME,READY,SIZE,DESCRIPTION"
+        assert lines[0] == "NAME,READY,SIZE,INPUTS,DESCRIPTION"
         sourmash_row = next(ln for ln in lines[1:] if ln.startswith("sourmash,"))
         assert '"GTDB gather database (sourmash, sketch k=31)"' in sourmash_row
 
@@ -942,5 +943,34 @@ class TestStatusCsv:
     def test_csv_output(self, root):
         _touch(root / "D1_marker" / "markers.fasta")
         text = db.format_status("csv").splitlines()
-        assert text[0] == "COMPONENT,READY,TIER,PATH"
-        assert text[1].startswith("D1_marker,ready,mini,")
+        assert text[0] == "COMPONENT,READY,TIER,INPUTS,PATH"
+        assert text[1].startswith("D1_marker,ready,mini,FASTA/FASTQ,")
+
+
+class TestInputKinds:
+    def test_status_has_inputs_column(self, root):
+        _touch(root / "D1_marker" / "markers.fasta")
+        lines = db.format_status("tsv").splitlines()
+        assert lines[0] == "COMPONENT\tREADY\tTIER\tINPUTS\tPATH"
+        assert lines[1].split("\t")[3] == "FASTA/FASTQ"
+        by_component = {ln.split("\t")[0]: ln.split("\t") for ln in lines[1:]}
+        assert by_component["D2_ani"][3] == "FASTA"
+        assert by_component["D6_sylph"][3] == "FASTQ"
+
+    def test_status_json_carries_inputs(self, root):
+        data = json.loads(db.format_status("json"))
+        assert data["D1_marker"]["inputs"] == "FASTA/FASTQ"
+        assert data["D2_ani"]["inputs"] == "FASTA"
+
+    def test_tiers_have_inputs_column(self):
+        lines = db.format_tiers("tsv").splitlines()
+        assert lines[0] == "NAME\tREADY\tSIZE\tINPUTS\tDESCRIPTION"
+        by_name = {ln.split("\t")[0]: ln.split("\t") for ln in lines[1:]}
+        assert by_name["mini"][3] == "FASTA/FASTQ"
+        assert by_name["panel"][3] == "FASTA"
+        assert by_name["meta_sylph"][3] == "FASTQ"
+
+    def test_tiers_json_carries_inputs(self):
+        data = json.loads(db.format_tiers("json"))
+        assert data["panel"]["inputs"] == "FASTA"
+        assert data["meta"]["inputs"] == "FASTA/FASTQ"

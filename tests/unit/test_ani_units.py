@@ -120,12 +120,33 @@ class TestPanelThresholds:
         r = identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result
         assert r["species"] == "Unknown" and r["ani"] is None
 
-    def test_unknown_ref_falls_back_to_id(self, monkeypatch, taxadb):
+    def test_full_path_ref_still_maps_to_species(self, monkeypatch, taxadb):
+        monkeypatch.setattr(
+            ani,
+            "_skani_search",
+            lambda q, d, threads=4: [_skani_hit(ref="/db/GCF_A_genomic.fna")],
+        )
+        r = identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result
+        assert r["species"] == "Escherichia_coli"
+        assert r["species_raw"] == "Escherichia coli K12"
+
+    def test_ref_with_genomic_suffix_maps(self, monkeypatch, taxadb):
+        monkeypatch.setattr(
+            ani,
+            "_skani_search",
+            lambda q, d, threads=4: [_skani_hit(ref="GCF_A_genomic.fna")],
+        )
+        r = identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result
+        assert r["species"] == "Escherichia_coli"
+
+    def test_unmapped_ref_is_unknown_not_accession(self, monkeypatch, taxadb):
         monkeypatch.setattr(
             ani, "_skani_search", lambda q, d, threads=4: [_skani_hit(ref="GCF_ZZ")]
         )
         r = identify_by_ani("q.fna", mode="panel", db_dir=taxadb).result
-        assert r["species"] == "GCF_ZZ"
+        assert r["species"] == "Unknown"
+        assert r["top_hits"][0]["genome"] == "GCF_ZZ"
+        assert r["top_hits"][0]["species"] == "Unknown"
 
 
 class TestMashThresholds:

@@ -330,29 +330,31 @@ def _pick(*genes: str) -> str:
 
 
 class TestRuleDesign:
-    def test_shigella_genus_is_uida_ipah_lacy_negative(self):
-        # No species marker -> genus-level Shigella (not forced to boydii).
+    def test_shigella_is_genus_only(self):
+        # Species/serotype markers never upgrade the call: typing is gapit's job.
         assert _pick("uida", "ipah") == "Shigella"
+        assert _pick("uida", "ipah", "rfc") == "Shigella"
+        assert _pick("uida", "ipah", "wbgz") == "Shigella"
         assert _pick("uida", "ipah", "lacy") == "Escherichia_coli"
 
-    def test_shigella_flexneri_uses_rfc_or_rfb_marker(self):
-        assert _pick("uida", "ipah", "rfc") == "Shigella_flexneri"
-        assert _pick("uida", "ipah", "rfbe") == "Shigella_flexneri"
+    def test_no_shigella_species_rules_ship(self):
+        species = {rule["species"] for rule in _load_rules()}
+        assert not any(s.startswith("Shigella_") for s in species)
+        assert "Shigella" in species
 
-    def test_shigella_sonnei_uses_wbgz_or_chromosomal_marker(self):
-        assert _pick("uida", "ipah", "wbgz") == "Shigella_sonnei"
-        assert _pick("uida", "ipah", "sonnei_psuk") == "Shigella_sonnei"
-
-    def test_shigella_dysenteriae_uses_rfpb_or_sd_panel(self):
-        assert _pick("uida", "ipah", "rfpb") == "Shigella_dysenteriae"
-        assert _pick("uida", "ipah", "sd1_wzx") == "Shigella_dysenteriae"
-
-    def test_shigella_boydii_uses_sb_serotype_panel(self):
-        assert _pick("uida", "ipah", "sb2_wzx") == "Shigella_boydii"
-        assert _pick("uida", "ipah", "rfc") == "Shigella_flexneri"
-
-    def test_eiec_is_escherichia_coli_not_shigella(self):
-        assert _pick("uida", "ipah", "lacy") == "Escherichia_coli"
+    def test_shigella_call_notes_point_to_gapit(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            mg,
+            "_blast_contigs",
+            lambda path, threads: [
+                {"gene": "uida", "identity": 99.0, "coverage": 100.0, "ref_len": 100},
+                {"gene": "ipah", "identity": 100.0, "coverage": 100.0, "ref_len": 100},
+            ],
+        )
+        result = mg.identify_multigene(str(tmp_path / "g.fna"))
+        assert result.species == "Shigella"
+        assert any("gapit" in note.lower() for note in result.notes)
+        assert any("serotyp" in note.lower() for note in result.notes)
 
     def test_bordetella_pertussis_needs_both_targets(self):
         assert _pick("ptxs1", "tcfa") == "Bordetella_pertussis"

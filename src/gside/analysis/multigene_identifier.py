@@ -294,6 +294,12 @@ def identify_multigene(
     result.species, result.confidence, result.matched_rule = _pick_rule(
         rules, _hits_by_gene(raw_hits), significant, _priority_species(rules)
     )
+    if result.species == "Shigella":
+        result.notes.append(
+            "Shigella is reported at genus level only; species/serotype "
+            "discrimination is not performed here. Use gapit for Shigella "
+            "serotyping/typing."
+        )
 
     if significant:
         result.detected_markers = [

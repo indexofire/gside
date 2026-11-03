@@ -108,6 +108,27 @@ _TIERS: dict[str, dict[str, Any]] = {
     },
 }
 
+# Which query kinds each component's engine accepts (documented in `db status`
+# and `db list` so users can see FASTA-only tiers before choosing a mode).
+_COMPONENT_INPUTS: dict[str, str] = {
+    "D1_marker": "FASTA/FASTQ",
+    "D2_ani": "FASTA",
+    "D3_mash": "FASTA/FASTQ",
+    "D4_sourmash": "FASTA/FASTQ",
+    "D5_kraken2": "FASTA/FASTQ",
+    "D6_sylph": "FASTQ",
+}
+
+_TIER_INPUTS: dict[str, str] = {
+    "mini": "FASTA/FASTQ",
+    "panel": "FASTA",
+    "mash": "FASTA/FASTQ",
+    "sourmash": "FASTA/FASTQ",
+    "meta": "FASTA/FASTQ",
+    "meta_sylph": "FASTQ",
+    "all": "FASTA/FASTQ",
+}
+
 _DOWNLOAD_TIMEOUT = 3600
 _CHUNK = 1024 * 1024
 
@@ -175,6 +196,7 @@ def db_status() -> dict[str, dict[str, Any]]:
             "ready": _component_ready(component),
             "path": str(SPECIES_DB_DIR / dir_name),
             "tier": tier,
+            "inputs": _COMPONENT_INPUTS[component],
         }
         for component, (tier, dir_name, _probes) in _COMPONENTS.items()
     }
@@ -552,29 +574,37 @@ def format_status(fmt: str) -> str:
     if fmt == "json":
         return json.dumps(status, indent=2, ensure_ascii=False)
     if fmt == "tsv":
-        lines = ["COMPONENT\tREADY\tTIER\tPATH"]
+        lines = ["COMPONENT\tREADY\tTIER\tINPUTS\tPATH"]
         lines += [
-            f"{name}\t{'ready' if info['ready'] else 'missing'}\t{info['tier']}\t{info['path']}"
+            f"{name}\t{'ready' if info['ready'] else 'missing'}\t{info['tier']}"
+            f"\t{info['inputs']}\t{info['path']}"
             for name, info in status.items()
         ]
         return "\n".join(lines)
     if fmt == "csv":
         out = io.StringIO()
         writer = csv.writer(out, lineterminator="\n")
-        writer.writerow(["COMPONENT", "READY", "TIER", "PATH"])
+        writer.writerow(["COMPONENT", "READY", "TIER", "INPUTS", "PATH"])
         writer.writerows(
-            [name, "ready" if info["ready"] else "missing", info["tier"], info["path"]]
+            [
+                name,
+                "ready" if info["ready"] else "missing",
+                info["tier"],
+                info["inputs"],
+                info["path"],
+            ]
             for name, info in status.items()
         )
         return out.getvalue().rstrip("\n")
     return _render_table(
         "gside database status",
-        ("COMPONENT", "READY", "TIER", "PATH"),
+        ("COMPONENT", "READY", "TIER", "INPUTS", "PATH"),
         [
             (
                 name,
                 "ready" if info["ready"] else "missing",
                 str(info["tier"]),
+                str(info["inputs"]),
                 str(info["path"]),
             )
             for name, info in status.items()
@@ -592,29 +622,31 @@ def format_tiers(fmt: str) -> str:
             name,
             "ready" if all(status[item]["ready"] for item in info["items"]) else "missing",
             info["size"],
+            _TIER_INPUTS[name],
             info["description"],
         )
         for name, info in _TIERS.items()
     ]
     if fmt == "json":
         payload = {
-            name: {**info, "ready": ready == "ready"}
-            for (name, ready, _, _), (_, info) in zip(rows, _TIERS.items(), strict=True)
+            name: {**info, "ready": ready == "ready", "inputs": _TIER_INPUTS[name]}
+            for (name, ready, _, _, _), (name_tier, info) in zip(rows, _TIERS.items(), strict=True)
+            if name == name_tier
         }
         return json.dumps(payload, indent=2, ensure_ascii=False)
     if fmt == "tsv":
-        lines = ["NAME\tREADY\tSIZE\tDESCRIPTION"]
+        lines = ["NAME\tREADY\tSIZE\tINPUTS\tDESCRIPTION"]
         lines += ["\t".join(row) for row in rows]
         return "\n".join(lines)
     if fmt == "csv":
         out = io.StringIO()
         writer = csv.writer(out, lineterminator="\n")
-        writer.writerow(["NAME", "READY", "SIZE", "DESCRIPTION"])
+        writer.writerow(["NAME", "READY", "SIZE", "INPUTS", "DESCRIPTION"])
         writer.writerows(rows)
         return out.getvalue().rstrip("\n")
     return _render_table(
         "gside database tiers",
-        ("TIER", "READY", "SIZE", "DESCRIPTION"),
+        ("TIER", "READY", "SIZE", "INPUTS", "DESCRIPTION"),
         rows,
         caption="Tiers marked ready can be used without downloading.",
     )
@@ -623,7 +655,7 @@ def format_tiers(fmt: str) -> str:
 def _render_table(
     title: str,
     columns: tuple[str, ...],
-    rows: list[tuple[str, str, str, str]],
+    rows: list[tuple[str, ...]],
     *,
     caption: str | None = None,
 ) -> str:

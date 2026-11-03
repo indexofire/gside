@@ -855,6 +855,41 @@ class TestSampleManifest:
         assert lines[1] == "A\tsylph\tEscherichia_coli\t0.5\thigh\t99.0"
         assert lines[2].startswith("B\tsylph\t")
 
+    def test_batch_json_streams_per_sample(self, monkeypatch, tmp_path):
+        seen_during_run = {}
+
+        def fake_payload(files, mode, db_dir, threads=4):
+            if files == ["b.fq"]:
+                seen_during_run["mid"] = (tmp_path / "out.json").read_text()
+            return {
+                "methods": {},
+                "verdict": {
+                    "top_species": [
+                        {
+                            "method": "sylph",
+                            "name": "Escherichia_coli",
+                            "abundance": 0.5,
+                            "confidence": "high",
+                            "ani": 99.0,
+                        }
+                    ]
+                },
+            }
+
+        monkeypatch.setattr(cli, "_meta_payload", fake_payload)
+        samples = [{"id": "A", "files": ["a.fq"]}, {"id": "B", "files": ["b.fq"]}]
+        assert (
+            cli._run_meta_samples(
+                samples, "sylph", None, output_format="json", output=str(tmp_path / "out.json")
+            )
+            == 0
+        )
+        assert seen_during_run["mid"].lstrip().startswith("[")
+        assert '"A"' in seen_during_run["mid"]
+        assert not seen_during_run["mid"].rstrip().endswith("]")
+        report = json.loads((tmp_path / "out.json").read_text())
+        assert [entry["sample"] for entry in report] == ["A", "B"]
+
     def test_jobs_with_one_sample_is_a_usage_error(self):
         result = CliRunner().invoke(main, ["meta", "r.fq", "-j", "2"])
         assert result.exit_code == 2

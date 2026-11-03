@@ -225,6 +225,20 @@ def _mash_result(
     return apply_species_name(result, raw_species or "Unknown")
 
 
+def _taxa_lookup(taxa: dict[str, str], ref: str) -> str:
+    """Species string for a skani/mash reference id, tolerating key formats.
+
+    Panel metadata is keyed by genome filename, but engines report either the
+    basename, a full path, or the bare assembly accession; try each in turn.
+    """
+    name = Path(ref).name
+    candidates = (ref, name, name.removesuffix("_genomic.fna"))
+    for candidate in candidates:
+        if candidate in taxa:
+            return taxa[candidate]
+    return ""
+
+
 def _panel_result(
     base: Path,
     contigs: str | Path | Sequence[str | Path],
@@ -243,10 +257,11 @@ def _panel_result(
 
     species, confidence = "Unknown", "low"
     if best is not None and best.aligned_fraction >= _AF_MIN:
+        matched = _taxa_lookup(taxa, best.ref)
         if best.ani >= ANI_HIGH:
-            species, confidence = taxa.get(best.ref, best.ref), "high"
+            species, confidence = (matched or "Unknown"), "high"
         elif best.ani >= ANI_MEDIUM:
-            species, confidence = taxa.get(best.ref, best.ref), "medium"
+            species, confidence = (matched or "Unknown"), "medium"
 
     result = {
         "confidence": confidence,
@@ -255,7 +270,7 @@ def _panel_result(
         "top_hits": [
             {
                 "genome": h.ref,
-                "species": taxa.get(h.ref, h.ref),
+                "species": _taxa_lookup(taxa, h.ref) or "Unknown",
                 "ani": h.ani,
                 "af": h.aligned_fraction,
             }

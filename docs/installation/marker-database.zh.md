@@ -1,11 +1,12 @@
 # 标记基因数据库
 
 标记基因数据库（`data/db/D1_marker/`，随仓库分发的 **mini** 层）驱动默认的
-`-m marker` 鉴定：`blastn` 将查询 contigs 比对到 139 条精选参考序列，
-再由 42 条物种规则把命中转化为判定。gside 是物种鉴定引擎：每条参考均
+`-m marker` 鉴定：`blastn` 将查询 contigs 比对到 75 条精选参考序列，
+再由 38 条物种规则把命中转化为判定。gside 是物种鉴定引擎：每条参考均
 锚定可核查的 NCBI/RefSeq accession，并经 291 基因组面板 blast 验证。
 种下分型是 gapit 的职责——霍乱弧菌 O1/O139 血清群库已移交该处
-（`gapit screen --db vc_serogroup`）。
+（`gapit screen --db vc_serogroup`）。志贺菌同样只报**属级** `Shigella`
+（uidA+ipaH、lacY 阴性），并在结果 notes 中注明种/血清型分型交给 gapit。
 
 ## marker 鉴定流程
 
@@ -29,10 +30,10 @@
 
 | 角色 | 含义 | 数量 |
 |---|---|---|
-| `primary` | 定义物种的标记；规则的 `genes` 从这里选 | 113 |
+| `primary` | 定义物种的标记；规则的 `genes` 从这里选 | 49 |
 | `confirm` | 与判定一起报告的佐证 | 23 |
 
-## 基因清单（139 条序列）
+## 基因清单（75 条序列）
 
 | 基因 | 角色 | 参考序列 |
 |---|---|---|
@@ -105,78 +106,14 @@
 | `ompw` | primary | X51948.1 outer membrane protein W [Vibrio cholerae] role=primary |
 | `cpa` | primary | PV804807.1 phospholipase C alpha toxin (cpa/plc) [Clostridium perfringens] role=primary |
 | `safC` | typing | NC_003197.2:343560-346076 saf atypical fimbrial operon [Salmonella enterica] role=typing |
-| `rfc` | primary | NC_004337.2:2110959-2112107 O-antigen polymerase rfc [Shigella flexneri] role=primary |
-| `wbgz` | primary | CP000039.1:204752-206671 putative epimerase/dehydratase wbgZ [Shigella sonnei] role=primary |
-| `rfpb` | primary | CP000640.1:2979-4112 glycosyltransferase rfpB [Shigella dysenteriae] role=primary |
-| `sonnei_psuk` | primary | GCF_002950395.1:595851-596792 pseudouridine kinase [Shigella sonnei] role=primary |
-| `rfbe` | primary | NC_004337.2:2113945-2115201 polysaccharide biosynthesis protein rfbE [Shigella flexneri] role=primary |
-| `rfbi` | primary | NC_004337.2:2110581-2110955 glycosyl translocase rfbI [Shigella flexneri] role=primary |
-| `sb11_wzx` | primary | ShigaTyper ShigellaRef5 Sb11_wzx [Shigella boydii] role=primary |
-| `sb11_wzy` | primary | ShigaTyper ShigellaRef5 Sb11_wzy [Shigella boydii] role=primary |
-| `sb12_wzx` | primary | ShigaTyper ShigellaRef5 Sb12_wzx [Shigella boydii] role=primary |
-| `sb12_wzy` | primary | ShigaTyper ShigellaRef5 Sb12_wzy [Shigella boydii] role=primary |
-| `sb14_wzx` | primary | ShigaTyper ShigellaRef5 Sb14_wzx [Shigella boydii] role=primary |
-| `sb14_wzy` | primary | ShigaTyper ShigellaRef5 Sb14_wzy [Shigella boydii] role=primary |
-| `sb15_wzx` | primary | ShigaTyper ShigellaRef5 Sb15_wzx [Shigella boydii] role=primary |
-| `sb15_wzy` | primary | ShigaTyper ShigellaRef5 Sb15_wzy [Shigella boydii] role=primary |
-| `sb16_wzy` | primary | ShigaTyper ShigellaRef5 Sb16_wzy [Shigella boydii] role=primary |
-| `sb17_wzx` | primary | ShigaTyper ShigellaRef5 Sb17_wzx [Shigella boydii] role=primary |
-| `sb17_wzy` | primary | ShigaTyper ShigellaRef5 Sb17_wzy [Shigella boydii] role=primary |
-| `sb18_wzx` | primary | ShigaTyper ShigellaRef5 Sb18_wzx [Shigella boydii] role=primary |
-| `sb18_wzy` | primary | ShigaTyper ShigellaRef5 Sb18_wzy [Shigella boydii] role=primary |
-| `sb19_wzx` | primary | ShigaTyper ShigellaRef5 Sb19_wzx [Shigella boydii] role=primary |
-| `sb19_wzy` | primary | ShigaTyper ShigellaRef5 Sb19_wzy [Shigella boydii] role=primary |
-| `sb1_wzx` | primary | ShigaTyper ShigellaRef5 Sb1_wzx [Shigella boydii] role=primary |
-| `sb1_wzy` | primary | ShigaTyper ShigellaRef5 Sb1_wzy [Shigella boydii] role=primary |
-| `sb2_wzx` | primary | ShigaTyper ShigellaRef5 Sb2_wzx [Shigella boydii] role=primary |
-| `sb2_wzy` | primary | ShigaTyper ShigellaRef5 Sb2_wzy [Shigella boydii] role=primary |
-| `sb3_wzx` | primary | ShigaTyper ShigellaRef5 Sb3_wzx [Shigella boydii] role=primary |
-| `sb3_wzy` | primary | ShigaTyper ShigellaRef5 Sb3_wzy [Shigella boydii] role=primary |
-| `sb4_wzx` | primary | ShigaTyper ShigellaRef5 Sb4_wzx [Shigella boydii] role=primary |
-| `sb4_wzy` | primary | ShigaTyper ShigellaRef5 Sb4_wzy [Shigella boydii] role=primary |
-| `sb5_wzx` | primary | ShigaTyper ShigellaRef5 Sb5_wzx [Shigella boydii] role=primary |
-| `sb5_wzy` | primary | ShigaTyper ShigellaRef5 Sb5_wzy [Shigella boydii] role=primary |
-| `sb6_wzx` | primary | ShigaTyper ShigellaRef5 Sb6_wzx [Shigella boydii] role=primary |
-| `sb6_wzy` | primary | ShigaTyper ShigellaRef5 Sb6_wzy [Shigella boydii] role=primary |
-| `sb7_wzx` | primary | ShigaTyper ShigellaRef5 Sb7_wzx [Shigella boydii] role=primary |
-| `sb7_wzy` | primary | ShigaTyper ShigellaRef5 Sb7_wzy [Shigella boydii] role=primary |
-| `sb8_wzx` | primary | ShigaTyper ShigellaRef5 Sb8_wzx [Shigella boydii] role=primary |
-| `sb8_wzy` | primary | ShigaTyper ShigellaRef5 Sb8_wzy [Shigella boydii] role=primary |
-| `sb9_wzx` | primary | ShigaTyper ShigellaRef5 Sb9_wzx [Shigella boydii] role=primary |
-| `sb9_wzy` | primary | ShigaTyper ShigellaRef5 Sb9_wzy [Shigella boydii] role=primary |
 | `sbprov_wzx` | primary | ShigaTyper ShigellaRef5 SbProv_wzx [Shigella boydii] role=primary |
 | `sbprov_wzy` | primary | ShigaTyper ShigellaRef5 SbProv_wzy [Shigella boydii] role=primary |
-| `sd10_wzx` | primary | ShigaTyper ShigellaRef5 Sd10_wzx [Shigella dysenteriae] role=primary |
-| `sd10_wzy` | primary | ShigaTyper ShigellaRef5 Sd10_wzy [Shigella dysenteriae] role=primary |
-| `sd12_wzx` | primary | ShigaTyper ShigellaRef5 Sd12_wzx [Shigella dysenteriae] role=primary |
-| `sd12_wzy` | primary | ShigaTyper ShigellaRef5 Sd12_wzy [Shigella dysenteriae] role=primary |
-| `sd13_wzx` | primary | ShigaTyper ShigellaRef5 Sd13_wzx [Shigella dysenteriae] role=primary |
-| `sd13_wzy` | primary | ShigaTyper ShigellaRef5 Sd13_wzy [Shigella dysenteriae] role=primary |
-| `sd14_wzx` | primary | ShigaTyper ShigellaRef5 Sd14_wzx [Shigella dysenteriae] role=primary |
-| `sd14_wzy` | primary | ShigaTyper ShigellaRef5 Sd14_wzy [Shigella dysenteriae] role=primary |
-| `sd15_wzx` | primary | ShigaTyper ShigellaRef5 Sd15_wzx [Shigella dysenteriae] role=primary |
-| `sd15_wzy` | primary | ShigaTyper ShigellaRef5 Sd15_wzy [Shigella dysenteriae] role=primary |
-| `sd1_rfp` | primary | ShigaTyper ShigellaRef5 Sd1_rfp [Shigella dysenteriae] role=primary |
-| `sd1_wzx` | primary | ShigaTyper ShigellaRef5 Sd1_wzx [Shigella dysenteriae] role=primary |
-| `sd1_wzy` | primary | ShigaTyper ShigellaRef5 Sd1_wzy [Shigella dysenteriae] role=primary |
-| `sd2_wzx` | primary | ShigaTyper ShigellaRef5 Sd2_wzx [Shigella dysenteriae] role=primary |
-| `sd2_wzy` | primary | ShigaTyper ShigellaRef5 Sd2_wzy [Shigella dysenteriae] role=primary |
-| `sd3_wzx` | primary | ShigaTyper ShigellaRef5 Sd3_wzx [Shigella dysenteriae] role=primary |
-| `sd3_wzy` | primary | ShigaTyper ShigellaRef5 Sd3_wzy [Shigella dysenteriae] role=primary |
-| `sd4_wzx` | primary | ShigaTyper ShigellaRef5 Sd4_wzx [Shigella dysenteriae] role=primary |
-| `sd4_wzy` | primary | ShigaTyper ShigellaRef5 Sd4_wzy [Shigella dysenteriae] role=primary |
-| `sd6_wzx` | primary | ShigaTyper ShigellaRef5 Sd6_wzx [Shigella dysenteriae] role=primary |
-| `sd6_wzy` | primary | ShigaTyper ShigellaRef5 Sd6_wzy [Shigella dysenteriae] role=primary |
-| `sd8_wzx` | primary | ShigaTyper ShigellaRef5 Sd8_wzx [Shigella dysenteriae] role=primary |
-| `sd8_wzy` | primary | ShigaTyper ShigellaRef5 Sd8_wzy [Shigella dysenteriae] role=primary |
-| `sd9_wzx` | primary | ShigaTyper ShigellaRef5 Sd9_wzx [Shigella dysenteriae] role=primary |
-| `sd9_wzy` | primary | ShigaTyper ShigellaRef5 Sd9_wzy [Shigella dysenteriae] role=primary |
 | `sdprove_wzx` | primary | ShigaTyper ShigellaRef5 SdProvE_wzx [Shigella dysenteriae] role=primary |
 | `sdprove_wzy` | primary | ShigaTyper ShigellaRef5 SdProvE_wzy [Shigella dysenteriae] role=primary |
 | `sdprov_wzx` | primary | ShigaTyper ShigellaRef5 SdProv_wzx [Shigella dysenteriae] role=primary |
 | `sdprov_wzy` | primary | ShigaTyper ShigellaRef5 SdProv_wzy [Shigella dysenteriae] role=primary |
 
-## 物种覆盖（42 条规则）
+## 物种覆盖（38 条规则）
 
 | 物种 | 规则基因 | 最少命中 | 最低一致性 |
 |---|---|---|---|
@@ -215,10 +152,6 @@
 | *Clostridium botulinum* | `bontA`, `bontB`, `bontE` | 1 | 90% |
 | *Clostridium perfringens* | `cpa` | 1 | 90% |
 | *Escherichia coli* | `uida`, `lacy` | 2 | 95% |
-| *Shigella flexneri* | `uida`, `ipah`, `rfc`, `rfbe`, `rfbi` | 3 | 95%（排除 `lacy`） |
-| *Shigella sonnei* | `uida`, `ipah`, `wbgz`, `sonnei_psuk` | 3 | 95%（排除 `lacy`） |
-| *Shigella dysenteriae* | `uida`, `ipah`, `rfpb`, `sd10_wzx`, `sd10_wzy`, `sd12_wzx`，…（另 26 个） | 3 | 85%（排除 `lacy`） |
-| *Shigella boydii* | `uida`, `ipah`, `sb11_wzx`, `sb11_wzy`, `sb12_wzx`, `sb12_wzy`，…（另 31 个） | 3 | 85%（排除 `lacy`） |
 | *Shigella* | `uida`, `ipah` | 2 | 95%（排除 `lacy`） |
 | *Campylobacter jejuni* | `mapa`, `hipo`, `cadf` | 2 | 90% |
 | *Campylobacter coli* | `ceue` | 1 | 90%（排除 `mapa`, `hipo`, `cadf`） |

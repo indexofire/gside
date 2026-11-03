@@ -84,7 +84,7 @@ applies.
 | `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
 | `--marker-db` | option | — | Custom marker DB directory (`markers.fasta` + `marker_rules.yaml`); see [Custom marker databases](custom-databases.md) |
 | `-f`, `--format` | option | `json` | `json` / `tsv` / `md` / `csv` |
-| `-o`, `--output PATH` | option | stdout | Write the report to PATH (row formats stream as samples complete; json once at the end) |
+| `-o`, `--output PATH` | option | stdout | Write the report to PATH; every format (json/tsv/csv/md) streams as samples complete |
 | `-j`, `--jobs N` | option | `1` | Concurrent samples (isolate batch, positional `--meta` batch, or `--samples`) |
 | `-t`, `--threads N` | option | `4` | Threads per tool invocation |
 | `-n`, `--no-header` | option | off | Suppress the header row (tsv/csv/md) |
@@ -140,14 +140,14 @@ bordered Rich tables; use `json`/`tsv`/`csv` for scripts.
 ```bash
 gside db status
 # ┌─────────────┬───────┬────────────┬──────────────────────────┐
-# │ COMPONENT   │ READY │ TIER       │ PATH                     │
+# │ COMPONENT   │ READY │ TIER       │ INPUTS      │ PATH                     │
 # ├─────────────┼───────┼────────────┼──────────────────────────┤
 # │ D1_marker   │ ready │ mini       │ data/db/D1_marker        │
 # │ D4_sourmash │ missing │ sourmash │ data/db/D4_sourmash      │
 # └─────────────┴───────┴────────────┴──────────────────────────┘
 
-gside db status -f json    # {component: {ready, path, tier}}
-gside db status -f csv     # COMPONENT,READY,TIER,PATH
+gside db status -f json    # {component: {ready, path, tier, inputs}}
+gside db status -f csv     # COMPONENT,READY,TIER,INPUTS,PATH
 ```
 
 ### list

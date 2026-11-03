@@ -77,7 +77,7 @@ gside scan --meta --samples samples.tsv [选项]
 | `--meta` | 开关 | 关 | 输入视为宏基因组群落 |
 | `-D`，`--db-dir` | 选项 | 自动 | 数据库根目录 |
 | `-f`，`--format` | 选项 | `json` | `json` / `tsv` / `md` / `csv` |
-| `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH（行式格式随样本完成流式写入；json 最后一次性写入） |
+| `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH；所有格式（json/tsv/csv/md）均随样本完成流式写入 |
 | `-j`，`--jobs N` | 选项 | `1` | 并发样本数（单菌株批量、位置参数 `--meta` 批量或 `--samples`） |
 | `-t`，`--threads N` | 选项 | `4` | 每次工具调用的线程数 |
 | `-n`，`--no-header` | 选项 | 关 | 隐藏表头行（tsv/csv/md） |
@@ -126,14 +126,14 @@ Rich 表格；脚本使用 `json`/`tsv`/`csv`。
 ```bash
 gside db status
 # ┌─────────────┬─────────┬────────────┬──────────────────────────┐
-# │ COMPONENT   │ READY   │ TIER       │ PATH                     │
+# │ COMPONENT   │ READY   │ TIER       │ INPUTS      │ PATH                     │
 # ├─────────────┼─────────┼────────────┼──────────────────────────┤
 # │ D1_marker   │ ready   │ mini       │ data/db/D1_marker        │
 # │ D4_sourmash │ missing │ sourmash   │ data/db/D4_sourmash      │
 # └─────────────┴─────────┴────────────┴──────────────────────────┘
 
-gside db status -f json    # {component: {ready, path, tier}}
-gside db status -f csv     # COMPONENT,READY,TIER,PATH
+gside db status -f json    # {component: {ready, path, tier, inputs}}
+gside db status -f csv     # COMPONENT,READY,TIER,INPUTS,PATH
 ```
 
 ### list
