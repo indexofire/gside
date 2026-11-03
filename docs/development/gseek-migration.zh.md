@@ -36,9 +36,9 @@ PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_pari
 ```
 
 > mash/sourmash 路径需要 gseek 0.10.0（`external_reference`）；sylph profiling
-> 路径需要 gseek 0.10.2（`sylph` 后端）。运行时依赖下限为 0.10.2，已发布 PyPI：
-> `pip install gseek==0.10.2`。开发/测试环境通过包依赖（或 pixi 环境）安装，
-> sibling checkout 仅用于修改 gseek 本身。
+> 路径需要 gseek 0.10.2（`sylph` 后端）。运行时依赖下限为 0.10.4（索引缓存
+> 安全加固），已发布 PyPI：`pip install gseek==0.10.4`。开发/测试环境通过
+> 包依赖（或 pixi 环境）安装，sibling checkout 仅用于修改 gseek 本身。
 
 ## 已迁移路径
 

@@ -43,10 +43,10 @@ PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_pari
 
 > The mash/sourmash paths require gseek 0.10.0 (`external_reference`); the
 > sylph profiling path requires gseek 0.10.2 (the `sylph` backend). The runtime
-> dependency floor is 0.10.2, published on PyPI:
-> `pip install gseek==0.10.2`. Development/test environments install it through
-> the package dependencies (or the pixi environment); the sibling checkout
-> remains useful for working on gseek itself.
+> dependency floor is 0.10.4 (index-cache security hardening), published on
+> PyPI: `pip install gseek==0.10.4`. Development/test environments install it
+> through the package dependencies (or the pixi environment); the sibling
+> checkout remains useful for working on gseek itself.
 
 ## Migrated paths
 
