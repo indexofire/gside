@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -20,10 +21,16 @@ from gside.marker_db import MarkerDatabase, resolve_marker_db
 
 _MARKERS_FASTA = SPECIES_DB_DIR / "D1_marker" / "markers.fasta"
 _MARKER_RULES = SPECIES_DB_DIR / "D1_marker" / "marker_rules.yaml"
+_MARKER_METADATA = SPECIES_DB_DIR / "D1_marker" / "metadata.yaml"
 
 _MIN_IDENTITY = 85.0
 _MIN_COVERAGE = 60.0
 _HIGH_CONF = 90.0
+_MIN_DEPTH = 5.0
+_MIN_RELATIVE_DEPTH = 0.10
+_MIN_MAPQ = 20
+_CONTROL_MIN_IDENTITY = 80.0
+_CONTROL_MIN_COVERAGE = 50.0
 
 
 @dataclass
@@ -37,6 +44,10 @@ class MultiGeneResult:
     database_version: str = "unknown"
     database_name: str = "species_markers_v2"
     notes: list[str] = field(default_factory=list)
+    control_gene: str = ""
+    control_depth: float | None = None
+    control_source: str = ""
+    depth_gate: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -46,6 +57,10 @@ class MultiGeneResult:
             "database": {"name": self.database_name, "version": self.database_version},
             "detected_markers": self.detected_markers,
             "matched_rule": self.matched_rule,
+            "control_gene": self.control_gene,
+            "control_depth": self.control_depth,
+            "control_source": self.control_source,
+            "depth_gate": self.depth_gate,
             "notes": self.notes,
             "interpretation": self._interpret(),
         }
@@ -82,6 +97,138 @@ def _load_rules(marker_db: MarkerDatabase | None = None) -> list[dict[str, Any]]
         return []
     data = yaml.safe_load(path.read_text())
     return list(data.get("rules", []))
+
+
+def _load_metadata(marker_db: MarkerDatabase | None = None) -> dict[str, Any]:
+    path = marker_db.root / "metadata.yaml" if marker_db is not None else _MARKER_METADATA
+    if not path.is_file():
+        return {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _control_config(
+    marker_db: MarkerDatabase | None = None,
+) -> tuple[dict[str, list[str]], dict[str, Any]]:
+    """(species -> control genes, reads-mode defaults) from metadata.yaml."""
+    metadata = _load_metadata(marker_db)
+    raw = metadata.get("control_genes") or {}
+    controls: dict[str, list[str]] = {}
+    if isinstance(raw, dict):
+        for species, genes in raw.items():
+            if isinstance(genes, str):
+                genes = [genes]
+            if isinstance(genes, list):
+                controls[str(species)] = [str(g).lower() for g in genes if str(g).strip()]
+    defaults = metadata.get("reads") if isinstance(metadata.get("reads"), dict) else {}
+    return controls, dict(defaults or {})
+
+
+@dataclass
+class _DepthGate:
+    hits: list[dict[str, Any]]
+    control_depth: float | None = None
+    control_gene: str = ""
+    control_source: str = ""
+    filtered: list[dict[str, Any]] = field(default_factory=list)
+
+
+def _control_depth(
+    hits: list[dict[str, Any]],
+    control_genes: list[str],
+) -> tuple[float | None, str, str]:
+    """Control mean depth, label, and source (dedicated/fallback).
+
+    A dedicated control is the median mean depth of the configured
+    single-copy control gene(s).  If none is detected, fall back to the
+    sample median of marker genes that pass the global identity/coverage
+    floor; if that is empty too, the relative gate is disabled.
+    """
+    # Control alleles can be divergent (e.g. C. jejuni lpxA vs C. coli
+    # lpxA_2).  For depth, use the deepest allele per gene; identity ranking
+    # would pick a few exact reads from a minor contaminant instead of the
+    # sample's real single-copy control.
+    best_depth: dict[str, dict[str, Any]] = {}
+    for hit in hits:
+        depth = float(hit.get("mean_depth") or 0.0)
+        if depth <= 0:
+            continue
+        gene = str(hit["gene"])
+        current = best_depth.get(gene)
+        if current is None or depth > float(current.get("mean_depth") or 0.0):
+            best_depth[gene] = hit
+
+    dedicated: list[tuple[str, float]] = []
+    for gene in control_genes:
+        hit = best_depth.get(gene)
+        if hit is None:
+            continue
+        if hit["identity"] < _CONTROL_MIN_IDENTITY or hit["coverage"] < _CONTROL_MIN_COVERAGE:
+            continue
+        depth = float(hit.get("mean_depth") or 0.0)
+        if depth > 0:
+            dedicated.append((gene, depth))
+    if dedicated:
+        depths = [depth for _, depth in dedicated]
+        label = "+".join(gene for gene, _ in dedicated)
+        return statistics.median(depths), label, "dedicated"
+
+    fallback = [
+        float(hit["mean_depth"])
+        for hit in best_depth.values()
+        if float(hit.get("mean_depth") or 0.0) > 0
+        and hit["identity"] >= _MIN_IDENTITY
+        and hit["coverage"] >= _MIN_COVERAGE
+    ]
+    if fallback:
+        return statistics.median(fallback), "sample_median", "fallback"
+    return None, "", ""
+
+
+def _apply_depth_gate(
+    hits: list[dict[str, Any]],
+    control_genes: list[str],
+    min_depth: float,
+    min_relative_depth: float,
+) -> _DepthGate:
+    """Gate reads-mode hits on absolute and control-relative mean depth."""
+    gate = _DepthGate(hits=[])
+    if not any("mean_depth" in hit for hit in hits):
+        # Assembly (BLAST) hits have no depth; preserve legacy behaviour.
+        gate.hits = list(hits)
+        return gate
+
+    control_depth, label, source = _control_depth(hits, control_genes)
+    gate.control_depth = control_depth
+    gate.control_gene = label
+    gate.control_source = source
+    if control_depth is None or control_depth <= 0:
+        # No relative control: still enforce the absolute depth floor.
+        for raw_hit in hits:
+            hit = dict(raw_hit)
+            depth = hit.get("mean_depth")
+            if depth is None or float(depth) >= min_depth:
+                gate.hits.append(hit)
+            else:
+                gate.filtered.append(hit)
+        return gate
+
+    for raw_hit in hits:
+        hit = dict(raw_hit)
+        depth = hit.get("mean_depth")
+        if depth is None:
+            gate.hits.append(hit)
+            continue
+        relative = float(depth) / control_depth
+        hit["relative_depth_pct"] = round(100.0 * relative, 1)
+        if float(depth) >= min_depth and relative >= min_relative_depth:
+            gate.hits.append(hit)
+        else:
+            gate.filtered.append(hit)
+    return gate
 
 
 def _legacy_blast_hits(
@@ -266,33 +413,78 @@ def identify_multigene(
     contigs_fasta: str | list[str],
     threads: int = 4,
     marker_db: str | Path | MarkerDatabase | None = None,
+    min_depth: float | None = None,
+    min_relative_depth: float | None = None,
+    min_mapq: int | None = None,
 ) -> MultiGeneResult:
     """Identify from an assembly or one/more FASTQ files (mates combined).
 
     Pass ``marker_db`` to use a custom marker database directory, or set
     ``GSIDE_MARKER_DB``. Without either, the bundled ``D1_marker`` database is
     used.
+
+    Reads mode applies a gapit-style abundance gate: a marker must have
+    ``mean_depth >= min_depth`` and be at least ``min_relative_depth`` of a
+    conserved single-copy control gene.  Assembly mode keeps the legacy
+    BLAST identity/coverage rules (depth is not available from BLAST hits).
     """
     db = _coerce_marker_db(marker_db)
     markers_fasta = db.fasta if db is not None else _MARKERS_FASTA
     files = [contigs_fasta] if isinstance(contigs_fasta, str) else list(contigs_fasta)
-    if is_fastq(files[0]):
+    controls, read_defaults = _control_config(db)
+    if min_depth is None:
+        min_depth = float(read_defaults.get("min_depth", _MIN_DEPTH))
+    if min_relative_depth is None:
+        min_relative_depth = float(read_defaults.get("min_relative_depth", _MIN_RELATIVE_DEPTH))
+    if min_mapq is None:
+        min_mapq = int(read_defaults.get("min_mapq", _MIN_MAPQ))
+
+    reads_mode = is_fastq(files[0])
+    if reads_mode:
         reads: str | list[str] = files[0] if len(files) == 1 else files
-        raw_hits = screen_reads(reads, markers_fasta, threads)
+        raw_hits = screen_reads(reads, markers_fasta, threads, min_mapq=min_mapq)
     elif db is not None:
         raw_hits = _blast_contigs(files[0], threads, db)
     else:
         raw_hits = _blast_contigs(files[0], threads)
+
     rules = _load_rules(db) if db is not None else _load_rules()
-    significant = _best_per_gene(raw_hits, _MIN_IDENTITY, _MIN_COVERAGE)
+
+    # Pick the control gene set from the preliminary (ungated) call, then gate.
+    prelim_significant = _best_per_gene(raw_hits, _MIN_IDENTITY, _MIN_COVERAGE)
+    prelim_species, _, _ = _pick_rule(
+        rules,
+        _hits_by_gene(raw_hits),
+        prelim_significant,
+        _priority_species(rules),
+    )
+    control_genes = controls.get(prelim_species, [])
+    if reads_mode:
+        gate = _apply_depth_gate(raw_hits, control_genes, min_depth, min_relative_depth)
+    else:
+        gate = _DepthGate(hits=list(raw_hits))
+    hits = gate.hits
+    significant = _best_per_gene(hits, _MIN_IDENTITY, _MIN_COVERAGE)
 
     result = MultiGeneResult(
         database_version=_db_version(db) if db is not None else _db_version(),
         database_name=db.name if db is not None else "species_markers_v2",
+        control_gene=gate.control_gene,
+        control_depth=round(gate.control_depth, 2) if gate.control_depth is not None else None,
+        control_source=gate.control_source,
+        depth_gate=(
+            (
+                f"min_depth={min_depth:g}x; "
+                f"min_relative_depth={min_relative_depth:.0%}; "
+                f"min_mapq={min_mapq}; control={gate.control_gene or 'none'}"
+            )
+            if reads_mode
+            else ""
+        ),
     )
-    result.all_hits = list(_best_per_gene(raw_hits).values())
+    result.all_hits = list(_best_per_gene(hits).values())
     result.species, result.confidence, result.matched_rule = _pick_rule(
-        rules, _hits_by_gene(raw_hits), significant, _priority_species(rules)
+        rules, _hits_by_gene(hits), significant, _priority_species(rules)
     )
     if result.species == "Shigella":
         result.notes.append(
@@ -301,15 +493,57 @@ def identify_multigene(
             "serotyping/typing."
         )
 
+    all_control_genes = {gene for genes in controls.values() for gene in genes}
+    rule_genes = {str(gene).lower() for rule in rules for gene in rule.get("genes", [])}
+    # A control that is also a rule gene (e.g. gdh for S. suis) must stay
+    # visible: it is the species marker itself, not a pure depth control.
+    display_control_genes = all_control_genes - rule_genes
     if significant:
-        result.detected_markers = [
-            {"gene": g, "identity": h["identity"], "coverage": h["coverage"]}
-            for g, h in sorted(significant.items(), key=lambda x: (-x[1]["identity"], x[0]))
-        ]
+        for gene, hit in sorted(
+            significant.items(), key=lambda item: (-item[1]["identity"], item[0])
+        ):
+            if gene in display_control_genes:
+                continue
+            marker = {
+                "gene": gene,
+                "identity": hit["identity"],
+                "coverage": hit["coverage"],
+            }
+            for key in ("mean_depth", "reads", "relative_depth_pct"):
+                if key in hit:
+                    marker[key] = hit[key]
+            result.detected_markers.append(marker)
 
-    if not significant and raw_hits:
+    if reads_mode:
+        if gate.control_depth is None:
+            result.notes.append(
+                "No control gene detected; relative-depth gate disabled "
+                f"(absolute min_depth={min_depth:g}x still applied)."
+            )
+        elif gate.control_source == "fallback":
+            result.notes.append(
+                f"No dedicated control for {prelim_species}; used sample median "
+                f"depth ({gate.control_depth:.1f}x) as the relative-depth control."
+            )
+        if gate.filtered:
+            shown = sorted(
+                (h for h in gate.filtered if h["gene"] not in all_control_genes),
+                key=lambda h: -(h.get("mean_depth") or 0),
+            )[:8]
+            if shown:
+                result.notes.append(
+                    "Depth-gated out: "
+                    + ", ".join(
+                        f"{h['gene']}({h.get('mean_depth', 0):.1f}x/"
+                        f"{h.get('relative_depth_pct', 0):.1f}%)"
+                        for h in shown
+                    )
+                    + (" ..." if len(gate.filtered) > len(shown) else "")
+                )
+
+    if not significant and hits:
         near = sorted(
-            (h for h in raw_hits if h["identity"] >= 75 and h["coverage"] >= 20),
+            (h for h in hits if h["identity"] >= 75 and h["coverage"] >= 20),
             key=lambda h: h["gene"],
         )
         if near:

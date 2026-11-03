@@ -48,6 +48,13 @@ Example with `-m marker` (marker results are flat; no `result` wrapper):
 The ANI modes (`panel`, `mash_refseq`) and `sourmash` instead nest their
 findings under a `result` object, as the `all` example below shows.
 
+Marker results additionally carry the reads-mode depth gate fields
+(`control_gene`, `control_depth`, `control_source`, `depth_gate`); on FASTQ
+input each `detected_markers` row also reports `mean_depth`, `reads` and
+`relative_depth_pct`, and genes removed by the depth gate are summarized in
+`notes` (see [Marker Rules Format](marker-rules.md#reads-mode-depth-gate-fastq-input)).
+Assembly input leaves the gate fields empty.
+
 ## Multi-Method Arbitration Output (-m all)
 
 ```json

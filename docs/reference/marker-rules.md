@@ -105,7 +105,47 @@ rules that omit them use 90 / 60. The global `_MIN_IDENTITY` (85) and
 `exclude_genes` guard.
 
 `priority_over` is supported by the engine (a matching priority species
-suppresses non-priority ones) but no shipped rule uses it.
+suppresses non-priority ones). The four Shigella species rules
+(`Shigella_flexneri`, `Shigella_sonnei`, `Shigella_dysenteriae`,
+`Shigella_boydii`) use it with `priority_over: [Shigella, Escherichia_coli]`:
+a species determinant (e.g. `rfc`, `wbgZ`, `sb1_wzx`) upgrades the genus
+signature, while the plain `uidA+ipaH` signature stays at the `Shigella` genus
+and every Shigella rule is lacY-negative (`exclude_genes: [lacy]`) so EIEC
+never fires a Shigella call.
+
+## Reads-Mode Depth Gate (FASTQ input)
+
+On FASTQ input the marker engine applies a gapit-style abundance gate on top
+of the identity/coverage rules. Per gene the screening reports `mean_depth`
+(summed aligned target-interval length over gene length — not a read count),
+`reads`, and `mapq_mean`; alignments below `min_mapq` (default 20) are
+dropped before aggregation.
+
+A marker passes when:
+
+```
+mean_depth >= min_depth  and  mean_depth / control_depth >= min_relative_depth
+```
+
+Defaults (in `metadata.yaml`, overridable per call via `min_depth` /
+`min_relative_depth` / `min_mapq`):
+
+| Parameter | Default | Description |
+|---|---|---|
+| `min_depth` | 5.0 | absolute mean-depth floor |
+| `min_relative_depth` | 0.10 | fraction of the control depth |
+| `min_mapq` | 20 | minimap2 MAPQ floor applied before aggregation |
+
+`control_depth` is the median mean depth of the species' configured
+single-copy control genes (`metadata.yaml: control_genes`, e.g. `rpoD` for
+*Salmonella*, two `lpxA` alleles for *Campylobacter*). The deepest allele per
+gene is used so a few contaminant reads cannot cap the control. Control genes
+carry `role=control` in `markers.fasta` and are never shown in
+`detected_markers`. Species without a dedicated control fall back to the
+sample median depth of detected markers (`control_source: "fallback"`);
+if no control is available at all, the relative gate is disabled and only the
+absolute floor applies. Assembly (BLAST) input has no depth and keeps the
+legacy behaviour.
 
 ## Adding a New Species
 

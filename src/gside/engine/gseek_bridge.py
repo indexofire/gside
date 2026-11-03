@@ -241,26 +241,33 @@ def _union_length(spans: Iterable[tuple[int, int]]) -> int:
     return covered
 
 
-def aggregate_screen(records: Iterable[Any]) -> list[dict[str, Any]]:
+def aggregate_screen(records: Iterable[Any], min_mapq: int = 0) -> list[dict[str, Any]]:
     """Aggregate gseek minimap2 records exactly like gside's PAF reducer.
 
     Breadth is the union of target intervals over gene length; identity is the
     alignment-length-weighted mean of ``nmatch / alen`` (gside PAF semantics),
-    not gseek's NM-first identity.
+    not gseek's NM-first identity.  ``mean_depth`` is the summed target
+    interval length over gene length (gapit's reads-mode depth).
     """
     spans: dict[str, list[tuple[int, int]]] = {}
     lengths: dict[str, int] = {}
     weights: dict[str, list[tuple[float, int]]] = {}
+    qnames: dict[str, set[str]] = {}
+    mapqs: dict[str, list[int]] = {}
 
     for record in records:
         aligned = int(record.aligned_length or 0)
         if aligned <= 0:
+            continue
+        if getattr(record, "mapq", 0) < min_mapq:
             continue
         if record.target_start is None or record.target_end is None:
             continue
         target = str(record.target_id)
         spans.setdefault(target, []).append((int(record.target_start), int(record.target_end)))
         lengths[target] = int(record.target_length or 0)
+        qnames.setdefault(target, set()).add(str(record.query_id))
+        mapqs.setdefault(target, []).append(int(getattr(record, "mapq", 0) or 0))
         if record.matches is None:
             continue
         identity = 100.0 * int(record.matches) / aligned
@@ -270,17 +277,24 @@ def aggregate_screen(records: Iterable[Any]) -> list[dict[str, Any]]:
     for target, target_spans in spans.items():
         target_length = lengths[target]
         coverage = 100.0 * _union_length(target_spans) / target_length if target_length > 0 else 0.0
+        aligned_bases = sum(end - start for start, end in target_spans)
+        mean_depth = aligned_bases / target_length if target_length > 0 else 0.0
         pairs = weights.get(target, [])
         weight_sum = sum(weight for _, weight in pairs)
         identity = (
             sum(value * weight for value, weight in pairs) / weight_sum if weight_sum else 0.0
         )
+        target_mapqs = mapqs[target]
         parts = target.split("~~~")
         hits.append(
             {
                 "gene": parts[1].lower() if len(parts) >= 2 else target.lower(),
                 "identity": round(identity, 2),
                 "coverage": round(coverage, 1),
+                "mean_depth": round(mean_depth, 2),
+                "reads": len(qnames[target]),
+                "aligned_bases": aligned_bases,
+                "mapq_mean": round(sum(target_mapqs) / len(target_mapqs), 1),
                 "ref_len": target_length,
                 "seqid": target,
             }
@@ -294,6 +308,7 @@ def screen_reads_gseek(
     *,
     threads: int = 4,
     preset: str = "sr",
+    min_mapq: int = 20,
 ) -> list[dict[str, Any]]:
     """Map FASTQ reads with gseek's minimap2 adapter and aggregate."""
     gseek = _require_gseek()
@@ -304,13 +319,13 @@ def screen_reads_gseek(
         target=Path(markers_fasta),
         query_kind="fastq",
         paired=len(files) > 1,
-        params={"preset": preset, "secondary": "no"},
+        params={"preset": preset, "secondary": "no", "cigar": True},
         threads=threads,
         resolver=_resolver(),
         index="auto",
         record_manifest=False,
     )
-    return aggregate_screen(result.records)
+    return aggregate_screen(result.records, min_mapq=min_mapq)
 
 
 def _mash_records(gseek: Any, **kwargs: Any) -> list[Any]:

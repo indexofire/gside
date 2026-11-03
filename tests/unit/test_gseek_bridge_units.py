@@ -126,6 +126,12 @@ class _FakeGseek:
         self.calls.append(kwargs)
         return SimpleNamespace(records=self.records)
 
+    def distance(self, **kwargs):
+        self.calls.append(kwargs)
+        if isinstance(self.records, Exception):
+            raise self.records
+        return SimpleNamespace(records=self.records)
+
 
 def test_blast_hits_maps_gside_defaults_and_filters(monkeypatch):
     fake = _FakeGseek([_record(identity=99.5, aligned_length=90, query_length=100)])
@@ -158,7 +164,7 @@ def test_blast_hits_filters_low_coverage(monkeypatch):
 
 
 def test_screen_reads_gseek_passes_paired_fastq(monkeypatch):
-    records = [_record(target_start=0, target_end=150, aligned_length=150, matches=145)]
+    records = [_record(target_start=0, target_end=150, aligned_length=150, matches=145, mapq=60)]
     fake = _FakeGseek(records)
     monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
     monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
@@ -171,9 +177,80 @@ def test_screen_reads_gseek_passes_paired_fastq(monkeypatch):
     assert call["query"] == (Path("r1.fq"), Path("r2.fq"))
     assert call["paired"] is True
     assert call["query_kind"] == "fastq"
-    assert call["params"] == {"preset": "map-ont", "secondary": "no"}
+    assert call["params"] == {"preset": "map-ont", "secondary": "no", "cigar": True}
     assert call["threads"] == 8
     assert hits[0]["gene"] == "inva"
+
+
+def test_screen_reads_gseek_filters_low_mapq(monkeypatch):
+    records = [
+        _record(
+            query_id="low", target_start=0, target_end=150, aligned_length=150, matches=145, mapq=5
+        ),
+        _record(
+            query_id="high",
+            target_start=0,
+            target_end=150,
+            aligned_length=150,
+            matches=145,
+            mapq=60,
+        ),
+    ]
+    fake = _FakeGseek(records)
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
+    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
+
+    hits = bridge.screen_reads_gseek("r.fq", "markers.fasta")
+    assert len(hits) == 1
+    assert hits[0]["reads"] == 1
+
+
+def test_aggregate_screen_reports_depth_fields():
+    records = [
+        _record(
+            query_id="r1", target_start=0, target_end=150, aligned_length=150, matches=145, mapq=60
+        ),
+        _record(
+            query_id="r2",
+            target_start=150,
+            target_end=300,
+            aligned_length=150,
+            matches=145,
+            mapq=40,
+        ),
+    ]
+    hits = bridge.aggregate_screen(records)
+    assert hits[0]["mean_depth"] == pytest.approx(1.0)
+    assert hits[0]["reads"] == 2
+    assert hits[0]["aligned_bases"] == 300
+    assert hits[0]["mapq_mean"] == 50.0
+
+
+def test_aggregate_screen_skips_unaligned_records_and_contained_spans():
+    records = [
+        _record(query_id="r0", aligned_length=0, mapq=60),
+        _record(
+            query_id="r1",
+            target_start=0,
+            target_end=150,
+            aligned_length=150,
+            matches=None,
+            mapq=60,
+        ),
+        _record(
+            query_id="r2",
+            target_start=50,
+            target_end=100,
+            aligned_length=50,
+            matches=50,
+            mapq=60,
+        ),
+    ]
+    hits = bridge.aggregate_screen(records)
+    assert len(hits) == 1
+    assert hits[0]["identity"] == 100.0  # weighted over r2 only (r1 has no matches)
+    assert hits[0]["reads"] == 2  # r0 dropped (unaligned)
+    assert hits[0]["coverage"] == pytest.approx(50.0)  # r2 span contained in r1
 
 
 def test_require_gseek_without_package_gives_actionable_error(monkeypatch):
@@ -430,3 +507,59 @@ def test_log_sylph_shadow_ignores_order_and_warns_on_diff(caplog):
     with caplog.at_level("WARNING"):
         bridge.log_sylph_shadow([base, other], [base, drifted])
     assert "sylph differs" in caplog.text
+
+
+def test_sourmash_gather_wraps_gseek_errors(monkeypatch):
+    fake = _FakeGseek(ValueError("sketch corrupt"))
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
+    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
+    with pytest.raises(RuntimeError, match="gseek sourmash gather failed"):
+        bridge.sourmash_gather("q.fna", "ref.zip")
+
+
+def test_sylph_profile_non_numeric_abundance_is_zero(monkeypatch):
+    records = [
+        SimpleNamespace(
+            ani=99.0,
+            aligned_fraction=0.5,
+            tags={"taxonomic_abundance": "n/a", "genome_file": "g.fna"},
+        )
+    ]
+    fake = _FakeGseek(records)
+    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
+    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
+
+    rows = bridge.sylph_profile("r.fq", "db.syl2db")
+    assert rows == [{"genome_file": "g.fna", "ani": 99.0, "abundance": 0.0, "coverage": 50.0}]
+
+
+def _ani_hit(ref, ani, fraction):
+    return SimpleNamespace(ref=ref, ani=ani, aligned_fraction=fraction)
+
+
+def test_log_skani_shadow_warns_on_diff(caplog):
+    with caplog.at_level("WARNING"):
+        bridge.log_skani_shadow([_ani_hit("a.fna", 99.0, 0.9)], [_ani_hit("b.fna", 98.0, 0.8)])
+    assert "skani differs" in caplog.text
+
+
+def test_log_sourmash_shadow_warns_on_diff(caplog):
+    with caplog.at_level("WARNING"):
+        bridge.log_sourmash_shadow(
+            [{"name": "Escherichia coli"}], [{"name": "Salmonella enterica"}]
+        )
+    assert "sourmash differs" in caplog.text
+
+
+def test_log_blast_shadow_warns_on_diff(caplog):
+    legacy = [SimpleNamespace(subject_id="mk~~~g1~~~x", identity=99.0)]
+    new = [SimpleNamespace(subject_id="mk~~~g2~~~y", identity=98.0)]
+    with caplog.at_level("WARNING"):
+        bridge.log_blast_shadow(legacy, new)
+    assert "BLAST differs" in caplog.text
+
+
+def test_log_screen_shadow_warns_on_diff(caplog):
+    with caplog.at_level("WARNING"):
+        bridge.log_screen_shadow([{"gene": "inva"}], [{"gene": "hilA"}])
+    assert "read screening differs" in caplog.text

@@ -100,6 +100,7 @@ nav:
 
 markdown_extensions:
   - md_in_html
+  - attr_list
 
 extra_css:
   - stylesheets/extra.css

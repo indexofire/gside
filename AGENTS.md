@@ -96,13 +96,14 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-11-03): **812 tests**, total coverage **97.1%**
-— all modules 100% except: marker_db 77%, ani 92%, gseek_bridge 93%,
-sylph 95%, sourmash 96%, multigene 97%, kraken2/db/cli 99%.
-(marker_db + gseek_bridge landed with the gseek migration and are still
-catching up on tests; do not let the total drop below 97.1%.)
-Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml`;
-raise it every time coverage climbs.
+Baseline (2026-11-03): **864 tests** (unit + integration, DBs provisioned),
+total coverage **99.0%** — all modules 100% except: ani 92%, sylph 95%,
+sourmash 96%, kraken2/db/cli 99%. Local coverage must never drop below its
+last high-water mark (99.0 with `D2_ani`/`D3_mash` provisioned; ~97 without).
+Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml` —
+the 95 floor exists because CI checkouts lack the gitignored databases and
+sit ~2pts below a provisioned local run; raise it every time the CI floor
+climbs.
 
 ---
 
@@ -227,6 +228,7 @@ tests/
 data/
 ├── db/
 │   ├── D1_marker/            # mini tier, TRACKED in git: rules + fasta + blastdb
+│   │                         # + metadata.yaml (control genes, reads defaults) + CONTROL_GENES.md
 │   ├── D2_ani/               # panel tier (skani sketch + genomes), gitignored
 │   │                         # except manifests/ (tracked build recipe)
 │   ├── D3_mash/              # mash tier (mash.msh), gitignored
@@ -275,9 +277,9 @@ testpaths = ["tests"]
 ## Known Gotchas (read before touching these areas)
 
 - **Binary discovery**: `GSIDE_PIXI_BIN` env → repo `.pixi/envs/default/bin` → `~/.pixi/envs/default/bin` → `PATH` (`config.py`). There is no machine-specific path in the package; point `GSIDE_PIXI_BIN` at a conda env when the tools live elsewhere.
-- **gseek is the default engine**: `GSIDE_ENGINE=gseek` uses `gseek.align` for marker BLAST + FASTQ screening and `gseek.distance(external_reference=True)` for mash/sourmash/skani/sylph; `legacy` keeps the subprocess backends and `shadow` runs both, logs differences, and returns legacy — both are debug-only. All gseek-backed modes (marker, mash, sourmash, panel, sylph) use gseek; gtdbtk/kraken2 have no gseek adapter. gseek>=0.10.2 is a runtime dependency (0.10.2 adds the sylph backend). See `docs/development/gseek-migration.md`.
+- **gseek is the default engine**: `GSIDE_ENGINE=gseek` uses `gseek.align` for marker BLAST + FASTQ screening and `gseek.distance(external_reference=True)` for mash/sourmash/skani/sylph; `legacy` keeps the subprocess backends and `shadow` runs both, logs differences, and returns legacy — both are debug-only. All gseek-backed modes (marker, mash, sourmash, panel, sylph) use gseek; gtdbtk/kraken2 have no gseek adapter. gseek>=0.10.4 is a runtime dependency (0.10.2 added the sylph backend; 0.10.4 pins the index-cache security hardening). See `docs/development/gseek-migration.md`.
 - **`gside species` never fails loud**: check `methods.<mode>.error` in JSON, not the exit code.
-- **Marker on FASTQ**: `analysis/read_screening.py` maps reads to the marker FASTA with minimap2 (`-x sr` short / `-x map-ont` long, `--secondary=no`); per-gene breadth is the union of reference intervals across primary alignments, identity is the alignment-weighted `nmatch/alen`. The rule engine is unchanged. Measured on a 1.65Mb genome: 10x -> 98-99% breadth, 1x -> 60-79% (still high), 0.3x -> Unknown. No assembly step, no read->FASTA conversion. Minimap2 is a declared pixi dependency.
+- **Marker on FASTQ**: `analysis/read_screening.py` maps reads to the marker FASTA with minimap2 (`-x sr` short / `-x map-ont` long, `--secondary=no -c`; `-c` is required — without base-level alignment PAF columns 10/11 are approximate). Per-gene breadth is the union of reference intervals across primary alignments, identity is the alignment-weighted `nmatch/alen`; alignments with MAPQ < `min_mapq` (default 20, from `metadata.yaml`) are dropped before aggregation. Reads mode then applies a depth gate (`min_depth=5x`, `min_relative_depth=10%` of a single-copy control gene, `sample_median` fallback) before the rule engine — assembly mode is unchanged. Measured on a 1.65Mb genome: 10x -> 98-99% breadth, 1x -> 60-79% (still high), 0.3x -> Unknown. No assembly step, no read->FASTA conversion. Minimap2 is a declared pixi dependency.
 - **Marker thresholds**: global `_MIN_IDENTITY=85.0` / `_MIN_COVERAGE=60.0` / `_HIGH_CONF=90.0` gate `detected_markers` and `exclude_genes`. Rule matching uses each rule's own `min_identity`/`min_coverage` (defaults 90/60) against every raw hit of the gene, so the two *Campylobacter* rules with `min_coverage: 50` really do accept 50-60% coverage. `priority_over` is used by the Shigella species rules (they suppress the genus/E. coli fallback).
 - **Panel thresholds**: ANI ≥ 95 + AF ≥ 0.65 → high; 93–95 → medium. Mash identity ≥ 0.97 → high, 0.90–0.97 → medium.
 - **Mash/sourmash on reads are species-level, not assembly-grade ANI**: mash sketches reads with `-m 2 -r` (Mash paper: species correct, best strain often wrong; distance inflates with coverage/error; 10x-100x recommended). sourmash `sketch` accepts FASTQ and `gather` is built for unassembled reads, but the result is a containment profile, not an assembly-vs-assembly ANI, and short reads are not individually classified.
@@ -288,4 +290,4 @@ testpaths = ["tests"]
 - **DB download verification**: panel pins SHA256, mash MD5 (Zenodo only publishes MD5), sourmash lineages + signature SHA256, sylph DB MD5 (GCS `x-goog-hash`). Kraken2 is verified per extracted file against the published `.md5` manifest. The sourmash signature zip has no upstream digest; `SOURMASH_SIG_SHA256` was pinned after a locally verified download (complete size, zip integrity, 143,385 k=31 DNA signatures, CC0) and `GSIDE_SOURMASH_SIG_SHA256` overrides it at setup time. Tar extraction uses `filter="data"`. All pinned artifacts live in the GitHub release tag `db-v0.1` (panel) — re-pin `PANEL_SHA256` whenever the release asset is replaced.
 - **`engine/` holds only live backends**: marker → `BlastBackend`, panel → `SkaniBackend`, mash_refseq/sourmash → `MashBackend`/`SourmashBackend` (analysis resolves binaries via `require_bin` and injects them with `binary=`; backends pass their module-level `which` as `resolver=` so tests can monkeypatch discovery). Shared scaffolding is `engine/_env.py` (`require_bin`/`run_checked`).
 - **Species name contract is `Genus_species`**: every tier emits the underscored label via `analysis/species_name.py` (`apply_species_name`) and keeps the tool string in `species_raw`, the strain in `strain`. The normalizer strips GTDB `s__` ranks, a leading `GCF_/GCA_` accession (sourmash names look like `GCF_... Campylobacter jejuni`), and GTDB disambiguation suffixes (`Campylobacter_D jejuni` → `Campylobacter_jejuni`, `Vibrio_A cholerae` → `Vibrio_cholerae`); `sp.`/`sp036004205`/`unidentified`/`Unknown` collapse to `Unknown`. marker labels are already contract form (`Salmonella_enterica`, `Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`) and pass through untouched — never "reduce" them to two tokens. bacmap's `canonical_from_verdict` only accepts `[A-Za-z]+(?:_[A-Za-z0-9]+)+`, so a spaced or dotted label breaks it.
-- **FASTA header contract**: `>markers~~~<gene>~~~<desc> role=<primary|confirm|typing|virulence>`; parser takes `split("~~~")[1]` — the `markers` prefix itself is never validated.
+- **FASTA header contract**: `>markers~~~<gene>~~~<desc> role=<primary|confirm|typing|virulence|control>`; parser takes `split("~~~")[1]` — the `markers` prefix itself is never validated. `role=control` entries are single-copy depth controls mapped in `metadata.yaml: control_genes`; they never appear in `detected_markers` and are not rule genes.

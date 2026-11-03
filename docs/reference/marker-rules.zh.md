@@ -93,8 +93,41 @@ rules:
 未填写的规则使用 90 / 60。全局 `_MIN_IDENTITY`（85）与 `_MIN_COVERAGE`（60）
 仍用于 `detected_markers` 上报与 `exclude_genes` 排除守卫。
 
-`priority_over` 引擎支持（命中的 priority 物种会压制非 priority 物种），
-但当前没有规则使用它。
+`priority_over` 引擎支持（命中的 priority 物种会压制非 priority 物种）。四条志贺菌
+种级规则（`Shigella_flexneri`、`Shigella_sonnei`、`Shigella_dysenteriae`、
+`Shigella_boydii`）使用 `priority_over: [Shigella, Escherichia_coli]`：
+种级决定因子（如 `rfc`、`wbgZ`、`sb1_wzx`）会升级属级判定，而单纯的
+`uidA+ipaH` 仍停留在 `Shigella` 属级；所有志贺菌规则均为 lacY 阴性
+（`exclude_genes: [lacy]`），EIEC 不会触发志贺菌判定。
+
+## Reads 模式深度门控（FASTQ 输入） {: #reads-mode-depth-gate }
+
+FASTQ 输入时，标记引擎在一致性/覆盖规则之上叠加 gapit 风格的丰度门控。
+每个基因上报 `mean_depth`（比对目标区间长度之和 / 基因长度 —— 不是读段数）、
+`reads` 和 `mapq_mean`；低于 `min_mapq`（默认 20）的比对在聚合前丢弃。
+
+标记基因需同时满足：
+
+```
+mean_depth >= min_depth  且  mean_depth / control_depth >= min_relative_depth
+```
+
+默认值（在 `metadata.yaml` 中，调用时可用 `min_depth` / `min_relative_depth` /
+`min_mapq` 覆盖）：
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `min_depth` | 5.0 | 绝对平均深度下限 |
+| `min_relative_depth` | 0.10 | 相对对照深度的比例 |
+| `min_mapq` | 20 | 聚合前的 minimap2 MAPQ 下限 |
+
+`control_depth` 是该物种配置的单拷贝对照基因（`metadata.yaml: control_genes`，
+如 *Salmonella* 的 `rpoD`、*Campylobacter* 的两个 `lpxA` 等位基因）的
+mean depth 中位数。每个基因取最深的等位基因，避免少量污染读段压低对照。
+对照基因在 `markers.fasta` 中标记 `role=control`，绝不会出现在
+`detected_markers` 中。没有专用对照的物种回退到已检出标记的样本中位深度
+（`control_source: "fallback"`）；完全无对照时关闭相对门控，仅保留绝对下限。
+组装（BLAST）输入没有深度信息，保持旧行为。
 
 ## 新增物种示例
 

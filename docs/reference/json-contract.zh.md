@@ -5,6 +5,12 @@
 `marker` 方法的结果为扁平结构（无 `result` 包装）；`panel`、`mash_refseq`、
 `sourmash` 的结果嵌套在 `result` 字段内。
 
+marker 结果额外携带 reads 模式深度门控字段（`control_gene`、`control_depth`、
+`control_source`、`depth_gate`）；FASTQ 输入时 `detected_markers` 每行还会给出
+`mean_depth`、`reads` 与 `relative_depth_pct`，被深度门控剔除的基因汇总在
+`notes` 中（见[标记规则格式](marker-rules.md#reads-mode-depth-gate)的「Reads 模式深度门控」一节）。
+组装输入的这些门控字段为空。
+
 ## 单方法输出（-m marker）
 
 ```json

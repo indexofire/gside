@@ -57,6 +57,7 @@ class TestPafParsing:
             "tend": 160,
             "nmatch": 148,
             "alen": 150,
+            "mapq": 60,
         }
 
     def test_secondary_row_skipped(self):
@@ -75,16 +76,42 @@ class TestPafParsing:
 
 
 class TestAggregate:
-    def _row(self, tstart, tend, nmatch=145, alen=150, tlen=300, tname="markers~~~inva~~~x"):
+    def _row(
+        self,
+        tstart,
+        tend,
+        nmatch=145,
+        alen=150,
+        tlen=300,
+        tname="markers~~~inva~~~x",
+        mapq=60,
+        qname="r",
+    ):
         return {
-            "qname": "r",
+            "qname": qname,
             "tname": tname,
             "tlen": tlen,
             "tstart": tstart,
             "tend": tend,
             "nmatch": nmatch,
             "alen": alen,
+            "mapq": mapq,
         }
+
+    def test_depth_fields_are_reported(self):
+        hits = rs._aggregate([self._row(0, 150, qname="r1"), self._row(150, 300, qname="r2")])
+        assert hits[0]["mean_depth"] == pytest.approx(1.0)
+        assert hits[0]["reads"] == 2
+        assert hits[0]["aligned_bases"] == 300
+        assert hits[0]["mapq_mean"] == 60.0
+
+    def test_min_mapq_drops_low_quality_rows(self):
+        hits = rs._aggregate(
+            [self._row(0, 150, mapq=5), self._row(0, 150, qname="r2", mapq=60)],
+            min_mapq=20,
+        )
+        assert len(hits) == 1
+        assert hits[0]["reads"] == 1
 
     def test_breadth_is_union_of_intervals(self):
         hits = rs._aggregate([self._row(0, 150), self._row(100, 250)])
@@ -164,8 +191,10 @@ class TestEngineSelection:
         monkeypatch.setattr(rs, "mean_read_length", lambda path: 150.0)
         seen = {}
 
-        def fake_screen(files, markers, *, threads, preset):
-            seen.update(files=files, markers=markers, threads=threads, preset=preset)
+        def fake_screen(files, markers, *, threads, preset, min_mapq):
+            seen.update(
+                files=files, markers=markers, threads=threads, preset=preset, min_mapq=min_mapq
+            )
             return [{"gene": "inva"}]
 
         monkeypatch.setattr(rs, "screen_reads_gseek", fake_screen)
@@ -175,18 +204,21 @@ class TestEngineSelection:
             "markers": "markers.fasta",
             "threads": 2,
             "preset": "sr",
+            "min_mapq": 20,
         }
 
     def test_shadow_runs_both_and_returns_legacy(self, monkeypatch):
         monkeypatch.setenv("GSIDE_ENGINE", "shadow")
         monkeypatch.setattr(rs, "mean_read_length", lambda path: 150.0)
         monkeypatch.setattr(
-            rs, "_screen_reads_legacy", lambda files, markers, threads, preset: [{"gene": "old"}]
+            rs,
+            "_screen_reads_legacy",
+            lambda files, markers, threads, preset, min_mapq=20: [{"gene": "old"}],
         )
         monkeypatch.setattr(
             rs,
             "screen_reads_gseek",
-            lambda files, markers, *, threads, preset: [{"gene": "new"}],
+            lambda files, markers, *, threads, preset, min_mapq=20: [{"gene": "new"}],
         )
         seen = {}
         monkeypatch.setattr(rs, "log_screen_shadow", lambda old, new: seen.update(old=old, new=new))

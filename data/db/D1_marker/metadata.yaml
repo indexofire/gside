@@ -1,0 +1,111 @@
+schema: gside.marker-db/1
+name: species_markers_v2
+description: Bundled species marker database. Control genes are conserved single-copy
+  genes used only for reads-mode relative-depth gating; they are not species rules.
+  Species without a dedicated control fall back to the sample median depth of detected
+  markers.
+control_genes:
+  Salmonella_enterica:
+  - rpoD
+  Listeria_monocytogenes:
+  - prs
+  Staphylococcus_aureus:
+  - fema
+  Klebsiella_pneumoniae:
+  - gyrb-kpn
+  Acinetobacter_baumannii:
+  - rpob-aba
+  Pseudomonas_aeruginosa:
+  - gyrb-pae
+  Streptococcus_pneumoniae:
+  - psaa
+  Neisseria_meningitidis:
+  - sodc
+  Campylobacter_jejuni:
+  - lpxa
+  Campylobacter_coli:
+  - lpxa
+  Bacillus_anthracis:
+  - rpob-bacillus_anthracis
+  Bordetella_pertussis:
+  - rpob-bordetella_pertussis
+  Clostridioides_difficile:
+  - rpob-clostridioides_difficile
+  Clostridium_perfringens:
+  - rpob-clostridium_perfringens
+  Corynebacterium_diphtheriae:
+  - rpob-corynebacterium_diphtheriae
+  Enterococcus_faecalis:
+  - rpob-enterococcus_faecalis
+  Escherichia_coli:
+  - rpob-escherichia_coli
+  Haemophilus_influenzae:
+  - rpob-haemophilus_influenzae
+  Legionella_pneumophila:
+  - rpob-legionella_pneumophila
+  Neisseria_gonorrhoeae:
+  - rpob-neisseria_gonorrhoeae
+  Shigella:
+  - rpob-escherichia_coli
+  Streptococcus_agalactiae:
+  - rpob-streptococcus_agalactiae
+  Streptococcus_pyogenes:
+  - rpob-streptococcus_pyogenes
+  Vibrio_parahaemolyticus:
+  - rpob-vibrio_parahaemolyticus
+  Shigella_flexneri:
+  - rpob-escherichia_coli
+  Shigella_sonnei:
+  - rpob-escherichia_coli
+  Shigella_dysenteriae:
+  - rpob-escherichia_coli
+  Shigella_boydii:
+  - rpob-escherichia_coli
+control_fallback: sample_median
+reads:
+  min_depth: 5.0
+  min_relative_depth: 0.1
+  min_mapq: 20
+control_gene_recommendations:
+  Vibrio_cholerae:
+  - rpoB
+  - gyrB
+  Vibrio_vulnificus:
+  - rpoB
+  - gyrB
+  Enterococcus_faecium:
+  - rpoB
+  - gyrB
+  Cronobacter_sakazakii:
+  - gyrB
+  Mycoplasma_pneumoniae:
+  - rpoB
+  - gyrB
+  - tufA
+  Helicobacter_pylori:
+  - rpoB
+  - gyrB
+  Streptococcus_suis:
+  - rpoB
+  - gyrB
+  Burkholderia_pseudomallei:
+  - rpoB
+  - gyrB
+  Leptospira_interrogans:
+  - rpoB
+  - gyrB
+  Treponema_pallidum:
+  - rpoB
+  - gyrB
+  Yersinia_pestis:
+  - rpoB
+  - gyrB
+  Yersinia_enterocolitica:
+  - rpoB
+  - gyrB
+  Aeromonas_hydrophila:
+  - rpoB
+  - gyrB
+  Clostridium_botulinum:
+  - rpoB
+  - gyrB

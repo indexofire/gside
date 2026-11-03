@@ -134,3 +134,111 @@ def test_identify_multigene_uses_custom_db(monkeypatch, tmp_path: Path) -> None:
     assert result.species == "Test_species"
     assert result.database_name == "custom_markers"
     assert result.to_dict()["database"] == {"name": "custom_markers", "version": "9"}
+
+
+def test_from_path_rejects_missing_directory(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="not a directory"):
+        MarkerDatabase.from_path(tmp_path / "nope")
+
+
+def test_from_path_rejects_invalid_metadata_yaml(tmp_path: Path) -> None:
+    root = _db(tmp_path / "db")
+    (root / "metadata.yaml").write_text("name: [unclosed")
+    with pytest.raises(ValueError, match="invalid metadata.yaml"):
+        MarkerDatabase.from_path(root)
+
+
+def test_from_path_rejects_non_mapping_metadata(tmp_path: Path) -> None:
+    root = _db(tmp_path / "db")
+    (root / "metadata.yaml").write_text("- a\n- b\n")
+    with pytest.raises(ValueError, match="mapping"):
+        MarkerDatabase.from_path(root)
+
+
+def test_from_path_rejects_unknown_schema(tmp_path: Path) -> None:
+    root = _db(tmp_path / "db", metadata={"schema": "gside.marker-db/2"})
+    with pytest.raises(ValueError, match="unsupported marker database schema"):
+        MarkerDatabase.from_path(root)
+
+
+def test_validate_flags_files_removed_after_load(tmp_path: Path) -> None:
+    db = MarkerDatabase(
+        root=tmp_path, fasta=tmp_path / "markers.fasta", rules=tmp_path / "marker_rules.yaml"
+    )
+    errors = db.validate()
+    assert any("missing markers.fasta" in err for err in errors)
+    assert any("missing marker_rules.yaml" in err for err in errors)
+
+
+def test_validate_rejects_empty_fasta_header(tmp_path: Path) -> None:
+    root = _db(tmp_path / "db", fasta=">\nACGT\n>markers~~~geneA~~~refA\nACGT\n")
+    errors = MarkerDatabase.from_path(root).validate()
+    assert any("empty FASTA header" in err for err in errors)
+
+
+@pytest.mark.parametrize(
+    ("rules_text", "expected"),
+    [
+        ("rules: [unclosed", "invalid marker_rules.yaml"),
+        ("- a\n- b\n", "must contain a mapping"),
+        ("rules: {a: 1}\n", "'rules' must be a list"),
+    ],
+)
+def test_validate_rejects_malformed_rules_yaml(
+    tmp_path: Path, rules_text: str, expected: str
+) -> None:
+    root = _db(tmp_path / "db")
+    (root / "marker_rules.yaml").write_text(rules_text)
+    errors = MarkerDatabase.from_path(root).validate()
+    assert any(expected in err for err in errors)
+
+
+def test_validate_rejects_malformed_rule_entries(tmp_path: Path) -> None:
+    root = _db(
+        tmp_path / "db",
+        rules=[
+            ["not", "a", "mapping"],
+            {"genes": ["geneA"]},
+            {"species": "X"},
+            {"species": "Y", "genes": [""]},
+        ],
+    )
+    errors = MarkerDatabase.from_path(root).validate()
+    assert any("must be a mapping" in err for err in errors)
+    assert any("species must be a non-empty string" in err for err in errors)
+    assert any("genes must be a non-empty list" in err for err in errors)
+    assert any("invalid name" in err for err in errors)
+
+
+def test_validate_rejects_db_without_sequences_or_rules(tmp_path: Path) -> None:
+    no_seqs = _db(tmp_path / "a", fasta="\n", rules=[])
+    assert any("no marker sequences" in err for err in MarkerDatabase.from_path(no_seqs).validate())
+    no_rules = _db(tmp_path / "b", rules=[])
+    assert any("contains no rules" in err for err in MarkerDatabase.from_path(no_rules).validate())
+
+
+def test_ensure_blast_db_reuses_existing_index(tmp_path: Path) -> None:
+    root = _db(tmp_path / "db")
+    (root / "markers_blastdb.nhr").write_bytes(b"")
+    db = MarkerDatabase.from_path(root)
+    assert db.ensure_blast_db() == root / "markers_blastdb"
+
+
+def test_ensure_blast_db_requires_writable_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = MarkerDatabase.from_path(_db(tmp_path / "db"))
+    monkeypatch.setattr(marker_db.os, "access", lambda path, mode: False)
+    with pytest.raises(RuntimeError, match="not writable"):
+        db.ensure_blast_db()
+
+
+def test_content_version_unreadable_files_is_unknown(tmp_path: Path) -> None:
+    assert marker_db._content_version(tmp_path / "x", tmp_path / "y") == "unknown"
+
+
+def test_default_marker_db_prefers_explicit_path(tmp_path: Path) -> None:
+    root = _db(tmp_path / "db", metadata={"name": "explicit_db"})
+    db = marker_db.default_marker_db(root)
+    assert db.custom is True
+    assert db.name == "explicit_db"
