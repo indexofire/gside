@@ -248,7 +248,7 @@ it still exits 0 when both tools ran. Configure the tools with `CHECKM2DB` and
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.2.1", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.2", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},
@@ -331,8 +331,8 @@ flag; `-J` adds a JSON envelope.
 
 ```bash
 gside -V
-# gside, version 0.2.1
+# gside, version 0.2.2
 
 gside --version --json     # or -V -J
-# {"tool": "gside", "version": "0.2.1"}
+# {"tool": "gside", "version": "0.2.2"}
 ```
