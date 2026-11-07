@@ -149,7 +149,7 @@ per sample instead of nested objects.
 species-level labels (genus-level `Shigella` only as the fallback when no
 species marker is detected), so marker and the ANI/sketch tiers agree on the
 same string. Pathotype/serotype typing (DEC, EIEC, Shigella serotypes) is
-gapit's job, not gside's.
+gspec's job, not gside's.
 
 ## Species name contract
 
@@ -167,7 +167,7 @@ gapit's job, not gside's.
 Marker registry labels are already in contract form: `Salmonella_enterica`,
 `Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`. Shigella is
 deliberately genus-level only — species/serotype discrimination belongs to
-gapit and is called out in `methods.marker.notes`. Strain/accession text is
+gspec and is called out in `methods.marker.notes`. Strain/accession text is
 never glued into `species` (a dot would break the downstream matcher); it goes
 to `strain`.
 Species-group placeholders (`Campylobacter sp.`) and `Unknown` are emitted as

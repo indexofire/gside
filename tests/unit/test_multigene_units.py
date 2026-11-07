@@ -616,7 +616,7 @@ class TestRuleDesign:
             assert rule["priority_over"] == ["Shigella", "Escherichia_coli"]
             assert "lacy" in [gene.lower() for gene in rule.get("exclude_genes", [])]
 
-    def test_shigella_call_notes_point_to_gapit(self, monkeypatch, tmp_path):
+    def test_shigella_call_notes_point_to_gspec(self, monkeypatch, tmp_path):
         monkeypatch.setattr(
             mg,
             "_blast_contigs",
@@ -627,7 +627,7 @@ class TestRuleDesign:
         )
         result = mg.identify_multigene(str(tmp_path / "g.fna"))
         assert result.species == "Shigella"
-        assert any("gapit" in note.lower() for note in result.notes)
+        assert any("gspec" in note.lower() for note in result.notes)
         assert any("serotyp" in note.lower() for note in result.notes)
 
     def test_bordetella_pertussis_needs_both_targets(self):

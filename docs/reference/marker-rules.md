@@ -115,7 +115,7 @@ never fires a Shigella call.
 
 ## Reads-Mode Depth Gate (FASTQ input)
 
-On FASTQ input the marker engine applies a gapit-style abundance gate on top
+On FASTQ input the marker engine applies a gspec-style abundance gate on top
 of the identity/coverage rules. Per gene the screening reports `mean_depth`
 (summed aligned target-interval length over gene length — not a read count),
 `reads`, and `mapq_mean`; alignments below `min_mapq` (default 20) are

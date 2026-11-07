@@ -423,7 +423,7 @@ def identify_multigene(
     ``GSIDE_MARKER_DB``. Without either, the bundled ``D1_marker`` database is
     used.
 
-    Reads mode applies a gapit-style abundance gate: a marker must have
+    Reads mode applies a gspec-style abundance gate: a marker must have
     ``mean_depth >= min_depth`` and be at least ``min_relative_depth`` of a
     conserved single-copy control gene.  Assembly mode keeps the legacy
     BLAST identity/coverage rules (depth is not available from BLAST hits).
@@ -489,7 +489,7 @@ def identify_multigene(
     if result.species == "Shigella":
         result.notes.append(
             "Shigella is reported at genus level only; species/serotype "
-            "discrimination is not performed here. Use gapit for Shigella "
+            "discrimination is not performed here. Use gspec for Shigella "
             "serotyping/typing."
         )
 

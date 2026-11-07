@@ -3,7 +3,7 @@
 Modeled on gmlst's ``make_progress``: spinner, description, bar, M-of-N,
 percent, elapsed time — on a console bound to stderr so bar rendering can
 never pollute stdout data streams (gside's stdout-purity law, same as
-gapit). ``redirect_stdout=False`` / ``redirect_stderr=False`` are pinned
+gspec). ``redirect_stdout=False`` / ``redirect_stderr=False`` are pinned
 so rich's Live cannot reroute streamed report bytes.
 
 The bar is ACTIVE only when ``--quiet`` is off, more than one sample

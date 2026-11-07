@@ -306,5 +306,5 @@ MIT。属于 `indexofire` 微生物基因组学工具栈：
 | --- | --- |
 | [gseek](https://github.com/indexofire/gseek) | 可复现的 DNA 比对基础设施 |
 | [gside](https://github.com/indexofire/gside) | 物种鉴定 + 宏基因组谱分析 |
-| [gapit](https://github.com/indexofire/gapit) | 基因筛查 + 表型判定 |
+| [gspec](https://github.com/indexofire/gspec) | 基因筛查 + 表型判定 |
 | [gmlst](https://github.com/indexofire/gmlst) | MLST / cgMLST 分型 |

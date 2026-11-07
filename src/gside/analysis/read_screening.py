@@ -1,8 +1,8 @@
-"""FASTQ marker screening via minimap2 (gapit reads-mode recipe).
+"""FASTQ marker screening via minimap2 (gspec reads-mode recipe).
 
 Reads are mapped against the marker FASTA and per-gene breadth is the union
 of reference intervals across all primary alignments divided by gene length
-(the same aggregate-breadth math as gapit's reads mode). Identity is the
+(the same aggregate-breadth math as gspec's reads mode). Identity is the
 alignment-length-weighted mean of ``nmatch / alen`` from the PAF rows. The
 multigene rule engine then runs unchanged, so a species needs the same
 per-gene identity/breadth as it would from an assembly.
@@ -102,7 +102,7 @@ def _union_length(spans: list[tuple[int, int]]) -> int:
 def _aggregate(rows: list[dict[str, Any]], min_mapq: int = 0) -> list[dict[str, Any]]:
     """Per-target breadth (union), alignment-weighted identity, and mean depth.
 
-    ``mean_depth`` follows gapit's reads-mode contract: the summed length of
+    ``mean_depth`` follows gspec's reads-mode contract: the summed length of
     all primary target intervals divided by the target length.  It is not a
     read count, so genes of different lengths are directly comparable.
     """

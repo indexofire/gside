@@ -331,5 +331,5 @@ MIT. Part of the `indexofire` microbial genomics stack:
 | --- | --- |
 | [gseek](https://github.com/indexofire/gseek) | Reproducible DNA alignment infrastructure |
 | [gside](https://github.com/indexofire/gside) | Species identification + metagenomic profiling |
-| [gapit](https://github.com/indexofire/gapit) | Gene screening + phenotype designation |
+| [gspec](https://github.com/indexofire/gspec) | Gene screening + phenotype designation |
 | [gmlst](https://github.com/indexofire/gmlst) | MLST / cgMLST typing |

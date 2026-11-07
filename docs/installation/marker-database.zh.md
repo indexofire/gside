@@ -4,9 +4,9 @@
 `-m marker` 鉴定：`blastn` 将查询 contigs 比对到 75 条精选参考序列，
 再由 38 条物种规则把命中转化为判定。gside 是物种鉴定引擎：每条参考均
 锚定可核查的 NCBI/RefSeq accession，并经 291 基因组面板 blast 验证。
-种下分型是 gapit 的职责——霍乱弧菌 O1/O139 血清群库已移交该处
-（`gapit screen --db vc_serogroup`）。志贺菌同样只报**属级** `Shigella`
-（uidA+ipaH、lacY 阴性），并在结果 notes 中注明种/血清型分型交给 gapit。
+种下分型是 gspec 的职责——霍乱弧菌 O1/O139 血清群库已移交该处
+（`gspec screen --db vc_serogroup`）。志贺菌同样只报**属级** `Shigella`
+（uidA+ipaH、lacY 阴性），并在结果 notes 中注明种/血清型分型交给 gspec。
 
 ## marker 鉴定流程
 

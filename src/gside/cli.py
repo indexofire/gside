@@ -785,7 +785,7 @@ register_mcp_command(main)
 
 
 class _OutputFileWriter:
-    """Chunk sink behind ``species --output`` (gapit OutputFileWriter semantics):
+    """Chunk sink behind ``species --output`` (gspec OutputFileWriter semantics):
     opens truncating on the first chunk, and every chunk is flushed, so an
     in-batch failure still persists the already-streamed prefix."""
 

@@ -2,7 +2,7 @@
 
 No binaries, no databases, no network: species calls stub cli._identify_one,
 db calls monkeypatch gside.db callables. Protocol tests feed newline-delimited
-JSON-RPC lines to serve() and parse the response lines (gapit test recipe).
+JSON-RPC lines to serve() and parse the response lines (gspec test recipe).
 """
 
 from __future__ import annotations

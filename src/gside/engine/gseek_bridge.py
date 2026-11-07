@@ -247,7 +247,7 @@ def aggregate_screen(records: Iterable[Any], min_mapq: int = 0) -> list[dict[str
     Breadth is the union of target intervals over gene length; identity is the
     alignment-length-weighted mean of ``nmatch / alen`` (gside PAF semantics),
     not gseek's NM-first identity.  ``mean_depth`` is the summed target
-    interval length over gene length (gapit's reads-mode depth).
+    interval length over gene length (gspec's reads-mode depth).
     """
     spans: dict[str, list[tuple[int, int]]] = {}
     lengths: dict[str, int] = {}

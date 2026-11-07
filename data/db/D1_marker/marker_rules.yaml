@@ -194,7 +194,7 @@ rules:
   min_hits: 2
   min_identity: 95
   note: Species-level E. coli call from uidA + lacY. DEC/EIEC pathotyping belongs
-    to gapit.
+    to gspec.
 - species: Shigella_flexneri
   genes:
   - uida
@@ -329,7 +329,7 @@ rules:
   - Escherichia_coli
   note: Shigella = uidA+ / ipaH+ / lacY-negative (Lobersli 2016). EIEC is
     lacY-positive and is called Escherichia_coli; Shigella serotyping/pathotyping
-    belongs to gapit. S. boydii/dysenteriae strains lacking ipaH fall through to
+    belongs to gspec. S. boydii/dysenteriae strains lacking ipaH fall through to
     the species-level layers.
 - species: Campylobacter_jejuni
   genes:

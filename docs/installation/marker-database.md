@@ -5,10 +5,10 @@ default `-m marker` identification: `blastn` maps query contigs against
 73 curated reference sequences, and 38 species rules turn the hits into a
 verdict. gside is a species-identification engine: every reference is anchored
 to a verifiable NCBI/RefSeq accession and was validated by blast against the
-291-genome panel. Sub-species typing is gapit's job — the V. cholerae
-O1/O139 serogroup database lives there (`gapit screen --db vc_serogroup`).
+291-genome panel. Sub-species typing is gspec's job — the V. cholerae
+O1/O139 serogroup database lives there (`gspec screen --db vc_serogroup`).
 Shigella follows the same rule: gside reports the **genus** `Shigella` only
-(uidA+ipaH, lacY-negative) and adds a note pointing at gapit for
+(uidA+ipaH, lacY-negative) and adds a note pointing at gspec for
 species/serotype discrimination.
 
 For a user-provided marker database, see

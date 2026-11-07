@@ -140,7 +140,7 @@ tsv`/`md`/`csv` 每个样本渲染一行，而非嵌套对象。
 
 `agreement` 按规范标签精确比对。marker 规则现在输出种级标签（仅在无种特异
 标记时回退到属级 `Shigella`），因此 marker 与 ANI/sketch 层使用同一字符串。
-DEC/EIEC、志贺菌血清型等致病型/血清型分型属于 gapit，不在 gside 中做。
+DEC/EIEC、志贺菌血清型等致病型/血清型分型属于 gspec，不在 gside 中做。
 
 ## 物种名契约
 
@@ -157,7 +157,7 @@ DEC/EIEC、志贺菌血清型等致病型/血清型分型属于 gapit，不在 g
 
 marker 注册标签本身即契约形式：`Salmonella_enterica`、
 `Vibrio_parahaemolyticus`、`Escherichia_coli`、`Shigella`。志贺菌有意只到
-属级——种/血清型分型属于 gapit，并在 `methods.marker.notes` 中注明。菌株/登录号
+属级——种/血清型分型属于 gspec，并在 `methods.marker.notes` 中注明。菌株/登录号
 文本绝不拼进 `species`（点号会破坏下游匹配），统一放入 `strain`。
 种组占位（`Campylobacter sp.`）与 `Unknown` 一律输出 `Unknown`。
 

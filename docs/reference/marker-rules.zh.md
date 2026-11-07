@@ -102,7 +102,7 @@ rules:
 
 ## Reads 模式深度门控（FASTQ 输入） {: #reads-mode-depth-gate }
 
-FASTQ 输入时，标记引擎在一致性/覆盖规则之上叠加 gapit 风格的丰度门控。
+FASTQ 输入时，标记引擎在一致性/覆盖规则之上叠加 gspec 风格的丰度门控。
 每个基因上报 `mean_depth`（比对目标区间长度之和 / 基因长度 —— 不是读段数）、
 `reads` 和 `mapq_mean`；低于 `min_mapq`（默认 20）的比对在聚合前丢弃。
 

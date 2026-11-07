@@ -1,6 +1,6 @@
 # Marker DB control genes (reads-mode relative-depth gate)
 
-The reads path uses a gapit-style abundance gate:
+The reads path uses a gspec-style abundance gate:
 
 ```
 mean_depth = sum(aligned target interval lengths) / target length
