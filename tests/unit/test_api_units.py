@@ -20,7 +20,5 @@ def test_api_covers_each_engine_family() -> None:
     assert "identify_by_ani" in api.__all__
     assert "identify_by_sourmash" in api.__all__
     assert "identify_by_gtdbtk" in api.__all__
-    assert "identify_by_kraken2" in api.__all__
-    assert "identify_by_sylph" in api.__all__
     assert "screen_reads" in api.__all__
     assert "validate_genome" in api.__all__

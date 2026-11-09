@@ -37,12 +37,4 @@ identification modes.
 
     [Identification modes](modes.md)
 
--   **Metagenomic Profiling**
-
-    ---
-
-    Kraken2/Bracken and sylph community profiling.
-
-    [Metagenomic profiling](meta.md)
-
 </div>

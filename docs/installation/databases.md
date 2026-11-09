@@ -10,8 +10,6 @@ gside reference databases are managed via the `gside db` subcommand with tiered 
 | **panel** | D2_ani (291 genomes, skani sketch) | ~130MB | ANI identification (L2) |
 | **mash** | D3_mash (RefSeq MinHash sketch) | ~179MB | Distance identification (L2) |
 | **sourmash** | D4_sourmash (GTDB reps k=31 + lineages) | ~3.9GB | Gather classification (sourmash) |
-| **meta** | D5_kraken2 (Kraken2 Standard-8 index) | ~5.5GB | Metagenomic profiling (`gside scan --meta`) |
-| **meta_sylph** | D6_sylph (sylph GTDB database) | ~14GB | ANI-based metagenomic profiling (`gside scan --meta`) |
 | **all** | panel + mash | ~310MB | Full capability (excludes sourmash) |
 
 ### Directory naming
@@ -60,8 +58,6 @@ gside database status
 gside db setup --tier panel          # Panel only (ANI), the default tier
 gside db setup --tier mash           # MinHash only
 gside db setup --tier sourmash       # GTDB gather db (~3.9GB)
-gside db setup --tier meta           # Kraken2 + Bracken (~5.5GB)
-gside db setup --tier meta_sylph     # sylph GTDB db (~14GB)
 gside db setup --tier all            # panel + mash (excludes sourmash)
 ```
 
@@ -75,23 +71,9 @@ if any step reports an error.
 (~3.9GB) is never included in `all`; run `gside db setup --tier sourmash`
 separately to provision it.
 
-The metagenomic tiers download automatically from upstream:
-
-```bash
-gside db setup --tier meta         # Kraken2 Standard-8 + Bracken (~5.5GB)
-gside db setup --tier meta_sylph   # sylph GTDB r226, .syl2db (~14GB)
-```
-
-- **meta** pulls Ben Langmead's Standard-8 archive, which bundles the Kraken2
-  index *and* the Bracken 50-300-mer distributions. Extracted files are
-  verified against the published `.md5` manifest; readiness requires
-  `database150mers.kmer_distrib` (Bracken's read length in gside).
-- **meta_sylph** pulls the two-stage `gtdb-r226-c200-dbv2.syl2db` from the
-  HTTPS mirror and verifies the GCS-published MD5.
-
-Both are large, one-time downloads. `gside scan --meta --auto-setup` installs the
-missing tier on first use (progress on stderr) and retries the method once.
-`--source` still copies an existing local database instead of downloading.
+Metagenomic databases are no longer gside tiers — community profiling moved
+to the [gmeta](https://github.com/indexofire/gmeta) tool. `--source` still
+copies an existing local database directory instead of downloading.
 
 ### Integrity checks
 

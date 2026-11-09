@@ -36,12 +36,4 @@
 
     [鉴定模式](modes.zh.md)
 
--   **宏基因组谱分析**
-
-    ---
-
-    Kraken2/Bracken 与 sylph 群落谱分析。
-
-    [宏基因组谱分析](meta.zh.md)
-
 </div>

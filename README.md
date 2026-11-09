@@ -23,8 +23,7 @@ contigs / reads
       ├── ANI (skani) ───┤
       ├── mash ──────────┼── layered arbitration ── species verdict
       ├── sourmash ──────┤
-      ├── GTDB-Tk ───────┘
-      └── kraken2 / sylph ── community profile
+      └── GTDB-Tk ───────┘
 ```
 
 ## Highlights
@@ -33,7 +32,8 @@ contigs / reads
   result objects directly in pipelines, notebooks, and tests.
 - **Five isolate modes.** Marker genes, curated ANI panel, RefSeq mash,
   sourmash/GTDB, and GTDB-Tk, with L3 > L2 > L1 arbitration.
-- **Two community modes.** Kraken2 + Bracken and sylph, or both together.
+  Metagenomic community profiling lives in [gmeta](../gmeta)
+  (`gmeta run`, `gmeta net build`).
 - **Assembly QC.** CheckM2 completeness/contamination plus GTDB-Tk taxonomy.
 - **Machine-friendly.** Stable JSON envelopes, structured missing-database
   errors, `--auto-setup`, machine-readable database status, and an MCP server.
@@ -55,7 +55,7 @@ Bioconda, or pixi:
 
 ```text
 blastn, makeblastdb, minimap2, skani, mash, sourmash,
-kraken2, bracken, sylph, GTDB-Tk, CheckM2
+GTDB-Tk, CheckM2
 ```
 
 For a complete development environment:
@@ -143,20 +143,18 @@ gtdbtk = identify_by_gtdbtk("contigs.fna", threads=8).to_dict()
 GTDB-Tk requires a configured `GTDBTK_DATA_PATH`. Sourmash uses the GTDB gather
 database from the `sourmash` tier.
 
-### Read screening and metagenomic profiling
+### Read screening
 
 ```python
-from pathlib import Path
-
-from gside.api import identify_by_kraken2, identify_by_sylph, screen_reads
+from gside.api import screen_reads
 from gside.config import SPECIES_DB_DIR
 
 markers = SPECIES_DB_DIR / "D1_marker" / "markers.fasta"
 hits = screen_reads(("sample_R1.fq", "sample_R2.fq"), markers, threads=8)
-
-kraken = identify_by_kraken2(("sample_R1.fq", "sample_R2.fq"), threads=8)
-sylph = identify_by_sylph(("sample_R1.fq", "sample_R2.fq"), threads=8)
 ```
+
+Metagenomic community profiling (kraken2/bracken, sylph) moved to
+[gmeta](../gmeta).
 
 ### Assembly quality
 
@@ -173,7 +171,7 @@ print(validation.status)
 
 | Result family | Shape |
 | --- | --- |
-| ANI, sourmash, GTDB-Tk, kraken2, sylph | `MethodEnvelope` with `.to_dict()` |
+| ANI, sourmash, GTDB-Tk | `MethodEnvelope` with `.to_dict()` |
 | Marker identification | `MultiGeneResult.to_dict()` |
 | Read screening | `list[dict]` rows |
 | Assembly validation | `ValidateResult.to_dict()` |
@@ -212,9 +210,6 @@ gside scan contigs.fna -m all --auto-setup
 gside scan reads.fq -m marker
 gside scan sample_R1.fq sample_R2.fq -m marker
 
-# Metagenomic community
-gside scan --meta reads_R1.fq reads_R2.fq
-
 # Assembly quality
 gside validate contigs.fna -o qc/
 
@@ -231,12 +226,10 @@ gside scan *.fna -m panel+mash_refseq -j 8 -t 4 -o results.tsv
 | `mash_refseq` | mash | FASTA / FASTQ | RefSeq mash tier |
 | `sourmash` | sourmash | FASTA / FASTQ | GTDB gather tier |
 | `gtdbtk` | GTDB-Tk | FASTA | External GTDB-Tk data |
-| `kraken2` | Kraken2 + Bracken | FASTA / FASTQ | Kraken2 tier |
-| `sylph` | sylph | FASTQ | sylph tier |
 | `all` | all applicable | depends | all required tiers |
 
-`-m` accepts `+` combinations such as `marker+sourmash`. `all` in isolate mode
-runs every genome layer; `--meta -m all` merges Kraken2 and sylph.
+`-m` accepts `+` combinations such as `marker+sourmash`; `all` runs every
+isolate genome layer.
 
 Arbitration always prefers the higher-confidence layer:
 
@@ -264,8 +257,6 @@ gside db setup --tier panel
 | `panel` | Curated skani reference panel | ~130 MB sketch / ~1 GB genomes |
 | `mash` | RefSeq MinHash sketch | ~179 MB |
 | `sourmash` | GTDB gather database | ~3.9 GB |
-| `meta` | Kraken2 Standard-8 index | ~5.5 GB |
-| `meta_sylph` | sylph GTDB-r226 database | ~14 GB |
 
 `gside validate` additionally needs CheckM2 (~1.7 GB) and GTDB-Tk
 (`GTDBTK_DATA_PATH`, ~57 GB download).

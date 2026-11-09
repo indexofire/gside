@@ -13,14 +13,10 @@ L1  marker target gene combination rules                          [authority=1]
 
 ## Combining modes
 
-`-m` accepts one mode or a `+`-joined combination; `all` expands to every
-mode for the current context. `--meta` switches to the community set
-(`kraken2`/`sylph`), where `all` means both.
 
 ```bash
 gside scan contigs.fna -m marker+sourmash     # just those two, arbitrated
 gside scan contigs.fna -m all                 # every genome tier
-gside scan reads.fq --meta -m kraken2+sylph   # both community methods
 ```
 
 | Mode | FASTA | FASTQ | Database |
@@ -31,12 +27,8 @@ gside scan reads.fq --meta -m kraken2+sylph   # both community methods
 | `sourmash` | ✅ | ✅ | sourmash (~3.9GB) |
 | `gtdbtk` | ✅ | ❌ | external GTDB-Tk DB |
 | `all` (isolate) | ✅ | ❌ | every genome tier |
-| `kraken2` (`--meta`) | ✅ | ✅ | meta (~5.5GB) |
-| `sylph` (`--meta`) | ❌ | ✅ | meta_sylph (~14GB) |
-| `all` (`--meta`) | ❌ | ✅ | kraken2+sylph |
 
 `all` includes `panel`/`gtdbtk` (assembly-only), so a read set needs an
-explicit combination such as `-m marker+sourmash` or `--meta`.
 
 ## L1: marker (Target Gene Combination)
 
@@ -285,13 +277,3 @@ Output includes all method results plus final verdict:
 | Comprehensive | `all` | Multi-method complementary + arbitration |
 | Near-relative discrimination | `panel` or `all` | marker may cross-react |
 
-## Metagenomic Profiling (`gside scan --meta`)
-
-For mixed-community samples, `gside scan --meta` provides taxonomic profiling using
-two complementary classifiers. See [Metagenomic Profiling](meta.md) for details.
-
-| Mode | Engine | Input | Confidence basis |
-|------|--------|-------|-----------------|
-| `kraken2` | Kraken2 + Bracken | FASTQ / FASTA | Bracken fraction (≥10% high, ≥1% medium) |
-| `sylph` | sylph | FASTQ reads only | Adjusted ANI (≥95 high, ≥93 medium) |
-| `all` | Both | FASTQ only (use `-m kraken2` for FASTA) | Merged profile |

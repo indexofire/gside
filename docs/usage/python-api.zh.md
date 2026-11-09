@@ -19,8 +19,6 @@ API 处于 1.0 之前：可能新增可选参数，但现有位置参数与结�
 | `identify_by_ani(mode="mash_refseq")` | `mash` | mash 层 |
 | `identify_by_sourmash` | `sourmash` | sourmash 层 |
 | `identify_by_gtdbtk` | `gtdbtk` | `GTDBTK_DATA_PATH` |
-| `identify_by_kraken2` | `kraken2`, `bracken` | meta 层 |
-| `identify_by_sylph` | `sylph` | meta_sylph 层 |
 | `screen_reads` | `minimap2` | marker FASTA |
 | `validate_genome` | `checkm2`, `gtdbtk` | 外部数据库 |
 
@@ -71,7 +69,7 @@ gtdbtk = identify_by_gtdbtk("contigs.fna", threads=8).to_dict()
 `identify_by_sourmash` 执行 GTDB gather，返回 `SourmashIdResult`。
 `identify_by_gtdbtk` 返回 `GtdbkResult`，需要 `GTDBTK_DATA_PATH`。
 
-## Reads 与宏基因组
+## Reads（读段筛选）
 
 ### Marker screening
 
@@ -86,19 +84,7 @@ rows = screen_reads(("sample_R1.fq", "sample_R2.fq"), markers, threads=8)
 ```
 
 Paired mates 在一次调用中映射。结果是按基因聚合的行列表，不是 `MethodEnvelope`。
-
-### Kraken2/Bracken 与 sylph
-
-```python
-from gside.api import identify_by_kraken2, identify_by_sylph
-
-kraken = identify_by_kraken2(("sample_R1.fq", "sample_R2.fq"), threads=8)
-sylph = identify_by_sylph(("sample_R1.fq", "sample_R2.fq"), threads=8)
-
-print(kraken.to_dict()["result"]["top_species"])
-```
-
-Kraken2 接受 FASTA 或 FASTQ；sylph 要求 FASTQ。二者返回 `MethodEnvelope` 子类。
+读段的宏基因组谱分析在 [gmeta](https://github.com/indexofire/gmeta) 工具中。
 
 ## 组装质量
 

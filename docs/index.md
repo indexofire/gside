@@ -1,9 +1,10 @@
 # gside documentation
 
 `gside` is a Python library and CLI for multi-layer microbial species
-identification and metagenomic profiling. This documentation covers the public
-Python API, the `gside` command line, reference databases, identification
-modes, and the JSON contract.
+identification from assemblies and sequencing reads. This documentation
+covers the public Python API, the `gside` command line, reference databases,
+identification modes, and the JSON contract. Metagenomic community profiling
+lives in the [gmeta](https://github.com/indexofire/gmeta) tool.
 
 ## Start here
 
@@ -13,7 +14,6 @@ modes, and the JSON contract.
 | Call identification engines from Python | [Python API](usage/python-api.md) |
 | Learn every CLI flag | [CLI reference](usage/cli.md) |
 | Understand marker/ANI/sketch/GTDB modes | [Identification modes](usage/modes.md) |
-| Profile a metagenomic community | [Metagenomic profiling](usage/meta.md) |
 | Prepare databases | [Databases](installation/databases.md) |
 | Use my own marker database | [Custom marker databases](usage/custom-databases.md) |
 | Consume JSON output safely | [JSON output contract](reference/json-contract.md) |
@@ -23,7 +23,7 @@ modes, and the JSON contract.
 
 ```text
 assembled contigs ── marker / panel / mash / sourmash / GTDB-Tk ── verdict
-FASTQ reads ──────── marker screening / kraken2 / sylph ─────────── profile
+FASTQ reads ──────── marker screening / mash / sourmash ───── species call
 assembled contigs ── CheckM2 + GTDB-Tk ─────────────────────────── assembly QC
 ```
 
@@ -41,8 +41,9 @@ pip install gside          # Python 3.12; bundled marker DB
 pixi install               # dev environment with all external tools
 ```
 
-External tools such as `blastn`, `skani`, `mash`, `sourmash`, `kraken2`,
-`sylph`, and GTDB-Tk are installed separately. See
+External tools such as `blastn`, `skani`, `mash`, `sourmash`, and GTDB-Tk
+are installed separately. Community (metagenomic) profiling lives in the
+[gmeta](https://github.com/indexofire/gmeta) tool. See
 [Quick start](installation/quick-start.md) and [Databases](installation/databases.md).
 
 ## Library example
@@ -64,7 +65,7 @@ The full function/result table is in the [Python API](usage/python-api.md).
 ```bash
 gside -V
 gside scan contigs.fna -m all --auto-setup
-gside scan --meta reads_R1.fq reads_R2.fq
+gmeta run reads_R1.fq reads_R2.fq --samples manifest.tsv -m kraken2
 gside validate contigs.fna -o qc/
 gside db status
 gside db list

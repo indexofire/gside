@@ -17,7 +17,7 @@ bundled marker database.
 
     ---
 
-    Choose and provision the panel, mash, sourmash, and metagenomic tiers.
+    Choose and provision the panel, mash, and sourmash tiers.
 
     [Databases](databases.md)
 

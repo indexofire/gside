@@ -14,7 +14,7 @@ gside sits between standard bioinformatics tools and your workflows:
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │  Bioinformatics tools                                   │
-│  blastn · skani · mash · sourmash · kraken2 · sylph     │
+│  blastn · skani · mash · sourmash                       │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -39,8 +39,6 @@ gside/
 │       ├── ani_identifier.py         L2 ANI (panel/mash_refseq)
 │       ├── sourmash_identifier.py    L2 sourmash gather
 │       ├── gtdbtk_identifier.py      L3 GTDB-Tk placement
-│       ├── kraken2_identifier.py     meta: kraken2 + bracken
-│       ├── sylph_identifier.py       meta: sylph ANI profiling
 │       ├── taxonomic_validator.py    CheckM2 + GTDB-Tk QC (`gside validate`)
 │       ├── _envelope.py              Shared result-dict envelope
 │       └── _thresholds.py            Shared ANI confidence cutoffs
@@ -50,8 +48,6 @@ gside/
 │       ├── D2_ani/         skani sketch + genomes (gitignored) + manifests/ (tracked recipe)
 │       ├── D3_mash/        mash sketch (gitignored)
 │       ├── D4_sourmash/    GTDB reps k=31 + lineages (via db setup)
-│       ├── D5_kraken2/     Kraken2 Standard-8 index (auto-download / gitignored)
-│       └── D6_sylph/       sylph GTDB-r226 .syl2db (auto-download / gitignored)
 └── tests/
 ```
 
@@ -63,11 +59,9 @@ gside/
 2. Validate mode/context/input — mismatches exit 2 **before** any tool runs.
 3. Dispatch each mode: marker → blastn (FASTA) or minimap2 read screening
    (FASTQ); panel → skani; mash_refseq → mash; sourmash → gather; gtdbtk →
-   GTDB-Tk; `--meta` → kraken2/sylph.
 4. Collect per-method payloads; a failure becomes `methods.<mode>.error`
    (with structured missing-database fields) and does not stop the others.
 5. Arbitrate for isolate runs (L3 > L2 > L1, then high > medium > low);
-   merge species lists for `--meta`.
 6. Render JSON / TSV / CSV / MD to stdout or `-o`.
 
 `gside validate contigs.fna -o dir`

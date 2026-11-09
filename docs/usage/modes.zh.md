@@ -12,13 +12,11 @@ L1  marker 靶基因组合规则                    [layer=1]
 
 ## 模式组合
 
-`-m` 支持单个模式或 `+` 组合；`all` 展开为当前上下文的全部模式。加 `--meta`
-切换到群落方法集（`kraken2`/`sylph`），此时 `all` 表示两者。
+展开为全部单菌模式。宏基因组群落分析已移至 gmeta。
 
 ```bash
 gside scan contigs.fna -m marker+sourmash     # 仅这两法并仲裁
 gside scan contigs.fna -m all                 # 全部基因组层
-gside scan reads.fq --meta -m kraken2+sylph   # 两种群落方法
 ```
 
 | 模式 | FASTA | FASTQ | 数据库 |
@@ -29,12 +27,8 @@ gside scan reads.fq --meta -m kraken2+sylph   # 两种群落方法
 | `sourmash` | ✅ | ✅ | sourmash（约 3.9GB） |
 | `gtdbtk` | ✅ | ❌ | 外部 GTDB-Tk 库 |
 | `all`（单菌株） | ✅ | ❌ | 全部基因组层 |
-| `kraken2`（`--meta`） | ✅ | ✅ | meta（约 5.5GB） |
-| `sylph`（`--meta`） | ❌ | ✅ | meta_sylph（约 14GB） |
-| `all`（`--meta`） | ❌ | ✅ | kraken2+sylph |
 
 `all` 含 `panel`/`gtdbtk`（仅组装），读段请显式组合（如
-`-m marker+sourmash`）或使用 `--meta`。
 
 ## L1: marker（靶基因组合）
 
@@ -266,13 +260,3 @@ gside scan contigs.fna -m all
 | 综合判定 | `all` | 多法互补 + 仲裁 |
 | 近缘种区分 | `panel` 或 `all` | marker 可能交叉反应 |
 
-## 宏基因组谱分析（`gside scan --meta`）
-
-混合群落样本可使用 `gside scan --meta` 做分类学谱分析。详见
-[宏基因组谱分析](meta.zh.md)。
-
-| 模式 | 引擎 | 输入 | 置信度依据 |
-|------|--------|-------|-----------------|
-| `kraken2` | Kraken2 + Bracken | FASTQ / FASTA | Bracken 丰度（≥10% high，≥1% medium） |
-| `sylph` | sylph | 仅 FASTQ | Adjusted ANI（≥95 high，≥93 medium） |
-| `all` | 双引擎 | FASTQ / FASTA | 合并谱 |

@@ -16,7 +16,7 @@
 
     ---
 
-    选择并准备 panel、mash、sourmash 与宏基因组数据库层级。
+    选择并准备 panel、mash、sourmash 数据库层级。
 
     [数据库](databases.zh.md)
 

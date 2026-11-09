@@ -1,6 +1,6 @@
-"""Shared ANI confidence thresholds (single source for panel / sylph).
+"""Shared ANI confidence thresholds (single source for panel engines).
 
-Panel skani and sylph both judge species-level ANI the same way: >= 95 is a
+Panel engines (skani/sourmash) judge species-level ANI the same way: >= 95 is a
 high-confidence same-species call, 93-95 is medium, below 93 is low.
 """
 

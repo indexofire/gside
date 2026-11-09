@@ -24,7 +24,7 @@ gseek 路径是生产默认值，双路径设计仍有意保留：
 - 每个已迁移路径都保留 legacy 实现，仍可正常使用；
 - `shadow` 同时跑两套实现，记录粗粒度差异，并返回 legacy 结果；
 - legacy 是 parity 测试的基准；
-- 没有 gseek 适配器的模式（`gtdbtk`、`kraken2`、`sylph`）不使用该开关。
+- 没有 gseek 适配器的模式（`gtdbtk`）不使用该开关。
 
 gseek 随包安装；本地开发：
 
@@ -35,8 +35,6 @@ pixi install -e dev
 PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_parity.py -q
 ```
 
-> mash/sourmash 路径需要 gseek 0.10.0（`external_reference`）；sylph profiling
-> 路径需要 gseek 0.10.2（`sylph` 后端）。运行时依赖下限为 0.10.4（索引缓存
 > 安全加固），已发布 PyPI：`pip install gseek==0.10.4`。开发/测试环境通过
 > 包依赖（或 pixi 环境）安装，sibling checkout 仅用于修改 gseek 本身。
 
@@ -49,7 +47,6 @@ PYTHONPATH=../gseek/src pixi run -e dev pytest tests/integration/test_gseek_pari
 | mash_refseq（组装/reads） | `MashBackend` 对 `mash.msh` | `gseek.distance(backend="mash", external_reference=True)` |
 | sourmash gather | sketch/gather CSV 解析 | `gseek.distance(backend="sourmash", external_reference=True)`，每个 query 文件一次 |
 | panel (skani) | `SkaniBackend` + `panel.sketch` DB | `gseek.distance(backend="skani", external_reference=True)`，针对预构建 DB 目录 |
-| meta sylph | `sylph sketch` + `sylph profile` + TSV 解析 | `gseek.distance(backend="sylph", external_reference=True)` |
 
 gseek 路径显式保留 gside 语义：
 
@@ -61,8 +58,8 @@ gseek 路径显式保留 gside 语义：
 
 ## 不走 gseek 的模式
 
-所有由 gseek 后端覆盖的 gside 模式均已迁移（marker、mash、sourmash、panel、
-sylph）。没有 gseek 适配器的模式（`gtdbtk`、`kraken2`）保持原有实现。
+所有由 gseek 后端覆盖的 gside 模式均已迁移（marker、mash、sourmash、
+panel）。没有 gseek 适配器的模式（`gtdbtk`）保持原有实现。
 
 ## 验证
 

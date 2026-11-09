@@ -1,6 +1,6 @@
 # gside 文档
 
-`gside` 是一个用于多层微生物物种鉴定与宏基因组谱分析的 Python 库和 CLI。本文档覆盖公共 Python API、`gside` 命令行、参考数据库、鉴定模式与 JSON 契约。
+`gside` 是一个用于多层微生物物种鉴定的 Python 库和 CLI（组装与测序读段）。本文档覆盖公共 Python API、`gside` 命令行、参考数据库、鉴定模式与 JSON 契约。宏基因组（群落）分析已移至 [gmeta](https://github.com/indexofire/gmeta) 工具。
 
 ## 从这里开始
 
@@ -10,7 +10,6 @@
 | 在 Python 中调用鉴定引擎 | [Python API](usage/python-api.zh.md) |
 | 查所有 CLI 参数 | [CLI 参考](usage/cli.zh.md) |
 | 理解 marker/ANI/sketch/GTDB 模式 | [鉴定模式](usage/modes.zh.md) |
-| 做宏基因组群落分析 | [宏基因组谱分析](usage/meta.zh.md) |
 | 准备数据库 | [数据库](installation/databases.zh.md) |
 | 使用自定义 marker 数据库 | [自定义 marker 数据库](usage/custom-databases.zh.md) |
 | 安全消费 JSON 输出 | [JSON 输出契约](reference/json-contract.zh.md) |
@@ -20,7 +19,7 @@
 
 ```text
 组装 contigs ── marker / panel / mash / sourmash / GTDB-Tk ── 判定
-FASTQ reads ─── marker screening / kraken2 / sylph ─────────── 群落谱
+FASTQ reads ─── marker screening / mash / sourmash ────────── 物种判定
 组装 contigs ── CheckM2 + GTDB-Tk ─────────────────────────── 组装质量
 ```
 
@@ -36,7 +35,7 @@ pip install gside          # Python 3.12；含 marker DB
 pixi install               # 含全部外部工具的 dev 环境
 ```
 
-`blastn`、`skani`、`mash`、`sourmash`、`kraken2`、`sylph`、GTDB-Tk 等外部工具需另行安装。见[快速开始](installation/quick-start.zh.md)与[数据库](installation/databases.zh.md)。
+`blastn`、`skani`、`mash`、`sourmash`、GTDB-Tk 等外部工具需另行安装。宏基因组（群落）分析已移至 [gmeta](https://github.com/indexofire/gmeta) 工具。见[快速开始](installation/quick-start.zh.md)与[数据库](installation/databases.zh.md)。
 
 ## 库示例
 
@@ -57,7 +56,7 @@ print(panel.to_dict()["result"]["species"])
 ```bash
 gside -V
 gside scan contigs.fna -m all --auto-setup
-gside scan --meta reads_R1.fq reads_R2.fq
+gmeta run reads_R1.fq reads_R2.fq --samples manifest.tsv -m kraken2
 gside validate contigs.fna -o qc/
 gside db status
 gside db list

@@ -95,20 +95,6 @@ def _tool_species(arguments: dict[str, Any]) -> str:
     return json.dumps(report, ensure_ascii=False, indent=2)
 
 
-def _tool_meta(arguments: dict[str, Any]) -> str:
-    reads = _reads(arguments)
-    mode = _string(arguments, "mode", "all")
-    from gside.cli import META_MODES
-
-    if mode not in META_MODES:
-        raise ValueError(f"mode must be one of {', '.join(META_MODES)}: got {mode}")
-    db_dir = _optional_string(arguments, "db_dir")
-    threads = _threads(arguments)
-    from gside import cli
-
-    return json.dumps(cli._meta_payload(reads, mode, db_dir, threads), ensure_ascii=False, indent=2)
-
-
 def _tool_db_status(arguments: dict[str, Any]) -> str:
     from gside.db import format_status
 
@@ -138,7 +124,6 @@ def _tool_db_setup(arguments: dict[str, Any]) -> str:
 
 TOOL_HANDLERS: dict[str, Callable[[dict[str, Any]], str]] = {
     "species": _tool_species,
-    "meta": _tool_meta,
     "db_status": _tool_db_status,
     "db_list": _tool_db_list,
     "db_setup": _tool_db_setup,

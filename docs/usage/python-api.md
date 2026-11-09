@@ -22,8 +22,6 @@ Each function needs the same external tools and reference data as its CLI mode:
 | `identify_by_ani(mode="mash_refseq")` | `mash` | mash tier |
 | `identify_by_sourmash` | `sourmash` | sourmash tier |
 | `identify_by_gtdbtk` | `gtdbtk` | `GTDBTK_DATA_PATH` |
-| `identify_by_kraken2` | `kraken2`, `bracken` | meta tier |
-| `identify_by_sylph` | `sylph` | meta_sylph tier |
 | `screen_reads` | `minimap2` | marker FASTA |
 | `validate_genome` | `checkm2`, `gtdbtk` | external databases |
 
@@ -78,7 +76,7 @@ gtdbtk = identify_by_gtdbtk("contigs.fna", threads=8).to_dict()
 `identify_by_gtdbtk` returns `GtdbkResult` and requires a GTDB-Tk database
 configured through `GTDBTK_DATA_PATH`.
 
-## Reads and metagenomes
+## Reads
 
 ### Marker screening
 
@@ -93,21 +91,8 @@ rows = screen_reads(("sample_R1.fq", "sample_R2.fq"), markers, threads=8)
 ```
 
 Paired mates are mapped in one invocation. The result is a list of aggregated
-per-gene rows, not a `MethodEnvelope`.
-
-### Kraken2/Bracken and sylph
-
-```python
-from gside.api import identify_by_kraken2, identify_by_sylph
-
-kraken = identify_by_kraken2(("sample_R1.fq", "sample_R2.fq"), threads=8)
-sylph = identify_by_sylph(("sample_R1.fq", "sample_R2.fq"), threads=8)
-
-print(kraken.to_dict()["result"]["top_species"])
-```
-
-Kraken2 accepts FASTA or FASTQ; sylph requires FASTQ. Both return
-`MethodEnvelope` subclasses.
+per-gene rows, not a `MethodEnvelope`. Metagenomic profiling of reads lives
+in the [gmeta](https://github.com/indexofire/gmeta) tool.
 
 ## Assembly validation
 
