@@ -1,11 +1,12 @@
 rules:
-- species: Salmonella_enterica
+- species: Salmonella
   genes:
   - inva
   min_hits: 1
   min_identity: 90
-  note: Label is species-level per the genus_species contract; invA is also present
-    in S. bongori, which this marker does not distinguish.
+  note: Genus-level call by design (CPIN) - typhoidal and non-typhoidal
+    Salmonella, including S. bongori and every S. enterica serovar, report as
+    Salmonella; serovar/serotype discrimination belongs to gspec.
 - species: Vibrio_parahaemolyticus
   genes:
   - tlh

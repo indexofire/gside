@@ -17,15 +17,15 @@ from gside.db_registry import (
 
 
 def _marker_db(root: Path, name: str = "food") -> Path:
-    path = root / "marker" / name
+    path = root / "D1_marker" / name
     path.mkdir(parents=True)
-    (path / "markers.fasta").write_text(">markers~~~g1~~~x marker\nACGTACGT\n")
+    (path / "markers.fasta").write_text(">gside|db=test|gene=g1|acc=t|func=primary")
     (path / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
     return path
 
 
 def _panel_db(root: Path, name: str = "lab2026") -> Path:
-    path = root / "panel" / name
+    path = root / "D2_ani" / name
     (path / "panel.sketch" / "sketches.db").parent.mkdir(parents=True)
     (path / "panel.sketch" / "sketches.db").write_bytes(b"sketch")
     (path / "metadata.tsv").write_text("fna\tspecies\n")
@@ -34,7 +34,7 @@ def _panel_db(root: Path, name: str = "lab2026") -> Path:
 
 class TestParseDbValue:
     def test_mode_qualified(self):
-        assert parse_db_value("panel:lab2026") == ("panel", "lab2026")
+        assert parse_db_value("ani:lab2026") == ("ani", "lab2026")
 
     def test_bare_name(self):
         assert parse_db_value("food") == (None, "food")
@@ -74,9 +74,9 @@ class TestResolveDb:
         from gside import config
 
         monkeypatch.setattr(config, "SPECIES_DB_DIR", tmp_path)
-        choice = resolve_db("panel", "default")
+        choice = resolve_db("ani", "default")
         assert choice.name == "default"
-        assert choice.path == tmp_path / "D2_ani"
+        assert choice.path == tmp_path / "D2_ani" / "default"
 
     def test_unknown_name_lists_available(self, tmp_path, monkeypatch):
         from gside import config
@@ -90,7 +90,7 @@ class TestResolveDb:
         from gside import config
 
         monkeypatch.setattr(config, "SPECIES_DB_DIR", tmp_path)
-        (tmp_path / "marker" / "broken").mkdir(parents=True)
+        (tmp_path / "D1_marker" / "broken").mkdir(parents=True)
         with pytest.raises(ValueError, match="not a valid marker database"):
             resolve_db("marker", "broken")
 
@@ -111,9 +111,9 @@ class TestResolveSelections:
         monkeypatch.setattr(config, "SPECIES_DB_DIR", tmp_path)
         marker = _marker_db(tmp_path)
         panel = _panel_db(tmp_path)
-        selections = resolve_selections(["marker:food", "panel:lab2026"], ["marker", "panel"])
+        selections = resolve_selections(["marker:food", "ani:lab2026"], ["marker", "ani"])
         assert [c.path for c in selections["marker"]] == [marker]
-        assert [c.path for c in selections["panel"]] == [panel]
+        assert [c.path for c in selections["ani"]] == [panel]
 
     def test_bare_name_needs_single_db_mode(self, tmp_path, monkeypatch):
         from gside import config
@@ -124,7 +124,7 @@ class TestResolveSelections:
 
     def test_bare_name_with_multiple_modes_rejected(self):
         with pytest.raises(ValueError, match="qualify the database"):
-            resolve_selections(["food"], ["marker", "panel"])
+            resolve_selections(["food"], ["marker", "ani"])
 
     def test_unknown_mode_prefix_rejected(self):
         with pytest.raises(ValueError, match="not part of this invocation"):
@@ -159,9 +159,9 @@ class TestEnumerate:
 
         monkeypatch.setattr(config, "SPECIES_DB_DIR", tmp_path)
         _marker_db(tmp_path)
-        bundled = tmp_path / "D1_marker"
-        bundled.mkdir()
-        (bundled / "markers.fasta").write_text(">markers~~~g1~~~x marker\nACGT\n")
+        bundled = tmp_path / "D1_marker" / "default"
+        bundled.mkdir(parents=True)
+        (bundled / "markers.fasta").write_text(">gside|db=test|gene=g1|acc=t|func=primary")
         (bundled / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
         databases = enumerate_databases()
         names = [(c.name, c.ready) for c in databases["marker"]]
@@ -173,16 +173,17 @@ class TestEnumerate:
 
         monkeypatch.setattr(config, "SPECIES_DB_DIR", tmp_path)
         databases = enumerate_databases()
-        default = next(c for c in databases["panel"] if c.name == "default")
+        default = next(c for c in databases["ani"] if c.name == "default")
         assert default.ready is False
+        assert default.path == tmp_path / "D2_ani" / "default"
 
     def test_invalid_entries_skipped(self, tmp_path, monkeypatch):
         from gside import config
 
         monkeypatch.setattr(config, "SPECIES_DB_DIR", tmp_path)
-        (tmp_path / "panel" / "junk").mkdir(parents=True)
+        (tmp_path / "D2_ani" / "junk").mkdir(parents=True)
         databases = enumerate_databases()
-        assert all(c.name != "junk" for c in databases["panel"])
+        assert all(c.name != "junk" for c in databases["ani"])
 
 
 def test_db_choice_shape(tmp_path):
@@ -193,8 +194,8 @@ def test_db_choice_shape(tmp_path):
 class TestLayoutValidation:
     def test_mash_layout(self, tmp_path):
         (tmp_path / "mash.msh").write_bytes(b"msh")
-        assert layout_valid("mash_refseq", tmp_path) is True
-        assert layout_valid("panel", tmp_path) is False
+        assert layout_valid("mash", tmp_path) is True
+        assert layout_valid("ani", tmp_path) is False
 
     def test_sourmash_layout_needs_both_files(self, tmp_path):
         assert layout_valid("sourmash", tmp_path) is False
@@ -205,7 +206,7 @@ class TestLayoutValidation:
 
     def test_panel_accepts_sketch_file_variant(self, tmp_path):
         (tmp_path / "panel.sketch").write_bytes(b"sketch-file")
-        assert layout_valid("panel", tmp_path) is True
+        assert layout_valid("ani", tmp_path) is True
 
     def test_missing_directory_is_invalid(self, tmp_path):
         assert layout_valid("marker", tmp_path / "nope") is False
@@ -229,5 +230,33 @@ def test_layout_requirements_rejects_unknown_mode():
 
 def test_resolve_db_path_with_wrong_layout(tmp_path):
     (tmp_path / "not-a-panel").mkdir()
-    with pytest.raises(ValueError, match="is not a valid panel database"):
-        resolve_db("panel", str(tmp_path / "not-a-panel"))
+    with pytest.raises(ValueError, match="is not a valid ani database"):
+        resolve_db("ani", str(tmp_path / "not-a-panel"))
+
+
+class TestFamilyAlias:
+    def test_ani_alias_targets_panel_family(self, tmp_path, monkeypatch):
+        from gside import config
+
+        monkeypatch.setattr(config, "SPECIES_DB_DIR", tmp_path)
+        db = _panel_db(tmp_path)
+        assert resolve_db("ani", "lab2026").path == db
+        choice = resolve_db("ani", "lab2026")  # same resolution via family alias
+        assert choice.path == db
+
+    def test_qualified_alias_in_selections(self, tmp_path, monkeypatch):
+        from gside import config
+
+        monkeypatch.setattr(config, "SPECIES_DB_DIR", tmp_path)
+        db = _panel_db(tmp_path)
+        selections = resolve_selections(["ani:lab2026"], ["ani"])
+        assert [c.path for c in selections["ani"]] == [db]
+
+    def test_mash_alias_targets_mash_refseq(self, tmp_path, monkeypatch):
+        from gside import config
+
+        monkeypatch.setattr(config, "SPECIES_DB_DIR", tmp_path)
+        (tmp_path / "D3_mash" / "std").mkdir(parents=True)
+        (tmp_path / "D3_mash" / "std" / "mash.msh").write_bytes(b"msh")
+        selections = resolve_selections(["mash:std"], ["mash"])
+        assert selections["mash"][0].path == tmp_path / "D3_mash" / "std"

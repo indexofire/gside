@@ -27,7 +27,7 @@ from gside.config import which  # noqa: E402
 from gside.engine import gseek_bridge  # noqa: E402
 
 _REPO = Path(__file__).resolve().parents[2]
-_MARKERS = _REPO / "data" / "db" / "D1_marker" / "markers.fasta"
+_MARKERS = _REPO / "data" / "db" / "D1_marker" / "default" / "markers.fasta"
 _GENOME = _REPO / "data" / "db" / "D2_ani" / "genomes" / "GCF_000006745.1_ASM674v1_genomic.fna"
 
 _READY = (
@@ -92,9 +92,9 @@ def test_mash_refseq_matches_legacy(tmp_path, monkeypatch):
 
     monkeypatch.setenv("GSEEK_CACHE_DIR", str(tmp_path / "gseek-cache"))
     monkeypatch.setenv("GSIDE_ENGINE", "legacy")
-    legacy = identify_by_ani(str(_K12), mode="mash_refseq").result
+    legacy = identify_by_ani(str(_K12), mode="mash").result
     monkeypatch.setenv("GSIDE_ENGINE", "gseek")
-    new = identify_by_ani(str(_K12), mode="mash_refseq").result
+    new = identify_by_ani(str(_K12), mode="mash").result
 
     assert new["species"] == legacy["species"]
     assert new["confidence"] == legacy["confidence"]
@@ -154,9 +154,9 @@ def test_mash_reads_matches_legacy(tmp_path, monkeypatch):
 
     monkeypatch.setenv("GSEEK_CACHE_DIR", str(tmp_path / "gseek-cache"))
     monkeypatch.setenv("GSIDE_ENGINE", "legacy")
-    legacy = identify_by_ani(str(reads), mode="mash_refseq").result
+    legacy = identify_by_ani(str(reads), mode="mash").result
     monkeypatch.setenv("GSIDE_ENGINE", "gseek")
-    new = identify_by_ani(str(reads), mode="mash_refseq").result
+    new = identify_by_ani(str(reads), mode="mash").result
 
     assert new["species"] == legacy["species"]
     assert new["confidence"] == legacy["confidence"]
@@ -174,7 +174,7 @@ _PANEL_DB = _REPO / "data" / "db" / "D2_ani" / "panel.sketch"
 def test_panel_matches_legacy(tmp_path, monkeypatch):
     monkeypatch.setenv("GSEEK_CACHE_DIR", str(tmp_path / "gseek-cache"))
     monkeypatch.setenv("GSIDE_ENGINE", "legacy")
-    legacy = identify_by_ani(str(_K12), mode="panel").result
+    legacy = identify_by_ani(str(_K12), mode="ani").result
     monkeypatch.setenv("GSIDE_ENGINE", "gseek")
-    new = identify_by_ani(str(_K12), mode="panel").result
+    new = identify_by_ani(str(_K12), mode="ani").result
     assert new == legacy

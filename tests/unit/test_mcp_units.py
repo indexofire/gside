@@ -185,26 +185,42 @@ class TestToolHandlers:
 
         monkeypatch.setattr(cli, "_identify_one", fake)
         TOOL_HANDLERS["species"](
-            {"contigs": ["x.fna"], "mode": "panel", "db_dir": "custom-db", "threads": 8}
+            {"contigs": ["x.fna"], "mode": "ani", "db_dir": "custom-db", "threads": 8}
         )
-        assert seen == [("x.fna", "panel", "custom-db", 8)]
+        assert seen == [("x.fna", "ani", "custom-db", 8)]
 
-    def test_db_status_returns_valid_json(self, monkeypatch):
+    def test_db_status_returns_valid_json(self, tmp_path, monkeypatch):
         from gside import db as dbmod
 
-        monkeypatch.setattr(dbmod, "db_status", lambda: _STATUS)
+        root = tmp_path / "db"
+        marker = root / "D1_marker" / "default"
+        marker.mkdir(parents=True)
+        (marker / "markers.fasta").write_text(">gside|db=test|gene=g1|acc=t|func=primary")
+        (marker / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
+        monkeypatch.setattr(dbmod, "SPECIES_DB_DIR", root)
         payload = json.loads(TOOL_HANDLERS["db_status"]({}))
-        assert payload == _STATUS
+        assert set(payload) == {"modes", "tiers"}
+        assert payload["modes"]["marker"][0] == {
+            "name": "default",
+            "default": True,
+            "ready": True,
+            "path": str(marker),
+        }
+        assert payload["modes"]["ani"][0]["ready"] is False
 
-    def test_db_list_returns_valid_json(self, monkeypatch):
+    def test_db_list_returns_valid_json(self, tmp_path, monkeypatch):
         from gside import db as dbmod
 
-        monkeypatch.setattr(dbmod, "db_status", lambda: _STATUS)
-        monkeypatch.setattr(dbmod, "_named_databases", lambda: {})
+        root = tmp_path / "db"
+        named = root / "D1_marker" / "food"
+        named.mkdir(parents=True)
+        (named / "markers.fasta").write_text(">gside|db=test|gene=g1|acc=t|func=primary")
+        (named / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
+        monkeypatch.setattr(dbmod, "SPECIES_DB_DIR", root)
         payload = json.loads(TOOL_HANDLERS["db_list"]({}))
-        assert set(payload) == {*TIERS, "custom_databases"}
-        assert payload["mini"]["ready"] is True
-        assert payload["panel"]["ready"] is False
+        assert set(payload) == {"modes", "tiers"}
+        assert [d["name"] for d in payload["modes"]["marker"]] == ["default", "food"]
+        assert payload["tiers"]["panel"]["items"] == ["D2_ani"]
 
     def test_db_setup_returns_results_json(self, monkeypatch):
         from gside import db as dbmod

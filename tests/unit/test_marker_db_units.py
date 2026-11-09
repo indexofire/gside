@@ -23,8 +23,8 @@ def _db(
     (root / "markers.fasta").write_text(
         fasta
         or (
-            ">markers~~~geneA~~~refA marker A\nACGTACGT\n"
-            ">markers~~~geneB~~~refB marker B\nTTTTCCCC\n"
+            ">gside|db=test|gene=geneA|acc=t|func=primary\nACGT\n"
+            ">gside|db=test|gene=geneB|acc=t|func=primary"
         )
     )
     if with_rules:
@@ -86,14 +86,17 @@ def test_validate_bad_fasta_header_and_unknown_rule_gene(tmp_path: Path) -> None
         rules=[{"species": "X", "genes": ["missing"], "min_hits": 1}],
     )
     errors = MarkerDatabase.from_path(root).validate()
-    assert any("markers~~~<gene>" in err for err in errors)
+    assert any("gside|db=..|gene=" in err for err in errors)
     assert any("unknown gene" in err for err in errors)
 
 
 def test_validate_duplicate_fasta_id(tmp_path: Path) -> None:
     root = _db(
         tmp_path / "db",
-        fasta=">markers~~~geneA~~~refA\nACGT\n>markers~~~geneA~~~refA\nTTTT\n",
+        fasta=(
+            ">gside|db=test|gene=geneA|acc=t|func=primary\nACGT\n"
+            ">gside|db=test|gene=geneA|acc=t|func=primary\nTTTT\n"
+        ),
     )
     assert any("duplicate" in err for err in MarkerDatabase.from_path(root).validate())
 

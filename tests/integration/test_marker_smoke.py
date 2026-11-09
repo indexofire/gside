@@ -14,7 +14,7 @@ import pytest
 from gside.config import which as _which
 
 _REPO = Path(__file__).resolve().parents[2]
-CONTIGS = _REPO / "data" / "db" / "D1_marker" / "markers.fasta"
+CONTIGS = _REPO / "data" / "db" / "D1_marker" / "default" / "markers.fasta"
 _HAS_BLASTN = _which("blastn") is not None
 
 
@@ -31,16 +31,16 @@ class TestSpeciesMarker:
         from gside.analysis.multigene_identifier import identify_multigene
 
         q = tmp_path / "inva.fna"
-        q.write_text(f">inva_q\n{_gene_seq('markers~~~inva~~~')}\n")
+        q.write_text(f">inva_q\n{_gene_seq('gside|db=species_markers_v2|gene=inva|acc=')}\n")
         r = identify_multigene(str(q)).to_dict()
-        assert r["species"] == "Salmonella_enterica"
+        assert r["species"] == "Salmonella"
 
     def test_excluded_gene_suppresses_coli_call(self, tmp_path):
         """ceuE + mapa suppress the coli call; jejuni then misses min_hits=2 → Unknown."""
         from gside.analysis.multigene_identifier import identify_multigene
 
-        ceue = _gene_seq("markers~~~ceue~~~")
-        mapa = _gene_seq("markers~~~mapa~~~")
+        ceue = _gene_seq("gside|db=species_markers_v2|gene=ceue|acc=")
+        mapa = _gene_seq("gside|db=species_markers_v2|gene=mapa|acc=")
         q = tmp_path / "excl.fna"
         q.write_text(f">ceue_q\n{ceue}\n>mapa_q\n{mapa}\n")
         r = identify_multigene(str(q)).to_dict()
@@ -51,7 +51,7 @@ class TestSpeciesMarker:
         from gside.analysis.multigene_identifier import identify_multigene
 
         q = tmp_path / "mapa.fna"
-        q.write_text(f">mapa_q\n{_gene_seq('markers~~~mapa~~~')}\n")
+        q.write_text(f">mapa_q\n{_gene_seq('gside|db=species_markers_v2|gene=mapa|acc=')}\n")
         r = identify_multigene(str(q)).to_dict()
         assert r["species"] == "Unknown"
 
@@ -59,8 +59,8 @@ class TestSpeciesMarker:
         """uidA+ipaH (lacY-negative) reports genus Shigella with a gspec note."""
         from gside.analysis.multigene_identifier import identify_multigene
 
-        uida = _gene_seq("markers~~~uida~~~")
-        ipah = _gene_seq("markers~~~ipah~~~")
+        uida = _gene_seq("gside|db=species_markers_v2|gene=uida|acc=")
+        ipah = _gene_seq("gside|db=species_markers_v2|gene=ipah|acc=")
         q = tmp_path / "shigella.fna"
         q.write_text(f">uida_q\n{uida}\n>ipah_q\n{ipah}\n")
         r = identify_multigene(str(q)).to_dict()

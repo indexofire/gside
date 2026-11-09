@@ -15,6 +15,7 @@ from gside.analysis.multigene_identifier import (
     _db_version,
     _load_rules,
 )
+from gside.marker_db import gene_from_seqid
 
 
 def _completed(stdout: str = "", returncode: int = 0, stderr: str = ""):
@@ -34,7 +35,7 @@ def _blastn_stub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, script: str) -
 _HIT_LINE = "\t".join(
     [
         "q1",
-        "mk~~~g1~~~x",
+        "gside|db=t|gene=g1|acc=x",
         "99.0",
         "400",
         "2",
@@ -116,7 +117,7 @@ class TestBlastFailureSurface:
         _blastn_stub(
             tmp_path,
             monkeypatch,
-            "#!/bin/sh\nprintf 'q1\\tmk~~~g1~~~x\\t99.0\\t400\\t2\\t0\\t10\\t409"
+            "#!/bin/sh\nprintf 'q1\\tgside|db=t|gene=g1|acc=x\\t99.0\\t400\\t2\\t0\\t10\\t409"
             "\\t1\\t400\\t1e-50\\t700\\t500\\t450\\n'\nexit 0\n",
         )
         hits = _blast_contigs("x.fna")
@@ -154,7 +155,7 @@ class TestBackendDelegation:
         _blastn_stub(tmp_path, monkeypatch, "#!/bin/sh\nexit 0\n")
         root = tmp_path / "mydb"
         root.mkdir()
-        (root / "markers.fasta").write_text(">markers~~~g1~~~x marker\nACGTACGT\n")
+        (root / "markers.fasta").write_text(">gside|db=test|gene=g1|acc=t|func=primary\nACGT\n")
         (root / "marker_rules.yaml").write_text(
             "rules:\n- species: Test_species\n  genes: [g1]\n  min_hits: 1\n"
         )
@@ -194,8 +195,12 @@ class TestBackendDelegation:
                 subject_id=subject, identity=99.0, subject_coverage=100.0, subject_length=400
             )
 
-        monkeypatch.setattr(mg, "_legacy_blast_hits", lambda c, t, db=None: [hit("mk~~~g1~~~x")])
-        monkeypatch.setattr(gseek_bridge, "blast_hits", lambda q, m, **kw: [hit("mk~~~g1~~~x")])
+        monkeypatch.setattr(
+            mg, "_legacy_blast_hits", lambda c, t, db=None: [hit("gside|db=t|gene=g1|acc=x")]
+        )
+        monkeypatch.setattr(
+            gseek_bridge, "blast_hits", lambda q, m, **kw: [hit("gside|db=t|gene=g1|acc=x")]
+        )
         seen: dict[str, object] = {}
         monkeypatch.setattr(
             gseek_bridge, "log_blast_shadow", lambda old, new: seen.update(n=len(new))
@@ -235,14 +240,14 @@ class TestBestHitSelection:
                     "identity": 99.2,
                     "coverage": 12.5,
                     "ref_len": 2020,
-                    "seqid": "markers~~~ctxa~~~x",
+                    "seqid": "gside|db=test|gene=ctxa|acc=t",
                 },
                 {
                     "gene": "ctxa",
                     "identity": 99.0,
                     "coverage": 100.0,
                     "ref_len": 2020,
-                    "seqid": "markers~~~ctxa~~~x",
+                    "seqid": "gside|db=test|gene=ctxa|acc=t",
                 },
             ],
         )
@@ -523,7 +528,7 @@ class TestCustomMarkerDbInput:
     def _custom_db(self, tmp_path: Path) -> Path:
         root = tmp_path / "mydb"
         root.mkdir()
-        (root / "markers.fasta").write_text(">markers~~~g1~~~x marker\nACGTACGT\n")
+        (root / "markers.fasta").write_text(">gside|db=test|gene=g1|acc=t|func=primary\nACGT\n")
         (root / "marker_rules.yaml").write_text(
             "rules:\n- species: Test_species\n  genes: [g1]\n  min_hits: 1\n"
         )
@@ -636,15 +641,15 @@ class TestRuleDesign:
 
     def test_renamed_labels(self):
         assert _pick("tlh") == "Vibrio_parahaemolyticus"
-        assert _pick("inva") == "Salmonella_enterica"
+        assert _pick("inva") == "Salmonella"
 
 
 def _bundled_marker_genes() -> set[str]:
-    fasta = config.SPECIES_DB_DIR / "D1_marker" / "markers.fasta"
+    fasta = config.SPECIES_DB_DIR / "D1_marker" / "default" / "markers.fasta"
     return {
-        line.split("~~~")[1].lower()
+        gene_from_seqid(line[1:]).lower()
         for line in fasta.read_text(encoding="utf-8").splitlines()
-        if line.startswith(">") and "~~~" in line
+        if line.startswith(">")
     }
 
 
@@ -710,7 +715,7 @@ def test_detected_marker_ties_are_gene_sorted(monkeypatch, tmp_path):
 def _custom_db_dir(tmp_path: Path, name: str, *, species: str, gene: str) -> Path:
     root = tmp_path / name
     root.mkdir(parents=True, exist_ok=True)
-    (root / "markers.fasta").write_text(f">markers~~~{gene}~~~x marker\nACGTACGT\n")
+    (root / "markers.fasta").write_text(f">gside|db=t|gene={gene}|acc=x\nACGTACGT\n")
     (root / "marker_rules.yaml").write_text(
         f"rules:\n- species: {species}\n  genes: [{gene}]\n  min_hits: 1\n"
     )
@@ -816,3 +821,174 @@ class TestCoerceMarkerDbs:
         assert "min_depth=3x" in payload["depth_gate"] or payload["depth_gate"] == ""
         controls, _defaults = mg._control_config(mg.MarkerDatabase.from_path(first))
         assert controls == {"Species_A": ["rpod"]}
+
+
+class TestCpinRuleDesign:
+    """data/CPIN.txt coverage: the cpin named database and its rules."""
+
+    @staticmethod
+    def _cpin_rules():
+        from gside.marker_db import MarkerDatabase
+
+        db = MarkerDatabase.from_path(config.SPECIES_DB_DIR / "D1_marker" / "cpin")
+        return db, _load_rules(db)
+
+    @staticmethod
+    def _cpin_genes():
+        fasta = config.SPECIES_DB_DIR / "D1_marker" / "cpin" / "markers.fasta"
+        return {
+            gene_from_seqid(line[1:]).lower()
+            for line in fasta.read_text(encoding="utf-8").splitlines()
+            if line.startswith(">")
+        }
+
+    def test_cpin_db_identity(self):
+        db, rules = self._cpin_rules()
+        assert db.name == "cpin_markers"
+        assert db.custom is True
+        assert len(rules) == 30
+
+    def test_cpin_species_ship(self):
+        _db, rules = self._cpin_rules()
+        expected = {
+            "Brucella",
+            "Mycobacterium_tuberculosis",
+            "Borrelia_burgdorferi",
+            "Yersinia_pseudotuberculosis",
+            "Citrobacter",
+            "Bartonella",
+            "Rickettsiaceae",
+            "Anaplasmataceae",
+            "Chlamydia_psittaci",
+            "Chlamydia_pneumoniae",
+            "Escherichia_albertii",
+            "Plesiomonas_shigelloides",
+            "Vibrio_fluvialis",
+            "Francisella_tularensis",
+            "Burkholderia_mallei",
+            "Burkholderia_gladioli",
+            "Nocardia",
+            "Cryptococcus",
+            "Aspergillus",
+            "Pneumocystis",
+            "Coccidioides",
+            "Histoplasma",
+            "Blastomyces",
+            "Paracoccidioides",
+            "Talaromyces_marneffei",
+            "Rhinocladiella",
+            "Cladophialophora",
+            "Candida",
+            "Fusarium",
+            "Sporothrix",
+        }
+        shipped = {rule["species"] for rule in rules}
+        missing = expected - shipped
+        assert not missing, f"CPIN species missing from rules: {sorted(missing)}"
+
+    def test_pseudotuberculosis_excludes_pestis_markers(self):
+        _db, rules = self._cpin_rules()
+        rule = next(r for r in rules if r["species"] == "Yersinia_pseudotuberculosis")
+        assert set(rule["exclude_genes"]) == {"pla"}
+
+    def test_mallei_allele_priority_over_pseudomallei(self):
+        _db, rules = self._cpin_rules()
+        rule = next(r for r in rules if r["species"] == "Burkholderia_mallei")
+        assert rule["genes"] == ["bima-bm"]
+        assert rule["priority_over"] == ["Burkholderia_pseudomallei"]
+
+    def test_enterobacteriaceae_barcodes_use_gyrb_not_rpob(self):
+        _db, rules = self._cpin_rules()
+        rules = {r["species"]: r for r in rules}
+        assert rules["Citrobacter"]["genes"] == ["gyrb-cf"]
+        assert rules["Escherichia_albertii"]["genes"] == ["gyrb-eal"]
+
+    def test_cpin_rule_genes_exist_in_markers_fasta(self):
+        genes = self._cpin_genes()
+        _db, rules = self._cpin_rules()
+        cpin_species = {
+            "Brucella",
+            "Mycobacterium_tuberculosis",
+            "Borrelia_burgdorferi",
+            "Yersinia_pseudotuberculosis",
+            "Citrobacter",
+            "Bartonella",
+            "Rickettsiaceae",
+            "Anaplasmataceae",
+            "Chlamydia_psittaci",
+            "Chlamydia_pneumoniae",
+            "Escherichia_albertii",
+            "Plesiomonas_shigelloides",
+            "Vibrio_fluvialis",
+            "Francisella_tularensis",
+            "Burkholderia_mallei",
+            "Burkholderia_gladioli",
+            "Nocardia",
+        }
+        for rule in rules:
+            if rule["species"] in cpin_species:
+                for gene in rule["genes"]:
+                    assert gene in genes, f"{rule['species']}: gene {gene} missing"
+
+    def test_fungal_its_barcodes_ship(self):
+        its = {g for g in self._cpin_genes() if g.startswith("its-")}
+        assert len(its) >= 13
+        _db, rules = self._cpin_rules()
+        rules = {r["species"] for r in rules}
+        for genus in (
+            "Cryptococcus",
+            "Aspergillus",
+            "Pneumocystis",
+            "Coccidioides",
+            "Histoplasma",
+            "Blastomyces",
+            "Paracoccidioides",
+            "Talaromyces_marneffei",
+            "Rhinocladiella",
+            "Cladophialophora",
+            "Candida",
+            "Fusarium",
+            "Sporothrix",
+        ):
+            assert genus in rules
+
+    def test_cpin_depth_controls_ship(self):
+        """Every cpin species carries a FASTQ depth control (rule 4 of the
+        CPIN build): virulence-gene species get an rpoB window, barcode
+        species reuse their own rule gene, fungi stay on sample-median."""
+        import yaml
+
+        from gside.marker_db import MarkerDatabase
+
+        db = MarkerDatabase.from_path(config.SPECIES_DB_DIR / "D1_marker" / "cpin")
+        meta = yaml.safe_load((db.root / "metadata.yaml").read_text())
+        controls = meta.get("control_genes", {})
+        genes = {
+            gene_from_seqid(line[1:])
+            for line in db.fasta.read_text().splitlines()
+            if line.startswith(">")
+        }
+        bacterial = {
+            "Brucella",
+            "Mycobacterium_tuberculosis",
+            "Borrelia_burgdorferi",
+            "Yersinia_pseudotuberculosis",
+            "Citrobacter",
+            "Bartonella",
+            "Rickettsiaceae",
+            "Anaplasmataceae",
+            "Chlamydia_psittaci",
+            "Chlamydia_pneumoniae",
+            "Escherichia_albertii",
+            "Plesiomonas_shigelloides",
+            "Vibrio_fluvialis",
+            "Francisella_tularensis",
+            "Burkholderia_mallei",
+            "Burkholderia_gladioli",
+            "Nocardia",
+        }
+        uncovered = bacterial - set(controls)
+        assert not uncovered, f"species without depth control: {sorted(uncovered)}"
+        for genes_list in controls.values():
+            for gene in genes_list:
+                assert gene in genes, f"control {gene} missing from cpin fasta"

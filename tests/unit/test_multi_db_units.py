@@ -37,9 +37,9 @@ class TestPanelMultiDatabase:
             str(salmdb): [_skani_hit(ref="GCF_B", ani=99.5)],
         }
         monkeypatch.setattr(ani, "_skani_search", lambda q, d, threads=4: hits_by_db[str(d)])
-        identified = identify_by_ani("q.fna", mode="panel", dbs=[taxadb, salmdb])
+        identified = identify_by_ani("q.fna", mode="ani", dbs=[taxadb, salmdb])
         r = identified.result
-        assert (r["species"], r["confidence"]) == ("Salmonella_enterica", "high")
+        assert (r["species"], r["confidence"]) == ("Salmonella", "high")
         assert r["top_hits"][0]["genome"] == "GCF_B"
         assert identified.database["name"] == f"{taxadb.name}+{salmdb.name}"
         assert [d["name"] for d in identified.to_dict()["databases"]] == [
@@ -55,12 +55,12 @@ class TestPanelMultiDatabase:
         second.mkdir()
         (second / "metadata.tsv").write_text("genome\tspecies\nGCF_A\tSalmonella enterica\n")
         monkeypatch.setattr(ani, "_skani_search", lambda q, d, threads=4: [_skani_hit(ref="GCF_A")])
-        r = identify_by_ani("q.fna", mode="panel", dbs=[first, second]).result
+        r = identify_by_ani("q.fna", mode="ani", dbs=[first, second]).result
         assert r["species"] == "Escherichia_coli"
 
     def test_single_db_list_keeps_single_shape(self, monkeypatch, taxadb):
         monkeypatch.setattr(ani, "_skani_search", lambda q, d, threads=4: [_skani_hit()])
-        identified = identify_by_ani("q.fna", mode="panel", dbs=[taxadb])
+        identified = identify_by_ani("q.fna", mode="ani", dbs=[taxadb])
         assert identified.database["name"] == taxadb.name
         assert "databases" not in identified.to_dict()
 
@@ -78,7 +78,7 @@ class TestMashMultiDatabase:
             str(two / "mash.msh"): [("GCF_B", 0.995)],
         }
         monkeypatch.setattr(ani, "_mash_dist", lambda q, msh, threads=4: rows_by_msh[str(msh)])
-        identified = identify_by_ani("q.fna", mode="mash_refseq", dbs=[one, two])
+        identified = identify_by_ani("q.fna", mode="mash", dbs=[one, two])
         r = identified.result
         assert r["identity"] == pytest.approx(0.995)
         assert r["top_hits"][0]["genome"] == "GCF_B"
@@ -100,7 +100,7 @@ class TestMashMultiDatabase:
         )
         reads = tmp_path / "r.fq"
         reads.write_text("@r\nACGT\n+\nI\n")
-        r = identify_by_ani(str(reads), mode="mash_refseq", dbs=[one, two]).result
+        r = identify_by_ani(str(reads), mode="mash", dbs=[one, two]).result
         assert r["top_hits"][0]["genome"] == "GCF_B"
 
 
@@ -168,5 +168,5 @@ class TestMashMultiBands:
             str(two / "mash.msh"): [("GCF_B", 0.94)],
         }
         monkeypatch.setattr(ani, "_mash_dist", lambda q, msh, threads=4: rows_by_msh[str(msh)])
-        r = identify_by_ani("q.fna", mode="mash_refseq", dbs=[one, two]).result
+        r = identify_by_ani("q.fna", mode="mash", dbs=[one, two]).result
         assert r["confidence"] == "medium"

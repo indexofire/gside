@@ -56,20 +56,20 @@ class TestStatus:
         assert not any(v["ready"] for v in status.values())
 
     def test_ready_branches(self, root):
-        _touch(root / "D1_marker" / "markers.fasta")
-        _touch(root / "D2_ani" / "panel.sketch" / "sketches.db")
-        _touch(root / "D3_mash" / "payload.bin")
-        _touch(root / "D4_sourmash" / "gtdb-reps-k31.zip")
-        _touch(root / "D4_sourmash" / "lineages.csv")
+        _touch(root / "D1_marker" / "default" / "markers.fasta")
+        _touch(root / "D2_ani" / "default" / "panel.sketch" / "sketches.db")
+        _touch(root / "D3_mash" / "default" / "payload.bin")
+        _touch(root / "D4_sourmash" / "default" / "gtdb-reps-k31.zip")
+        _touch(root / "D4_sourmash" / "default" / "lineages.csv")
         status = db_status()
         assert all(v["ready"] for v in status.values())
 
     def test_panel_sketch_as_file(self, root):
-        _touch(root / "D2_ani" / "panel.sketch")
+        _touch(root / "D2_ani" / "default" / "panel.sketch")
         assert _check_panel()
 
     def test_mash_msh(self, root):
-        _touch(root / "D3_mash" / "mash.msh")
+        _touch(root / "D3_mash" / "default" / "mash.msh")
         assert _check_mash()
 
 
@@ -82,14 +82,14 @@ class TestSetupTiers:
             db_setup("wat")
 
     def test_already_ready(self, root):
-        _touch(root / "D2_ani" / "panel.sketch" / "sketches.db")
-        _touch(root / "D3_mash" / "mash.msh")
+        _touch(root / "D2_ani" / "default" / "panel.sketch" / "sketches.db")
+        _touch(root / "D3_mash" / "default" / "mash.msh")
         assert db_setup("panel") == {"D2_ani": "already ready"}
         assert db_setup("mash") == {"D3_mash": "already ready"}
 
     def test_all_tier_covers_panel_and_mash(self, root):
-        _touch(root / "D2_ani" / "panel.sketch" / "sketches.db")
-        _touch(root / "D3_mash" / "mash.msh")
+        _touch(root / "D2_ani" / "default" / "panel.sketch" / "sketches.db")
+        _touch(root / "D3_mash" / "default" / "mash.msh")
         assert db_setup("all") == {"D2_ani": "already ready", "D3_mash": "already ready"}
 
 
@@ -98,12 +98,12 @@ class TestCopyFromSource:
         src = tmp_path / "D3_mash"
         _touch(src / "mash.msh")
         assert _copy_from_source(str(src), "D3_mash") == f"copied from {src}"
-        assert (root / "D3_mash" / "mash.msh").is_file()
+        assert (root / "D3_mash" / "default" / "mash.msh").is_file()
 
     def test_copy_parent_appends_name(self, root, tmp_path):
         _touch(tmp_path / "D2_ani" / "panel.sketch" / "sketches.db")
         assert _copy_from_source(str(tmp_path), "D2_ani").startswith("copied from")
-        assert (root / "D2_ani" / "panel.sketch" / "sketches.db").is_file()
+        assert (root / "D2_ani" / "default" / "panel.sketch" / "sketches.db").is_file()
 
     def test_missing_source(self, root, tmp_path):
         msg = _copy_from_source(str(tmp_path / "nope"), "D2_ani")
@@ -143,7 +143,7 @@ class TestMashDownload:
         monkeypatch.setattr(db, "MASH_MD5", hashlib.md5(gz_bytes).hexdigest())
         msg = _download_mash_zenodo(dst)
         assert msg == "downloaded from Zenodo (community sketch)"
-        assert (dst / "mash.msh").read_bytes() == b"fake-sketch-bytes"
+        assert (dst / "default" / "mash.msh").read_bytes() == b"fake-sketch-bytes"
 
     def test_network_failure(self, root, monkeypatch):
         def boom(url, dst):
@@ -224,86 +224,6 @@ class TestBuildFromManifest:
         assert _build_panel_from_manifest(tmp_path / "dst").startswith("ERROR: skani not found")
 
 
-class TestFormatStatus:
-    def test_table_matches_print_status_bytes(self, root, capsys):
-        _touch(root / "D1_marker" / "markers.fasta")
-        run_db_command(["status"])
-        expected = capsys.readouterr().out
-        assert db.format_status("table") + "\n" == expected
-
-    def test_tsv_rows(self, root):
-        _touch(root / "D1_marker" / "markers.fasta")
-        text = db.format_status("tsv")
-        lines = text.splitlines()
-        assert lines[0] == "COMPONENT\tREADY\tTIER\tINPUTS\tPATH"
-        assert lines[1].startswith("D1_marker\tready\tmini\tFASTA/FASTQ\t")
-        assert lines[2].split("\t")[:4] == ["D2_ani", "missing", "panel", "FASTA"]
-        assert "✅" not in text
-        assert "Run 'gside" not in text
-
-    def test_json_roundtrip(self, root):
-        assert json.loads(db.format_status("json")) == db_status()
-
-    def test_unknown_format_raises(self):
-        with pytest.raises(ValueError, match="unknown format"):
-            db.format_status("wat")
-
-
-class TestFormatTiers:
-    def test_table_matches_run_db_command_bytes(self, capsys):
-        run_db_command(["list"])
-        expected = capsys.readouterr().out
-        assert db.format_tiers("table") + "\n" == expected
-
-    def test_table_has_bordered_header_and_all_tiers(self):
-        text = db.format_tiers("table")
-        assert "gside database tiers" in text
-        assert "│ TIER" in text
-        assert "│ READY" in text
-        assert "│ SIZE" in text
-        assert "│ INPUTS" in text
-        assert "│ DESCRIPTION" in text
-        assert "┌" in text and "└" in text
-        for name in db._TIERS:
-            assert f"│ {name}" in text
-        ready_values = {
-            line.split("│")[2].strip()
-            for line in text.splitlines()
-            if line.startswith("│ ") and line.split("│")[1].strip()
-        }
-        assert ready_values <= {"ready", "missing", "READY"}
-
-    def test_tsv_rows(self):
-        lines = db.format_tiers("tsv").splitlines()
-        assert lines[0] == "NAME\tREADY\tSIZE\tINPUTS\tDESCRIPTION"
-        assert len(lines) == 1 + len(db._TIERS)
-        assert lines[1].split("\t")[:4] == ["mini", "ready", "~1MB", "FASTA/FASTQ"]
-
-    def test_tsv_ready_aggregates_tier_items(self, root):
-        _touch(root / "D2_ani" / "panel.sketch" / "sketches.db")
-        lines = db.format_tiers("tsv").splitlines()
-        by_name = {ln.split("\t")[0]: ln.split("\t")[1] for ln in lines[1:]}
-        assert by_name["panel"] == "ready"
-        assert by_name["all"] == "missing"
-        assert by_name["mash"] == "missing"
-
-    def test_json_roundtrip_with_ready(self):
-        data = json.loads(db.format_tiers("json"))
-        assert set(data) == {*db._TIERS, "custom_databases"}
-        assert data["mini"]["ready"] is True
-        assert isinstance(data["panel"]["ready"], bool)
-
-    def test_csv_quotes_commas(self):
-        lines = db.format_tiers("csv").splitlines()
-        assert lines[0] == "NAME,READY,SIZE,INPUTS,DESCRIPTION"
-        sourmash_row = next(ln for ln in lines[1:] if ln.startswith("sourmash,"))
-        assert '"GTDB gather database (sourmash, sketch k=31)"' in sourmash_row
-
-    def test_unknown_format_raises(self):
-        with pytest.raises(ValueError, match="unknown format"):
-            db.format_tiers("wat")
-
-
 class TestRunDbCommand:
     def test_status_and_list(self, root, capsys):
         assert run_db_command(["status"]) == 0
@@ -318,19 +238,19 @@ class TestRunDbCommand:
         assert run_db_command(["setup", "panel"]) == 1
 
     def test_setup_ok(self, root):
-        _touch(root / "D2_ani" / "panel.sketch" / "sketches.db")
+        _touch(root / "D2_ani" / "default" / "panel.sketch" / "sketches.db")
         assert run_db_command(["setup", "panel"]) == 0
 
 
 class TestSourmashTier:
     def test_already_ready(self, root):
-        _touch(root / "D4_sourmash" / "gtdb-reps-k31.zip")
-        _touch(root / "D4_sourmash" / "lineages.csv")
+        _touch(root / "D4_sourmash" / "default" / "gtdb-reps-k31.zip")
+        _touch(root / "D4_sourmash" / "default" / "lineages.csv")
         assert db_setup("sourmash") == {"D4_sourmash": "already ready"}
 
     def test_status_row(self, root):
-        _touch(root / "D4_sourmash" / "gtdb-reps-k31.zip")
-        _touch(root / "D4_sourmash" / "lineages.csv")
+        _touch(root / "D4_sourmash" / "default" / "gtdb-reps-k31.zip")
+        _touch(root / "D4_sourmash" / "default" / "lineages.csv")
         assert db_status()["D4_sourmash"]["ready"]
 
     def test_download_failure(self, root, monkeypatch):
@@ -350,8 +270,8 @@ class TestSourmashTier:
         monkeypatch.setattr(db, "SOURMASH_LINEAGES_SHA256", hashlib.sha256(b"x").hexdigest())
         msg = db_setup("sourmash")["D4_sourmash"]
         assert msg.startswith("downloaded from farm.cse.ucdavis.edu")
-        assert (root / "D4_sourmash" / "gtdb-reps-k31.zip").is_file()
-        assert (root / "D4_sourmash" / "lineages.csv").is_file()
+        assert (root / "D4_sourmash" / "default" / "gtdb-reps-k31.zip").is_file()
+        assert (root / "D4_sourmash" / "default" / "lineages.csv").is_file()
 
     def test_copy_from_source(self, root, tmp_path):
         src = tmp_path / "D4_sourmash"
@@ -381,7 +301,7 @@ class TestSetupDownloadPaths:
         monkeypatch.setattr(db, "_MANIFEST_DIR", manifests)
         monkeypatch.setattr(db, "_try_download_panel_release", lambda dst: "downloaded!")
         db_setup("panel")
-        assert (root / "D2_ani" / "metadata.tsv").is_file()
+        assert (root / "D2_ani" / "default" / "metadata.tsv").is_file()
 
     def test_mash_download_path(self, root, monkeypatch):
         monkeypatch.setattr(db, "_download_mash_zenodo", lambda dst: "dl!")
@@ -433,7 +353,8 @@ class TestSourmashRenameErrors:
         dst = root / "D4_sourmash"
         dst.mkdir(parents=True)
         # Pre-existing directory at the rename target makes os.rename fail.
-        (dst / "lineages.csv").mkdir()
+        (dst / "default").mkdir(exist_ok=True)
+        (dst / "default" / "lineages.csv").mkdir()
         msg = db_setup("sourmash")["D4_sourmash"]
         assert msg.startswith("ERROR:")
 
@@ -528,8 +449,8 @@ class TestTarExtractionSafety:
         monkeypatch.setattr(db, "PANEL_SHA256", "")
         msg = _try_download_panel_release(dst)
         assert msg == "downloaded from GitHub Release (pre-built sketch)"
-        assert (dst / "panel.sketch" / "sketches.db").is_file()
-        assert (dst / "panel.sketch" / "nested" / "deep" / "file.txt").is_file()
+        assert (dst / "default" / "panel.sketch" / "sketches.db").is_file()
+        assert (dst / "default" / "panel.sketch" / "nested" / "deep" / "file.txt").is_file()
 
 
 def _tar_bytes(names: list[str]) -> bytes:
@@ -555,7 +476,7 @@ class TestPanelChecksumVerification:
         monkeypatch.setattr(db, "PANEL_SHA256", hashlib.sha256(archive_bytes).hexdigest())
         msg = _try_download_panel_release(dst)
         assert msg == "downloaded from GitHub Release (pre-built sketch)"
-        assert (dst / "panel.sketch" / "sketches.db").is_file()
+        assert (dst / "default" / "panel.sketch" / "sketches.db").is_file()
 
     def test_pinned_mismatch_fails_closed(self, root, monkeypatch):
         dst = root / "D2_ani"
@@ -596,9 +517,10 @@ class TestSourmashChecksumVerification:
         dst.mkdir(parents=True)
         msg = db._download_sourmash_farm(dst)
         assert msg.startswith("ERROR: SHA256 mismatch for gtdb-rs226-reps.lineages.csv")
-        assert not (dst / "gtdb-rs226-reps.lineages.csv").exists()
-        assert not (dst / "lineages.csv").exists()
+        assert not (dst / "default" / "gtdb-rs226-reps.lineages.csv").exists()
+        assert not (dst / "default" / "lineages.csv").exists()
         assert not (dst / "gtdb-reps-k31.zip").exists()
+        assert not (dst / "lineages.csv").exists()
 
     def test_sig_unpinned_warns_and_lineages_verified(self, root, monkeypatch, capsys):
         def fake_download(url, d):
@@ -639,8 +561,8 @@ class TestMashStreamingMd5:
         msg = _download_mash_zenodo(dst)
         monkeypatch.undo()
         assert msg == "downloaded from Zenodo (community sketch)"
-        assert (dst / "mash.msh").read_bytes() == payload
-        assert not (dst / "mash.msh.gz").exists()
+        assert (dst / "default" / "mash.msh").read_bytes() == payload
+        assert not (dst / "default" / "mash.msh.gz").exists()
 
 
 class TestSourmashChecksumOverride:
@@ -741,45 +663,11 @@ class TestPanelGenomeUnzip:
 
 class TestStatusCsv:
     def test_csv_output(self, root):
-        _touch(root / "D1_marker" / "markers.fasta")
+        _touch(root / "D1_marker" / "default" / "markers.fasta")
+        _touch(root / "D1_marker" / "default" / "marker_rules.yaml")
         text = db.format_status("csv").splitlines()
-        assert text[0] == "COMPONENT,READY,TIER,INPUTS,PATH"
-        assert text[1].startswith("D1_marker,ready,mini,FASTA/FASTQ,")
-
-
-class TestNamedDatabasesListing:
-    def _named_marker_db(self, root):
-        path = Path(root) / "marker" / "food"
-        path.mkdir(parents=True)
-        (path / "markers.fasta").write_text(">markers~~~g1~~~x marker\nACGTACGT\n")
-        (path / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
-        return path
-
-    def test_json_includes_custom_databases(self, root):
-        import json as json_mod
-
-        self._named_marker_db(root)
-        payload = json_mod.loads(db.format_tiers("json"))
-        custom = payload["custom_databases"]["marker"]
-        assert [entry["name"] for entry in custom] == ["food"]
-        assert custom[0]["path"].endswith("marker/food")
-
-    def test_table_appends_named_section(self, root):
-        self._named_marker_db(root)
-        text = db.format_tiers("table")
-        assert "named databases" in text
-        assert "food" in text
-
-    def test_no_named_databases_omit_section(self, root):
-        assert "named databases" not in db.format_tiers("table")
-        payload = json.loads(db.format_tiers("json"))
-        assert payload["custom_databases"] == {}
-
-    def test_tsv_unchanged(self, root):
-        self._named_marker_db(root)
-        lines = db.format_tiers("tsv").splitlines()
-        assert lines[0] == "NAME\tREADY\tSIZE\tINPUTS\tDESCRIPTION"
-        assert all(len(line.split("\t")) == 5 for line in lines)
+        assert text[0] == "MODE,DATABASE,READY,INPUTS,PATH"
+        assert text[1].startswith("marker,default,ready,FASTA/FASTQ,")
 
 
 class TestFlattenIfNested:
@@ -829,3 +717,157 @@ class TestDownloadPanelGenomes:
         error = db._download_panel_genomes("/bin/datasets", ["GCF_1"], dst, genomes)
         assert error is not None
         assert error.startswith("ERROR: NCBI datasets download failed")
+
+
+class TestFormatDatabases:
+    """db list/status render the mode -> database view that -d selects."""
+
+    def _marker_family_db(self, root):
+        path = Path(root) / "D1_marker" / "food"
+        path.mkdir(parents=True)
+        (path / "markers.fasta").write_text(">gside|db=t|gene=g1|acc=x\nACGTACGT\n")
+        (path / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
+        return path
+
+    def test_table_shows_mode_database_rows(self, root):
+        self._marker_family_db(root)
+        text = db.format_databases("table")
+        assert "MODE" in text and "DATABASE" in text
+        assert "marker" in text and "food" in text and "default" in text
+        assert "ani" in text and "sourmash" in text
+
+    def test_tsv_columns(self, root):
+        self._marker_family_db(root)
+        lines = db.format_databases("tsv").splitlines()
+        assert lines[0] == "MODE\tDATABASE\tREADY\tINPUTS\tPATH"
+        assert all(len(line.split("\t")) == 5 for line in lines)
+
+    def test_json_groups_by_mode_with_tiers(self, root):
+        import json as json_mod
+
+        self._marker_family_db(root)
+        payload = json_mod.loads(db.format_databases("json"))
+        marker_dbs = payload["modes"]["marker"]
+        assert [d["name"] for d in marker_dbs] == ["default", "food"]
+        assert marker_dbs[0]["default"] is True
+        assert marker_dbs[0]["ready"] is False  # no bundled D1_marker in tmp root
+        assert marker_dbs[1]["default"] is False
+        assert payload["modes"]["ani"][0]["name"] == "default"
+        assert payload["tiers"]["panel"]["items"] == ["D2_ani"]
+
+    def test_status_uses_same_view(self, root):
+        self._marker_family_db(root)
+        text = db.format_status("table")
+        assert "MODE" in text and "food" in text
+
+    def test_mcp_db_list_serves_new_view(self, monkeypatch, root):
+        import json as json_mod
+
+        from gside.mcp_tools import TOOL_HANDLERS
+
+        self._marker_family_db(root)
+        payload = json_mod.loads(TOOL_HANDLERS["db_list"]({}))
+        assert "modes" in payload and "tiers" in payload
+        assert payload["modes"]["marker"][1]["name"] == "food"
+
+
+class TestFormatStatus:
+    def test_table_matches_run_db_command_bytes(self, root, capsys):
+        run_db_command(["status"])
+        expected = capsys.readouterr().out
+        assert db.format_status("table") + "\n" == expected
+
+    def test_tsv_rows(self, root):
+        lines = db.format_status("tsv").splitlines()
+        assert lines[0] == "MODE\tDATABASE\tREADY\tINPUTS\tPATH"
+        assert any(row.startswith("marker\tdefault\t") for row in lines[1:])
+        assert all(len(row.split("\t")) == 5 for row in lines)
+
+    def test_json_is_database_view(self, root):
+        payload = json.loads(db.format_status("json"))
+        assert set(payload) == {"modes", "tiers"}
+        assert "marker" in payload["modes"]
+
+    def test_json_matches_cli_table_source(self, root, capsys):
+        run_db_command(["status"])
+        assert "gside databases" in capsys.readouterr().out
+
+
+class TestNamedDatabasesListing:
+    def _named_marker_db(self, root):
+        path = Path(root) / "D1_marker" / "food"
+        path.mkdir(parents=True)
+        (path / "markers.fasta").write_text(">gside|db=t|gene=g1|acc=x\nACGTACGT\n")
+        (path / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
+        return path
+
+    def test_table_lists_named_database(self, root):
+        self._named_marker_db(root)
+        text = db.format_databases("table")
+        assert "marker" in text and "food" in text and "default" in text
+
+    def test_json_lists_named_database(self, root):
+        self._named_marker_db(root)
+        payload = json.loads(db.format_databases("json"))
+        names = [d["name"] for d in payload["modes"]["marker"]]
+        assert names == ["default", "food"]
+
+    def test_no_named_databases_still_lists_defaults(self, root):
+        payload = json.loads(db.format_databases("json"))
+        panel_default = {
+            "name": "default",
+            "default": True,
+            "ready": False,
+            "path": payload["modes"]["ani"][0]["path"],
+        }
+        assert payload["modes"]["ani"] == [panel_default]
+
+    def test_tsv_shape(self, root):
+        self._named_marker_db(root)
+        lines = db.format_databases("tsv").splitlines()
+        assert lines[0] == "MODE\tDATABASE\tREADY\tINPUTS\tPATH"
+        assert all(len(line.split("\t")) == 5 for line in lines)
+
+
+def test_check_format_rejects_unknown():
+    with pytest.raises(ValueError, match="unknown format"):
+        db._check_format("pretty")
+
+
+class TestNormalizeDefaultDir:
+    def test_flat_layout_moves_into_default(self, tmp_path):
+        (tmp_path / "mash.msh").write_bytes(b"msh")
+        (tmp_path / "manifests").mkdir()
+        db._normalize_default_dir(tmp_path)
+        assert (tmp_path / "default" / "mash.msh").is_file()
+        assert (tmp_path / "manifests").is_dir()  # aux dirs stay
+
+    def test_existing_default_left_untouched(self, tmp_path):
+        (tmp_path / "default").mkdir()
+        (tmp_path / "mash.msh").write_bytes(b"msh")
+        db._normalize_default_dir(tmp_path)
+        assert (tmp_path / "mash.msh").is_file()  # not moved
+
+    def test_empty_dir_noop(self, tmp_path):
+        db._normalize_default_dir(tmp_path)
+        assert not (tmp_path / "default").exists()
+
+
+def test_sketch_rebuild_replaces_existing(monkeypatch, tmp_path):
+    # covers the rmtree branch in _build_skani_sketch
+    import types
+
+    monkeypatch.setattr(db, "which", lambda tool: f"/bin/{tool}")
+    dst = tmp_path / "dst"
+    (dst / "default" / "panel.sketch").mkdir(parents=True)
+    (dst / "default" / "panel.sketch" / "old.db").write_bytes(b"x")
+    called = {}
+
+    def fake_run(cmd, **kwargs):
+        called["cmd"] = cmd
+        return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(db.subprocess, "run", fake_run)
+    assert db._build_skani_sketch("/bin/skani", [tmp_path / "g.fna"], dst) is None
+    assert str(dst / "default" / "panel.sketch") in " ".join(called["cmd"])
+    assert not (dst / "default" / "panel.sketch" / "old.db").exists()

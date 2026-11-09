@@ -96,7 +96,7 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-11-09): **775 tests** (unit + integration, DBs provisioned),
+Baseline (2026-11-09): **814 tests** (unit + integration, DBs provisioned),
 total coverage **99.8%** — all modules 100% except: ani 97% (`main()` text
 branch). Local coverage must never drop below its
 last high-water mark (99.8 with `D2_ani`/`D3_mash` provisioned; ~97 without).
@@ -182,14 +182,14 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 
 ### CLI Patterns
 - Click group style (mirrors gmlst/gspec family): `HELP_SETTINGS` (`-h`/`--help`), bare invocation prints help and exits 2 (`no_args_is_help`), `-v`/`-q` mutually exclusive (UsageError), thin commands registered via `add_command`
-- One command, `scan`; `-m/--mode` picks the method (isolate identification only — metagenomic profiling lives in the gmeta tool). Every option carries a short flag: `-m/--mode -f/--format -D/--db-dir -d/--db -o/--output -j/--jobs -t/--threads -n/--no-header -a/--auto-setup`; validate `-m/--mode -o/--output-dir`; db `-t/--tier -s/--source -f/--format`
-- `-d/--db [MODE:]NAME` (repeatable) selects databases per mode: a name under `data/db/<family>/<name>/`, a directory path, or `default`; resolutions live in `db_registry.py`. Multiple selections run and merge (marker: pooled rules+hits; panel/mash/sourmash: pooled hits re-ranked, taxa first-wins); `databases` array appears in the method payload only for multi-runs; `--marker-db` is a `-d marker:PATH` alias. `gtdbtk` rejects `-d`
+- One command, `scan`; `-m/--mode` picks the method (isolate identification only — metagenomic profiling lives in the gmeta tool). Every option carries a short flag: `-m/--mode -f/--format -D/--db-dir -d/--db -o/--output -j/--jobs -t/--threads -n/--no-header -a/--auto-setup`; validate `-m/--mode -o/--output-dir`; db `list -f/--format`, `setup -d/--db [MODE:]default|mode` (alias of legacy `-t/--tier`) `-s/--source -f/--format`
+- `-d/--db [MODE:]NAME` (repeatable) selects databases per mode: a name under the mode's tier directory (`D1_marker|D2_ani|D3_mash|D4_sourmash/<name>/`; the `-d MODE:` prefix takes the canonical mode name (legacy `panel:`/`mash_refseq:` normalize)), a directory path, or `default`; resolutions live in `db_registry.py`. Multiple selections run and merge (marker: pooled rules+hits; ani/mash/sourmash: pooled hits re-ranked, taxa first-wins); `databases` array appears in the method payload only for multi-runs; `--marker-db` is a `-d marker:PATH` alias. `gtdbtk` rejects `-d`
 - `-D/--db-dir`, `-f/--format` and `-t/--threads` are built by the shared factories `_db_dir_option` / `_format_option` / `_threads_option` in `cli.py` — add new commands through them so flags never drift
-- Agent-friendly outputs: `scan` defaults to JSON on stdout and supports `-f json|tsv|md|csv`; `-o` writes the payload to a file (row formats flushed per row as inputs complete — a mid-batch failure persists the prefix; json single document at the end; stdout stays empty, notice on stderr); `db status|list` accept `--format table|tsv|json`; `db setup` accepts `--format text|json` (json routes progress to stderr); `-V -J` prints version as JSON
-- Subcommands: `scan` / `db` group (`status|setup|list`) / `validate` / `mcp` (MCP stdio server) / `--version`; entry `gside.cli:main`
+- Agent-friendly outputs: `scan` defaults to JSON on stdout and supports `-f json|tsv|md|csv`; `-o` writes the payload to a file (row formats flushed per row as inputs complete — a mid-batch failure persists the prefix; json single document at the end; stdout stays empty, notice on stderr); `db status|list` render the mode→database view (`-d` selections; JSON also carries installable `tiers`) and accept `--format table|tsv|csv|json`; `db setup` accepts `--format text|json` (json routes progress to stderr); `-V -J` prints version as JSON
+- Subcommands: `scan` / `db` group (`list|setup|validate`; `status` is a hidden alias of `list` — same mode→database view) / `mcp` (MCP stdio server) / `--version`; entry `gside.cli:main`
 - `species` is a **hidden compatibility alias** for `scan`; bacmap still calls `gside species`, so keep it until that pin moves
-- Mode choices: `marker|panel|mash_refseq|sourmash|gtdbtk|all` — do not invent modes. `-m` also accepts `+` combinations (`marker+sourmash`): `_split_modes` dedupes in order, `all` cannot be combined, and `_validate_scan` checks **every** component against the input kind
-- Input kinds are inferred from the extension (`.fna/.fa/.fasta` vs `.fq/.fastq`, `.gz` stripped) and validated **before** any tool runs: `_MODE_INPUTS` in `cli.py` defines the matrix (marker/mash_refseq/sourmash accept both; panel/gtdbtk are FASTA-only — skani and GTDB-Tk need assemblies). `all` expands to the full isolate list and is validated component-by-component, so `all` needs FASTA. Update the matrix and docs together when adding a mode
+- Mode choices: `marker|ani|mash|sourmash|gtdbtk|all` — canonical names mirror the tier directories (D2_ani/D3_mash); legacy `panel`/`mash_refseq` spellings normalize to `ani`/`mash` at `_split_modes`. Do not invent modes. `-m` also accepts `+` combinations (`marker+sourmash`): `_split_modes` dedupes in order, `all` cannot be combined, and `_validate_scan` checks **every** component against the input kind
+- Input kinds are inferred from the extension (`.fna/.fa/.fasta` vs `.fq/.fastq`, `.gz` stripped) and validated **before** any tool runs: `_MODE_INPUTS` in `cli.py` defines the matrix (marker/mash/sourmash accept both; ani/gtdbtk are FASTA-only — skani and GTDB-Tk need assemblies). `all` expands to the full isolate list and is validated component-by-component, so `all` needs FASTA. Update the matrix and docs together when adding a mode
 - `--db-dir` overrides the database root for one invocation
 - `validate` is assembly QC (CheckM2 + GTDB-Tk), not a scan mode and **not** marker-based: no `-m`; `-o/--output-dir` is required and takes a **directory** (file is always `validation.json`), unlike `scan -o` (a file); `-t/--threads` feeds both tools. Exit 0 only when both tools ran; `partial`/`error` exit 1. The report carries schema/genome/parameters/software/tools/quality/taxonomy/status/errors/created_at
 - `verdict` shape is shared by single-mode and `all`: `species` (canonical), `display_name`, `strain`, `confidence`, `basis` (winner only), `supporting`, `agreement`
@@ -226,16 +226,15 @@ tests/
     └── test_marker_smoke.py  # Real blastn marker calls
 data/
 ├── db/
-│   ├── D1_marker/            # mini tier, TRACKED in git: rules + fasta + blastdb
-│   │                         # + metadata.yaml (control genes, reads defaults) + CONTROL_GENES.md
-│   ├── D2_ani/               # panel tier (skani sketch + genomes), gitignored
-│   │                         # except manifests/ (tracked build recipe)
-│   ├── D3_mash/              # mash tier (mash.msh), gitignored
-│   ├── D4_sourmash/          # GTDB reps k31 + lineages, via db setup (3.9GB)
-│   # named per-mode databases (-d [MODE:]NAME), family dirs:
-│   #   marker/<name>/  panel/<name>/  mash_refseq/<name>/  sourmash/<name>/
-│   # layouts mirror the tiers (marker: fasta+rules; panel: panel.sketch/;
-│   # mash_refseq: mash.msh; sourmash: gtdb-reps-k31.zip + lineages.csv)
+│   ├── D1_marker/            # marker tier, one subdirectory per database:
+│   │   ├── default/           # bundled DB (rules+fasta+blastdb+metadata)
+│   │   └── cpin/              # bundled CPIN extension (tracked; rpoB/gyrB controls)
+│   ├── D2_ani/               # panel tier (default/ holds sketch; genomes/ + manifests/ tracked recipe)
+│   ├── D3_mash/              # mash tier (default/mash.msh)
+│   ├── D4_sourmash/          # sourmash tier (default/), via db setup (3.9GB)
+│   # additional named databases sit beside default/ inside each tier dir
+│   # (layouts: marker fasta+rules; panel panel.sketch/; mash mash.msh;
+│   # sourmash gtdb-reps-k31.zip + lineages.csv)
 docs/
 ├── index.md / index.zh.md    # + architecture|installation|usage|reference/, same pairing
 └── (nav in mkdocs.yml; en default, zh secondary; build with --strict)
@@ -289,5 +288,5 @@ testpaths = ["tests"]
 - **`sourmash` needs its GTDB db**: provisioned via pixi (`sourmash>=4.9`) + `gside db setup --tier sourmash` (~3.9GB rs226 reps, renamed in place); `gather` output is read from `-o` file, never `--csv -` (unsupported flag). Confidence comes from the gather containment ANI (`average_containment_ani`, 95/93 bands, shared with panel); the old `f_unique_weighted` 0.90/0.70 bands remain only as a fallback when that column is absent. `possible_mixture` requires >=2 **distinct species** at >=10% with ANI >=93 — multiple strains of one species do not trigger it.
 - **DB download verification**: panel pins SHA256, mash MD5 (Zenodo only publishes MD5), sourmash lineages + signature SHA256. The sourmash signature zip has no upstream digest; `SOURMASH_SIG_SHA256` was pinned after a locally verified download (complete size, zip integrity, 143,385 k=31 DNA signatures, CC0) and `GSIDE_SOURMASH_SIG_SHA256` overrides it at setup time. Tar extraction uses `filter="data"`. All pinned artifacts live in the GitHub release tag `db-v0.1` (panel) — re-pin `PANEL_SHA256` whenever the release asset is replaced.
 - **`engine/` holds only live backends**: marker → `BlastBackend`, panel → `SkaniBackend`, mash_refseq/sourmash → `MashBackend`/`SourmashBackend` (analysis resolves binaries via `require_bin` and injects them with `binary=`; backends pass their module-level `which` as `resolver=` so tests can monkeypatch discovery). Shared scaffolding is `engine/_env.py` (`require_bin`/`run_checked`).
-- **Species name contract is `Genus_species`**: every tier emits the underscored label via `analysis/species_name.py` (`apply_species_name`) and keeps the tool string in `species_raw`, the strain in `strain`. The normalizer strips GTDB `s__` ranks, a leading `GCF_/GCA_` accession (sourmash names look like `GCF_... Campylobacter jejuni`), and GTDB disambiguation suffixes (`Campylobacter_D jejuni` → `Campylobacter_jejuni`, `Vibrio_A cholerae` → `Vibrio_cholerae`); `sp.`/`sp036004205`/`unidentified`/`Unknown` collapse to `Unknown`. marker labels are already contract form (`Salmonella_enterica`, `Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`) and pass through untouched — never "reduce" them to two tokens. bacmap's `canonical_from_verdict` only accepts `[A-Za-z]+(?:_[A-Za-z0-9]+)+`, so a spaced or dotted label breaks it.
-- **FASTA header contract**: `>markers~~~<gene>~~~<desc> role=<primary|confirm|typing|virulence|control>`; parser takes `split("~~~")[1]` — the `markers` prefix itself is never validated. `role=control` entries are single-copy depth controls mapped in `metadata.yaml: control_genes`; they never appear in `detected_markers` and are not rule genes.
+- **Species name contract is `Genus_species`**: every tier emits the underscored label via `analysis/species_name.py` (`apply_species_name`) and keeps the tool string in `species_raw`, the strain in `strain`. The normalizer strips GTDB `s__` ranks, a leading `GCF_/GCA_` accession (sourmash names look like `GCF_... Campylobacter jejuni`), and GTDB disambiguation suffixes (`Campylobacter_D jejuni` → `Campylobacter_jejuni`, `Vibrio_A cholerae` → `Vibrio_cholerae`); `sp.`/`sp036004205`/`unidentified`/`Unknown` collapse to `Unknown`. marker labels are already contract form (`Salmonella`, `Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`, `Shigella_flexneri`) and pass through untouched — never "reduce" them to two tokens. `Salmonella` and `Shigella` are deliberate genus-level labels (CPIN: typhoidal/non-typhoidal Salmonella and every serovar report as `Salmonella`; serovar typing belongs to gspec). bacmap's `canonical_from_verdict` only accepts `[A-Za-z]+(?:_[A-Za-z0-9]+)+`, so a spaced or dotted label breaks it.
+- **FASTA header contract (gspec-style pipes)**: `>gside|db=<database>|gene=<gene>|acc=<accession>|func=<role>|note=<text>` where func is primary/confirm/typing/virulence/control; the single parser is `marker_db.gene_from_seqid` (legacy `markers~~~<gene>~~~<acc>` headers keep parsing for user DBs). `func=control` entries are single-copy depth controls mapped in `metadata.yaml: control_genes`; they never appear in `detected_markers` and are not rule genes.

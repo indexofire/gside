@@ -283,7 +283,9 @@ def aggregate_screen(records: Iterable[Any], min_mapq: int = 0) -> list[dict[str
             sum(value * weight for value, weight in pairs) / weight_sum if weight_sum else 0.0
         )
         target_mapqs = mapqs[target]
-        parts = target.split("~~~")
+        from gside.marker_db import gene_from_seqid
+
+        parts = [target, gene_from_seqid(target), ""]
         hits.append(
             {
                 "gene": parts[1].lower() if len(parts) >= 2 else target.lower(),

@@ -33,7 +33,7 @@ TOOLS: list[dict[str, object]] = [
     _tool_entry(
         "species",
         "Identify species from assemblies or FASTQ reads (R1/R2 are paired into one"
-        " methods (marker/panel/mash_refseq/sourmash/gtdbtk), arbitration, and"
+        " methods (marker/ani/mash/sourmash/gtdbtk), arbitration, and"
         " confidence.",
         dict(
             contigs=_FILES,
@@ -50,7 +50,8 @@ TOOLS: list[dict[str, object]] = [
     ),
     _tool_entry(
         "db_list",
-        "List available database tiers with readiness. Returns JSON with tier metadata.",
+        "List databases per identification mode (the -d [MODE:]NAME view),"
+        " plus installable tier metadata. Returns JSON.",
         dict(format=_FORMAT),
     ),
     _tool_entry(

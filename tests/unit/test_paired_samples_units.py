@@ -84,7 +84,7 @@ class TestIdentifyOneFiles:
                 )
             ),
         )
-        cli._identify_one(["S_R1.fq", "S_R2.fq"], "mash_refseq", None)
+        cli._identify_one(["S_R1.fq", "S_R2.fq"], "mash", None)
         assert seen["files"] == ["S_R1.fq", "S_R2.fq"]
 
 

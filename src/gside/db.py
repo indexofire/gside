@@ -103,17 +103,24 @@ _CHUNK = 1024 * 1024
 
 
 _COMPONENTS: dict[str, tuple[str, str, list[list[tuple[str, Callable[[Path], bool]]]]]] = {
-    "D1_marker": ("mini", "D1_marker", [[("markers.fasta", Path.exists)]]),
+    "D1_marker": ("mini", "D1_marker", [[("default/markers.fasta", Path.exists)]]),
     "D2_ani": (
         "panel",
         "D2_ani",
-        [[("panel.sketch/sketches.db", Path.exists)], [("panel.sketch", Path.is_file)]],
+        [
+            [("default/panel.sketch/sketches.db", Path.exists)],
+            [("default/panel.sketch", Path.is_file)],
+        ],
     ),
-    "D3_mash": ("mash", "D3_mash", [[("mash.msh", Path.exists)], [("payload.bin", Path.exists)]]),
+    "D3_mash": (
+        "mash",
+        "D3_mash",
+        [[("default/mash.msh", Path.exists)], [("default/payload.bin", Path.exists)]],
+    ),
     "D4_sourmash": (
         "sourmash",
         "D4_sourmash",
-        [[("gtdb-reps-k31.zip", Path.exists), ("lineages.csv", Path.exists)]],
+        [[("default/gtdb-reps-k31.zip", Path.exists), ("default/lineages.csv", Path.exists)]],
     ),
 }
 
@@ -140,7 +147,7 @@ def db_status() -> dict[str, dict[str, Any]]:
     return {
         component: {
             "ready": _component_ready(component),
-            "path": str(SPECIES_DB_DIR / dir_name),
+            "path": str(SPECIES_DB_DIR / dir_name / "default"),
             "tier": tier,
             "inputs": _COMPONENT_INPUTS[component],
         }
@@ -190,15 +197,16 @@ def _install_panel(dst: Path) -> str:
 
 
 def _publish_taxa_map(dst: Path) -> None:
-    """Copy the tracked ``manifests/metadata.tsv`` next to the sketch.
+    """Copy the tracked ``manifests/metadata.tsv`` into the default database.
 
-    The panel taxa map is read from ``<D2_ani>/metadata.tsv`` at scan time;
-    the manifest build publishes it, so the pre-built release download must
-    do the same or every panel hit maps to ``Unknown``.
+    The panel taxa map is read from ``<D2_ani>/default/metadata.tsv`` at scan
+    time; the manifest build publishes it, so the pre-built release download
+    must do the same or every panel hit maps to ``Unknown``.
     """
     metadata = _MANIFEST_DIR / "metadata.tsv"
-    target = dst / "metadata.tsv"
+    target = dst / "default" / "metadata.tsv"
     if metadata.is_file() and not target.is_file():
+        target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(metadata, target)
 
 
@@ -226,8 +234,10 @@ def _download_sourmash_farm(dst: Path) -> str:
     # No checksum published upstream for the sig zip; the lineages csv is pinned.
     try:
         print("  downloading sourmash GTDB sketch (~3.9GB)...")
-        sig_zip = dst / "gtdb-rs226-reps.k31.sig.zip"
-        lineages_csv = dst / "gtdb-rs226-reps.lineages.csv"
+        default_dir = dst / "default"
+        default_dir.mkdir(parents=True, exist_ok=True)
+        sig_zip = default_dir / "gtdb-rs226-reps.k31.sig.zip"
+        lineages_csv = default_dir / "gtdb-rs226-reps.lineages.csv"
         _download_file(SOURMASH_SIG_URL, sig_zip)
         print("  downloading GTDB lineages...")
         _download_file(SOURMASH_LINEAGES_URL, lineages_csv)
@@ -244,13 +254,33 @@ def _download_sourmash_farm(dst: Path) -> str:
             artifact.unlink(missing_ok=True)
             return f"ERROR: SHA256 mismatch for {artifact.name}"
     try:
-        sig_zip.rename(dst / "gtdb-reps-k31.zip")
-        lineages_csv.rename(dst / "lineages.csv")
+        sig_zip.rename(default_dir / "gtdb-reps-k31.zip")
+        lineages_csv.rename(default_dir / "lineages.csv")
     except OSError as e:
         return f"ERROR: {e}"
     if _check_sourmash():
         return "downloaded from farm.cse.ucdavis.edu (GTDB rs226 reps, renamed in place)"
     return "ERROR: download incomplete, expected gtdb-reps-k31.zip + lineages.csv"
+
+
+def _normalize_default_dir(dst: Path) -> None:
+    """Move a legacy flat layout into ``<dst>/default``.
+
+    ``--source`` may point at a tier directory whose database files sit at
+    the top level (pre-multi-database layout); the runtime expects them in
+    ``default/``. Tier-level auxiliary dirs (``manifests``, ``genomes``) and
+    an existing ``default/`` are left untouched.
+    """
+    keep_at_top = {"default", "manifests", "genomes"}
+    if (dst / "default").is_dir():
+        return
+    entries = [child for child in dst.iterdir() if child.name not in keep_at_top]
+    if not entries:
+        return
+    default_dir = dst / "default"
+    default_dir.mkdir(parents=True, exist_ok=True)
+    for child in entries:
+        shutil.move(str(child), str(default_dir / child.name))
 
 
 def _copy_from_source(source: str, name: str) -> str:
@@ -262,13 +292,16 @@ def _copy_from_source(source: str, name: str) -> str:
     dst = SPECIES_DB_DIR / name
     dst.mkdir(parents=True, exist_ok=True)
     shutil.copytree(src, dst, dirs_exist_ok=True)
+    _normalize_default_dir(dst)
     return f"copied from {src}"
 
 
 def _try_download_panel_release(dst: Path) -> str | None:
     try:
         print("  downloading panel sketch from GitHub Release...")
-        archive = dst / "panel.sketch.tar.gz"
+        default_dir = dst / "default"
+        default_dir.mkdir(parents=True, exist_ok=True)
+        archive = default_dir / "panel.sketch.tar.gz"
         _download_file(PANEL_RELEASE_URL, archive)
         if not _verify_sha256(archive, PANEL_SHA256):
             archive.unlink(missing_ok=True)
@@ -276,7 +309,7 @@ def _try_download_panel_release(dst: Path) -> str | None:
         print("  extracting...")
         try:
             with tarfile.open(archive, "r:gz") as tf:
-                tf.extractall(dst, filter="data")
+                tf.extractall(default_dir, filter="data")
         except tarfile.TarError as e:
             archive.unlink(missing_ok=True)
             return f"ERROR: unsafe or corrupt archive: {e}"
@@ -292,7 +325,9 @@ def _try_download_panel_release(dst: Path) -> str | None:
 def _download_mash_zenodo(dst: Path) -> str:
     try:
         print("  downloading mash sketch from Zenodo (~179MB)...")
-        gz_path = dst / "mash.msh.gz"
+        default_dir = dst / "default"
+        default_dir.mkdir(parents=True, exist_ok=True)
+        gz_path = default_dir / "mash.msh.gz"
         _download_file(MASH_ZENODO_URL, gz_path)
 
         digest = _file_md5(gz_path)
@@ -301,7 +336,7 @@ def _download_mash_zenodo(dst: Path) -> str:
             return f"ERROR: MD5 mismatch (got {digest}, expected {MASH_MD5})"
 
         print("  verifying MD5 ✓, decompressing...")
-        with gzip.open(gz_path, "rb") as fin, open(dst / "mash.msh", "wb") as fout:
+        with gzip.open(gz_path, "rb") as fin, open(default_dir / "mash.msh", "wb") as fout:
             shutil.copyfileobj(fin, fout)
         gz_path.unlink(missing_ok=True)
         return "downloaded from Zenodo (community sketch)"
@@ -369,7 +404,9 @@ def _download_panel_genomes(
 def _build_skani_sketch(skani_bin: str, fnas: list[Path], dst: Path) -> str | None:
     """Sketch every genome into ``panel.sketch``; returns an error or None."""
     print(f"  building skani sketch from {len(fnas)} genomes...")
-    sketch_dir = dst / "panel.sketch"
+    default_dir = dst / "default"
+    default_dir.mkdir(parents=True, exist_ok=True)
+    sketch_dir = default_dir / "panel.sketch"
     if sketch_dir.exists():
         shutil.rmtree(sketch_dir)
     result = subprocess.run(
@@ -410,7 +447,7 @@ def _build_panel_from_manifest(dst: Path) -> str:
     if error:
         return error
 
-    shutil.copy2(metadata, dst / "metadata.tsv")
+    _publish_taxa_map(dst)
     return f"built from manifest: {len(fnas)} genomes → panel.sketch"
 
 
@@ -452,128 +489,79 @@ def _check_format(fmt: str) -> None:
         raise ValueError(f"unknown format {fmt!r}; expected 'table', 'tsv', 'csv', or 'json'")
 
 
-def format_status(fmt: str) -> str:
-    """Render ``db status`` output as table (human), tsv, or json."""
-    _check_format(fmt)
-    status = db_status()
-    if fmt == "json":
-        return json.dumps(status, indent=2, ensure_ascii=False)
-    if fmt == "tsv":
-        lines = ["COMPONENT\tREADY\tTIER\tINPUTS\tPATH"]
-        lines += [
-            f"{name}\t{'ready' if info['ready'] else 'missing'}\t{info['tier']}"
-            f"\t{info['inputs']}\t{info['path']}"
-            for name, info in status.items()
-        ]
-        return "\n".join(lines)
-    if fmt == "csv":
-        out = io.StringIO()
-        writer = csv.writer(out, lineterminator="\n")
-        writer.writerow(["COMPONENT", "READY", "TIER", "INPUTS", "PATH"])
-        writer.writerows(
-            [
-                name,
-                "ready" if info["ready"] else "missing",
-                info["tier"],
-                info["inputs"],
-                info["path"],
-            ]
-            for name, info in status.items()
-        )
-        return out.getvalue().rstrip("\n")
-    return _render_table(
-        "gside database status",
-        ("COMPONENT", "READY", "TIER", "INPUTS", "PATH"),
-        [
-            (
-                name,
-                "ready" if info["ready"] else "missing",
-                str(info["tier"]),
-                str(info["inputs"]),
-                str(info["path"]),
+_MODE_TO_TIER = {"marker": "mini", "ani": "panel", "mash": "mash", "sourmash": "sourmash"}
+
+
+def _database_rows() -> list[tuple[str, str, str, str, str]]:
+    """(mode, database, ready, inputs, path) rows — the view ``-d`` selects."""
+    from gside.db_registry import enumerate_databases
+
+    rows: list[tuple[str, str, str, str, str]] = []
+    for mode, choices in enumerate_databases(root=SPECIES_DB_DIR).items():
+        inputs = _TIER_INPUTS[_MODE_TO_TIER[mode]]
+        for choice in choices:
+            rows.append(
+                (
+                    mode,
+                    choice.name,
+                    "ready" if choice.ready else "missing",
+                    inputs,
+                    str(choice.path),
+                )
             )
-            for name, info in status.items()
-        ],
-        caption="Use: gside db setup --tier <tier>",
-    )
+    return rows
 
 
-def _named_databases() -> dict[str, list[dict[str, str]]]:
-    """Valid named databases per mode (``default`` tiers excluded)."""
+def format_databases(fmt: str) -> str:
+    """Render the mode → database view for ``db list``/``db status``.
+
+    Every row is a database ``-d [MODE:]NAME`` can select: the default tier
+    database plus the named databases under ``data/db/<family>/``. The JSON
+    view additionally carries the installable ``tiers`` (``db setup``) so
+    machine consumers keep sizes and descriptions.
+    """
     from gside.db_registry import DEFAULT_NAME, enumerate_databases
 
-    named: dict[str, list[dict[str, str]]] = {}
-    for mode, choices in enumerate_databases(root=SPECIES_DB_DIR).items():
-        entries = [
-            {"name": choice.name, "path": str(choice.path)}
-            for choice in choices
-            if choice.name != DEFAULT_NAME
-        ]
-        if entries:
-            named[mode] = entries
-    return named
-
-
-def format_tiers(fmt: str) -> str:
-    """Render ``db list`` output as table (human), tsv, csv, or json."""
     _check_format(fmt)
-    status = db_status()
-    rows = [
-        (
-            name,
-            "ready" if all(status[item]["ready"] for item in info["items"]) else "missing",
-            info["size"],
-            _TIER_INPUTS[name],
-            info["description"],
-        )
-        for name, info in _TIERS.items()
-    ]
-    named = _named_databases()
+    rows = _database_rows()
     if fmt == "json":
-        payload = {
-            name: {**info, "ready": ready == "ready", "inputs": _TIER_INPUTS[name]}
-            for (name, ready, _, _, _), (name_tier, info) in zip(rows, _TIERS.items(), strict=True)
-            if name == name_tier
-        }
-        payload["custom_databases"] = named
-        return json.dumps(payload, indent=2, ensure_ascii=False)
+        modes: dict[str, list[dict[str, Any]]] = {}
+        for mode, choices in enumerate_databases(root=SPECIES_DB_DIR).items():
+            modes[mode] = [
+                {
+                    "name": c.name,
+                    "default": c.name == DEFAULT_NAME,
+                    "ready": c.ready,
+                    "path": str(c.path),
+                }
+                for c in choices
+            ]
+        tiers = {name: {**info, "inputs": _TIER_INPUTS[name]} for name, info in _TIERS.items()}
+        return json.dumps({"modes": modes, "tiers": tiers}, indent=2, ensure_ascii=False)
     if fmt == "tsv":
-        lines = ["NAME\tREADY\tSIZE\tINPUTS\tDESCRIPTION"]
+        lines = ["MODE\tDATABASE\tREADY\tINPUTS\tPATH"]
         lines += ["\t".join(row) for row in rows]
         return "\n".join(lines)
     if fmt == "csv":
         out = io.StringIO()
         writer = csv.writer(out, lineterminator="\n")
-        writer.writerow(["NAME", "READY", "SIZE", "INPUTS", "DESCRIPTION"])
+        writer.writerow(["MODE", "DATABASE", "READY", "INPUTS", "PATH"])
         writer.writerows(rows)
         return out.getvalue().rstrip("\n")
-    caption = "Tiers marked ready can be used without downloading."
-    if named:
-        named_rows = [
-            (mode, entry["name"], entry["path"])
-            for mode, entries in named.items()
-            for entry in entries
-        ]
-        return (
-            _render_table(
-                "gside database tiers",
-                ("TIER", "READY", "SIZE", "INPUTS", "DESCRIPTION"),
-                rows,
-                caption=caption,
-            )
-            + "\n\n"
-            + _render_table(
-                "named databases (select with -d [MODE:]NAME)",
-                ("MODE", "NAME", "PATH"),
-                named_rows,
-            )
-        )
     return _render_table(
-        "gside database tiers",
-        ("TIER", "READY", "SIZE", "INPUTS", "DESCRIPTION"),
+        "gside databases",
+        ("MODE", "DATABASE", "READY", "INPUTS", "PATH"),
         rows,
-        caption=caption,
+        caption=(
+            "Select with: gside scan -d [MODE:]NAME · install default tiers with:"
+            " gside db setup --tier <tier>"
+        ),
     )
+
+
+def format_status(fmt: str) -> str:
+    """``db status`` renders the same view as ``db list`` (hidden alias)."""
+    return format_databases(fmt)
 
 
 def _render_table(
@@ -644,4 +632,4 @@ def _print_status() -> None:
 
 
 def _print_tiers() -> None:
-    print(format_tiers("table"))
+    print(format_databases("table"))

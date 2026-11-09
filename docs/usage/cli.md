@@ -14,8 +14,8 @@ gside scan <files...> [options]
 
 |---|---|---|---|---|
 | `marker` | no | ✅ | ✅ | FASTQ: reads mapped with minimap2 (`sr`/`map-ont`); per-gene breadth is the union of read alignments — ~1x genome coverage suffices |
-| `panel` | no | ✅ | ❌ | skani ANI |
-| `mash_refseq` | no | ✅ | ✅ | reads are sketched with `mash sketch -m 2 -r`; species-level at >=10x, strain calls unreliable |
+| `ani` (panel) | no | ✅ | ❌ | skani ANI |
+| `mash` (mash_refseq) | no | ✅ | ✅ | reads are sketched with `mash sketch -m 2 -r`; species-level at >=10x, strain calls unreliable |
 | `sourmash` | no | ✅ | ✅ | gather on read sketches (~4 min for a 10x 1.6Mb set); containment-ANI based |
 | `gtdbtk` | no | ✅ | ❌ | phylogenetic placement |
 | `all` | no | ✅ | ❌ | every species tier + arbitration (panel/gtdbtk are assembly-only) |
@@ -105,9 +105,9 @@ help (the same as `gside db -h`) and exits 0.
 
 | Subcommand | Purpose |
 |---|---|
-| `status` | Readiness of every component (name, tier, path) |
-| `list` | Tiers with readiness, size and description |
-| `setup` | Install or update one tier |
+| `status` | Readiness of every database `-d` can select, per mode |
+| `list` | The same mode → database view, plus installable tiers in JSON |
+| `setup` | Install or update one tier (the default databases) |
 | `validate` | Validate a custom marker database |
 
 `status` and `list` accept `-f/--format table|tsv|csv|json` (default `table`);
@@ -125,22 +125,22 @@ gside db status
 # │ D4_sourmash │ missing │ sourmash │ data/db/D4_sourmash      │
 # └─────────────┴───────┴────────────┴──────────────────────────┘
 
-gside db status -f json    # {component: {ready, path, tier, inputs}}
-gside db status -f csv     # COMPONENT,READY,TIER,INPUTS,PATH
+gside db status -f json    # {modes: {mode: [{name, default, ready, path}]}, tiers: {...}}
+gside db status -f csv     # MODE,DATABASE,READY,INPUTS,PATH
 ```
 
 ### list
 
 ```bash
-gside db list              # bordered tier table
-gside db list -f tsv       # TIER	READY	SIZE	DESCRIPTION
+gside db list              # bordered mode→database table (the -d view)
+gside db list -f tsv       # MODE	DATABASE	READY	INPUTS	PATH
 ```
 
 ### setup
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `-t`, `--tier` | `panel` | `mini|panel|mash|sourmash|all` |
+| `-t`, `--tier` | `ani` (panel) | `mini|panel|mash|sourmash|all` |
 | `-s`, `--source` | — | Copy an existing local database directory instead of downloading |
 | `-f`, `--format` | `text` | `text` / `json` (json routes progress to stderr) |
 
@@ -226,7 +226,7 @@ it still exits 0 when both tools ran. Configure the tools with `CHECKM2DB` and
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.2.3", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.4", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},
@@ -303,8 +303,8 @@ flag; `-J` adds a JSON envelope.
 
 ```bash
 gside -V
-# gside, version 0.2.3
+# gside, version 0.2.4
 
 gside --version --json     # or -V -J
-# {"tool": "gside", "version": "0.2.3"}
+# {"tool": "gside", "version": "0.2.4"}
 ```

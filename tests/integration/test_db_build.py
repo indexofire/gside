@@ -42,8 +42,8 @@ class TestBuildFromManifest:
         )
         msg = _build_panel_from_manifest(tmp_path / "dst")
         assert msg.startswith("built from manifest: 1 genomes")
-        assert (tmp_path / "dst" / "panel.sketch").exists()
-        assert (tmp_path / "dst" / "metadata.tsv").is_file()
+        assert (tmp_path / "dst" / "default" / "panel.sketch").exists()
+        assert (tmp_path / "dst" / "default" / "metadata.tsv").is_file()
 
 
 class TestBuildErrors:

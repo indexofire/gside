@@ -47,7 +47,7 @@ class TestMarkerRegistryLabels:
     @pytest.mark.parametrize(
         "label",
         [
-            "Salmonella_enterica",
+            "Salmonella",
             "Vibrio_parahaemolyticus",
             "Escherichia_coli",
             "Shigella",
@@ -175,3 +175,34 @@ class TestGtdbDisambiguationSuffix:
     def test_strain_tokens_are_preserved(self):
         assert parse_species_name("Vibrio cholerae O1").strain == "O1"
         assert parse_species_name("Escherichia coli K12").strain == "K12"
+
+
+class TestGenusCollapse:
+    """Deliberate genus-level labels (CPIN): every Salmonella entry point -
+    marker registry, panel metadata, GTDB lineages - reports as Salmonella."""
+
+    @pytest.mark.parametrize(
+        ("raw", "label", "display"),
+        [
+            ("Salmonella enterica", "Salmonella", "Salmonella"),
+            ("Salmonella bongori", "Salmonella", "Salmonella"),
+            ("Salmonella enterica subsp. enterica", "Salmonella", "Salmonella"),
+            ("Salmonella enterica subsp. enterica serovar Typhi", "Salmonella", "Salmonella"),
+            ("Salmonella", "Salmonella", "Salmonella"),
+            ("s__Salmonella enterica", "Salmonella", "Salmonella"),
+        ],
+    )
+    def test_salmonella_collapses_to_genus(self, raw, label, display):
+        parsed = parse_species_name(raw)
+        assert parsed.label == label
+        assert parsed.display == display
+
+    def test_serovar_detail_lands_in_strain(self):
+        parsed = parse_species_name("Salmonella enterica subsp. enterica serovar Typhi")
+        assert parsed.label == "Salmonella"
+        assert "enterica" in parsed.strain
+        assert "Typhi" in parsed.strain
+
+    def test_other_genera_unchanged(self):
+        assert parse_species_name("Vibrio cholerae").label == "Vibrio_cholerae"
+        assert parse_species_name("Shigella flexneri").label == "Shigella_flexneri"

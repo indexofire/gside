@@ -20,9 +20,10 @@ from gside.analysis.read_screening import is_fastq, screen_reads
 from gside.config import SPECIES_DB_DIR
 from gside.marker_db import MarkerDatabase, resolve_marker_db
 
-_MARKERS_FASTA = SPECIES_DB_DIR / "D1_marker" / "markers.fasta"
-_MARKER_RULES = SPECIES_DB_DIR / "D1_marker" / "marker_rules.yaml"
-_MARKER_METADATA = SPECIES_DB_DIR / "D1_marker" / "metadata.yaml"
+_DEFAULT_MARKER_DIR = SPECIES_DB_DIR / "D1_marker" / "default"
+_MARKERS_FASTA = _DEFAULT_MARKER_DIR / "markers.fasta"
+_MARKER_RULES = _DEFAULT_MARKER_DIR / "marker_rules.yaml"
+_MARKER_METADATA = _DEFAULT_MARKER_DIR / "metadata.yaml"
 
 _MIN_IDENTITY = 85.0
 _MIN_COVERAGE = 60.0
@@ -271,7 +272,7 @@ def _legacy_blast_hits(
     if marker_db is not None:
         db = str(marker_db.ensure_blast_db())
     else:
-        db = str(SPECIES_DB_DIR / "D1_marker" / "markers_blastdb")
+        db = str(SPECIES_DB_DIR / "D1_marker" / "default" / "markers_blastdb")
     backend = BlastBackend(binary=blastn, threads=threads)
     return backend.find(
         query=Path(contigs_fasta),
@@ -311,8 +312,9 @@ def _blast_contigs(
     hits = []
     for hit in engine_hits:
         seqid = hit.subject_id
-        parts = seqid.split("~~~")
-        gene = parts[1].lower() if len(parts) >= 2 else seqid.lower()
+        from gside.marker_db import gene_from_seqid
+
+        gene = gene_from_seqid(seqid).lower()
         hits.append(
             {
                 "gene": gene,

@@ -102,9 +102,9 @@ def _tool_db_status(arguments: dict[str, Any]) -> str:
 
 
 def _tool_db_list(arguments: dict[str, Any]) -> str:
-    from gside.db import format_tiers
+    from gside.db import format_databases
 
-    return format_tiers(_format(arguments))
+    return format_databases(_format(arguments))
 
 
 def _tool_db_setup(arguments: dict[str, Any]) -> str:

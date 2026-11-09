@@ -38,7 +38,7 @@ If you installed gside from PyPI and keep the binaries elsewhere, point
 ## 3. Verify
 
 ```bash
-gside -V              # gside, version 0.2.3
+gside -V              # gside, version 0.2.4
 gside db status       # mini (D1_marker) must be ✅
 ```
 

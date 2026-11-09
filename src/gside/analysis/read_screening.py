@@ -134,7 +134,9 @@ def _aggregate(rows: list[dict[str, Any]], min_mapq: int = 0) -> list[dict[str, 
         weight_sum = sum(weight for _, weight in pairs)
         identity = sum(value * weight for value, weight in pairs) / weight_sum
         target_mapqs = mapqs[target]
-        parts = target.split("~~~")
+        from gside.marker_db import gene_from_seqid
+
+        parts = [target, gene_from_seqid(target), ""]
         hits.append(
             {
                 "gene": parts[1].lower() if len(parts) >= 2 else target.lower(),

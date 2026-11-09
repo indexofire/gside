@@ -837,8 +837,8 @@ packages:
   requires_python: '>=3.12'
 - pypi: ./
   name: gside
-  version: 0.2.3
-  sha256: b897c11f4cb3b97f3677c293bff1f7a231e67121a893b3df019176379a0d62f2
+  version: 0.2.4
+  sha256: 3566728a27ffaf27c6d81e36d12bd8155d01f88f9c9c5dcc38f43c86e53706ae
   requires_dist:
   - click>=8.0
   - gseek>=0.10.4

@@ -15,7 +15,6 @@ from typing import Any
 from gside.analysis._envelope import MethodEnvelope
 from gside.analysis._thresholds import ANI_HIGH, ANI_MEDIUM
 from gside.analysis.species_name import UNKNOWN, apply_species_name, canonical_species
-from gside.config import SPECIES_DB_DIR
 
 # Fallback bands for gather CSVs without the containment-ANI column
 # (sourmash >= 4.x always emits it; older exports may not).
@@ -171,11 +170,14 @@ def identify_by_sourmash(
             {"name": base.name, "version": _db_version(base), "path": str(base)} for base in bases
         ]
     else:
-        base = (
-            multi_dbs[0]
-            if multi_dbs
-            else (Path(db_dir) if db_dir else SPECIES_DB_DIR / "D4_sourmash")
-        )
+        if multi_dbs:
+            base = multi_dbs[0]
+        else:
+            from gside.db_registry import default_db_dir
+
+            base = default_db_dir("sourmash", root=db_dir)
+            if db_dir is not None and not base.is_dir():
+                base = Path(db_dir)
         partition = _gather_and_tax(contigs, base)
         database = {"name": base.name, "version": _db_version(base)}
         databases = []

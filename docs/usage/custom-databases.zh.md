@@ -4,7 +4,7 @@
 
 `gside` 的各模式依赖数据库。除内置/安装的 tier（`D1_marker`、`D2_ani`、
 `D3_mash`、`D4_sourmash`）外,所有支持本地数据库的模式 —— `marker`、
-`panel`、`mash_refseq`、`sourmash` —— 都可以添加命名数据库,并且一次鉴定
+`ani`、`mash`、`sourmash` —— 都可以添加命名数据库,并且一次鉴定
 可以选择其中的多个。
 
 ## 选择数据库
@@ -38,18 +38,27 @@ family 子目录中:
 
 ```text
 data/db/
-├── D1_marker/               # marker 默认 tier(随包)
-├── D2_ani/                  # panel 默认 tier(db setup --tier panel)
-├── D3_mash/                 # mash_refseq 默认 tier
-├── D4_sourmash/             # sourmash 默认 tier
-├── marker/<name>/           # 自定义 marker 库(布局见下)
-├── panel/<name>/            # panel.sketch/ + metadata.tsv
-├── mash_refseq/<name>/      # mash.msh
-└── sourmash/<name>/         # gtdb-reps-k31.zip + lineages.csv
+├── D1_marker/               # marker tier:一个子目录一个数据库
+│   ├── default/             # 随包默认库(markers.fasta + 规则 + blastdb)
+│   └── cpin/                # 随包发行的 CPIN 扩展库
+├── D2_ani/                  # panel tier(default/ 存 sketch;genomes/ 为构建输入)
+│   └── <name>/              # 你的命名 panel 库
+├── D3_mash/                 # mash tier(default/mash.msh;<name>/ 放更多)
+└── D4_sourmash/             # sourmash tier(default/;<name>/ 放更多)
 ```
 
-`gside db list` 会枚举它们(table 格式的「named databases」小节,以及
-`--format json` 的 `custom_databases` 键)。没有本地数据库的模式
+每个模式独占一个 tier 目录,数据库放在其**内部**——一个子目录一个库,
+`default` 加任意命名库。目录内名字唯一,因此 (模式, 库名) 天然不重复。
+`-d MODE:` 前缀接受模式名(`panel:lab`)或别名(`ani:lab`),二者等价。
+
+**一个模式多个 bundled 数据库的存放约定。** 其余 bundled 库与用户库
+同格式,作为 `default/` 的兄弟子目录发行——`D1_marker/cpin` 即随包示例
+(git 跟踪,同一套布局校验)。你的库放在旁边(`D1_marker/my-panel/`),
+或 `-d` 直接指向任意目录路径。
+
+`gside db list` / `gside db status` 会枚举它们:`-d` 可选的每个数据库都
+以 `MODE / DATABASE` 行出现(JSON 为 `modes`,另附可安装的 `tiers`)。
+没有本地数据库的模式
 (`gtdbtk`)传入 `-d` 会得到可操作的报错。
 
 ### 合并语义
@@ -77,10 +86,10 @@ my-markers/
 
 ### `markers.fasta`
 
-FASTA header 必须保留三段式契约：
+FASTA header 采用 gspec 风格的竖线契约：
 
 ```text
->markers~~~<gene>~~~<accession> <description>
+>gside|db=<database>|gene=<gene>|acc=<accession>|func=<role>|note=<text>
 ```
 
 示例：
@@ -219,7 +228,7 @@ merged = identify_multigene("sample.fna", marker_db=["my-markers", "other"])
 
 ## 限制
 
-- 命名数据库支持 `marker`、`panel`、`mash_refseq`、`sourmash`；`gtdbtk`
+- 命名数据库支持 `marker`、`ani`、`mash`、`sourmash`；`gtdbtk`
   （外部 GTDB-Tk 库）不接受 `-d`。
 - 自定义库不参与 `db setup` / `db status`；`db list` 会列出命名库，
   `db validate` 校验 marker 布局。

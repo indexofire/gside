@@ -13,8 +13,8 @@ gside scan <files...> [选项]
 
 |---|---|---|---|---|
 | `marker` | 否 | ✅ | ✅ | FASTQ：minimap2（`sr`/`map-ont`）比对，基因 breadth 取所有读段比对区间的并集——约 1× 基因组覆盖即可 |
-| `panel` | 否 | ✅ | ❌ | skani ANI |
-| `mash_refseq` | 否 | ✅ | ✅ | 读段先 `mash sketch -m 2 -r`；≥10× 可做种级判定，菌株级不可靠 |
+| `ani` (panel) | 否 | ✅ | ❌ | skani ANI |
+| `mash` (mash_refseq) | 否 | ✅ | ✅ | 读段先 `mash sketch -m 2 -r`；≥10× 可做种级判定，菌株级不可靠 |
 | `sourmash` | 否 | ✅ | ✅ | 对读段签名做 gather（1.6Mb 的 10× 数据约 4 分钟）；基于 containment ANI |
 | `gtdbtk` | 否 | ✅ | ❌ | 系统发育 placement |
 | `all` | 否 | ✅ | ❌ | 全部物种层 + 仲裁（panel/gtdbtk 仅接受组装） |
@@ -94,9 +94,9 @@ gside scan ont_reads.fastq -m marker
 
 | 子命令 | 用途 |
 |---|---|
-| `status` | 每个组件的就绪状态（名称、tier、路径） |
-| `list` | tier 列表（就绪、大小、说明） |
-| `setup` | 安装/更新单个 tier |
+| `status` | `-d` 可选的每个数据库的就绪状态（按模式） |
+| `list` | 同一"模式→数据库"视图；JSON 附可安装 tier 元数据 |
+| `setup` | 安装/更新单个 tier（默认数据库） |
 | `validate` | 校验自定义 marker 数据库 |
 
 `status` 与 `list` 接受 `-f/--format table|tsv|csv|json`（默认 `table`）；
@@ -114,22 +114,22 @@ gside db status
 # │ D4_sourmash │ missing │ sourmash   │ data/db/D4_sourmash      │
 # └─────────────┴─────────┴────────────┴──────────────────────────┘
 
-gside db status -f json    # {component: {ready, path, tier, inputs}}
-gside db status -f csv     # COMPONENT,READY,TIER,INPUTS,PATH
+gside db status -f json    # {modes: {模式: [{name, default, ready, path}]}}, tiers: {...}}
+gside db status -f csv     # MODE,DATABASE,READY,INPUTS,PATH
 ```
 
 ### list
 
 ```bash
-gside db list              # 带边框的 tier 表格
-gside db list -f tsv       # TIER	READY	SIZE	DESCRIPTION
+gside db list              # 带边框的“模式→数据库”表（-d 视角）
+gside db list -f tsv       # MODE	DATABASE	READY	INPUTS	PATH
 ```
 
 ### setup
 
 | 选项 | 默认 | 说明 |
 |---|---|---|
-| `-t`，`--tier` | `panel` | `mini|panel|mash|sourmash|all` |
+| `-t`，`--tier` | `ani` (panel) | `mini|panel|mash|sourmash|all` |
 | `-s`，`--source` | — | 从本地已有数据库目录复制，而不是下载 |
 | `-f`，`--format` | `text` | `text` / `json`（json 把进度写到 stderr） |
 
@@ -210,7 +210,7 @@ gside validate <contigs.fasta> -o <输出目录> [选项]
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.2.3", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.4", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},
@@ -283,8 +283,8 @@ JSON。
 
 ```bash
 gside -V
-# gside, version 0.2.3
+# gside, version 0.2.4
 
 gside --version --json     # 或 -V -J
-# {"tool": "gside", "version": "0.2.3"}
+# {"tool": "gside", "version": "0.2.4"}
 ```

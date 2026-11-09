@@ -12,7 +12,7 @@ _GENOMES = _REPO / "data" / "db" / "D2_ani" / "genomes"
 _SKETCH = _REPO / "data" / "db" / "D2_ani" / "panel.sketch"
 
 _CASES = {
-    "GCF_000006945.2_ASM694v2_genomic.fna": ("Salmonella_enterica", "Salmonella"),
+    "GCF_000006945.2_ASM694v2_genomic.fna": ("Salmonella", "Salmonella"),
     "GCF_000009085.1_ASM908v1_genomic.fna": ("Campylobacter_jejuni", "Campylobacter_jejuni"),
     "GCF_000465235.1_ASM46523v1_genomic.fna": ("Campylobacter_coli", "Campylobacter_coli"),
     "GCF_000005845.2_ASM584v2_genomic.fna": ("Escherichia_coli", "Escherichia_coli"),
@@ -35,7 +35,7 @@ class TestMarkerPanelAgreement:
 
         marker_species, panel_fragment = expected
         m = identify_multigene(str(_GENOMES / fna)).to_dict()
-        p = identify_by_ani(str(_GENOMES / fna), mode="panel").result
+        p = identify_by_ani(str(_GENOMES / fna), mode="ani").result
         assert m["species"] == marker_species
         assert m["confidence"] == "high"
         assert panel_fragment in p["species"]

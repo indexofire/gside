@@ -47,11 +47,11 @@ class TestMeanReadLength:
 class TestPafParsing:
     def test_primary_row(self):
         row = rs._parse_paf_line(
-            "r1\t150\t0\t150\t+\tmarkers~~~inva~~~M90846.1\t900\t10\t160\t148\t150\t60\ttp:A:P"
+            "r1\t150\t0\t150\t+\tgside|db=t|gene=inva|acc=M90846.1\t900\t10\t160\t148\t150\t60\ttp:A:P"
         )
         assert row == {
             "qname": "r1",
-            "tname": "markers~~~inva~~~M90846.1",
+            "tname": "gside|db=t|gene=inva|acc=M90846.1",
             "tlen": 900,
             "tstart": 10,
             "tend": 160,
@@ -63,7 +63,7 @@ class TestPafParsing:
     def test_secondary_row_skipped(self):
         assert (
             rs._parse_paf_line(
-                "r1\t150\t0\t150\t+\tmarkers~~~inva~~~x\t900\t10\t160\t148\t150\t0\ttp:A:S"
+                "r1\t150\t0\t150\t+\tgside|db=t|gene=inva|acc=x\t900\t10\t160\t148\t150\t0\ttp:A:S"
             )
             is None
         )
@@ -83,7 +83,7 @@ class TestAggregate:
         nmatch=145,
         alen=150,
         tlen=300,
-        tname="markers~~~inva~~~x",
+        tname="gside|db=test|gene=inva|acc=t|func=primary",
         mapq=60,
         qname="r",
     ):
@@ -131,8 +131,8 @@ class TestAggregate:
     def test_multiple_targets(self):
         hits = rs._aggregate(
             [
-                self._row(0, 150, tname="markers~~~inva~~~x"),
-                self._row(0, 60, tname="markers~~~mapa~~~y", tlen=120),
+                self._row(0, 150, tname="gside|db=test|gene=inva|acc=t|func=primary"),
+                self._row(0, 60, tname="gside|db=test|gene=mapa|acc=t|func=primary", tlen=120),
             ]
         )
         by_gene = {hit["gene"]: hit for hit in hits}
@@ -172,8 +172,8 @@ class TestScreenReads:
 
     def test_rows_are_aggregated(self, monkeypatch):
         paf = (
-            "r1\t150\t0\t150\t+\tmarkers~~~inva~~~x\t300\t0\t150\t145\t150\t60\ttp:A:P\n"
-            "r2\t150\t0\t150\t+\tmarkers~~~inva~~~x\t300\t150\t300\t145\t150\t60\ttp:A:P\n"
+            "r1\t150\t0\t150\t+\tgside|db=t|gene=inva|acc=x\t300\t0\t150\t145\t150\t60\ttp:A:P\n"
+            "r2\t150\t0\t150\t+\tgside|db=t|gene=inva|acc=x\t300\t150\t300\t145\t150\t60\ttp:A:P\n"
         )
         self._stub(monkeypatch, paf)
         hits = rs.screen_reads("r.fq", "markers.fasta")
@@ -245,7 +245,7 @@ class TestMalformedInputs:
     def test_contained_interval_is_ignored(self):
         row = {
             "qname": "r",
-            "tname": "markers~~~x~~~y",
+            "tname": "gside|db=test|gene=x|acc=t|func=primary",
             "tlen": 300,
             "tstart": 0,
             "tend": 300,

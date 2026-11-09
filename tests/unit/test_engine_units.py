@@ -10,7 +10,7 @@ from gside.engine.hits import Hit
 def _blast_line(**kw) -> str:
     cols = {
         "qseqid": "q1",
-        "sseqid": "markers~~~inva~~~X",
+        "sseqid": "gside|db=t|gene=inva|acc=X",
         "pident": "99.5",
         "length": "400",
         "mismatch": "2",

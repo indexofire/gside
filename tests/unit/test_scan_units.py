@@ -56,7 +56,7 @@ class TestScanIsolate:
         assert calls["args"][1] == "marker"
 
     def test_fastq_rejected_for_genome_tiers(self):
-        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "panel"])
+        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "ani"])
         assert result.exit_code == 2
         assert "does not accept FASTQ" in result.output
 
@@ -112,8 +112,8 @@ class TestMetaMovedToGmeta:
 class TestAliases:
     def test_species_alias_forwards(self, monkeypatch):
         calls = _capture(monkeypatch, "_run_species")
-        assert CliRunner().invoke(main, ["species", "g.fna", "-m", "panel"]).exit_code == 0
-        assert calls["args"][1] == "panel"
+        assert CliRunner().invoke(main, ["species", "g.fna", "-m", "ani"]).exit_code == 0
+        assert calls["args"][1] == "ani"
 
     def test_species_alias_defaults_to_marker(self, monkeypatch):
         calls = _capture(monkeypatch, "_run_species")
@@ -137,7 +137,7 @@ class TestReadsCapableGenomeTiers:
     def test_mash_refseq_accepts_fastq(self, monkeypatch):
         calls = _capture(monkeypatch, "_run_species")
         assert CliRunner().invoke(main, ["scan", "r.fq", "-m", "mash_refseq"]).exit_code == 0
-        assert calls["args"][1] == "mash_refseq"
+        assert calls["args"][1] == "mash"
 
     def test_sourmash_accepts_fastq(self, monkeypatch):
         calls = _capture(monkeypatch, "_run_species")
@@ -145,7 +145,7 @@ class TestReadsCapableGenomeTiers:
         assert calls["args"][1] == "sourmash"
 
     def test_panel_still_rejects_fastq(self):
-        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "panel"])
+        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "ani"])
         assert result.exit_code == 2
         assert "does not accept FASTQ" in result.output
 
@@ -166,12 +166,12 @@ class TestCompositeModes:
         calls = _capture(monkeypatch, "_run_species")
         result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "marker+mash_refseq+sourmash"])
         assert result.exit_code == 0
-        assert calls["args"][1] == "marker+mash_refseq+sourmash"
+        assert calls["args"][1] == "marker+mash+sourmash"
 
     def test_incompatible_component_is_named(self):
-        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "marker+panel"])
+        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "marker+ani"])
         assert result.exit_code == 2
-        assert "mode 'panel' does not accept FASTQ" in result.output
+        assert "mode 'ani' does not accept FASTQ" in result.output
 
     def test_all_cannot_be_combined(self):
         result = CliRunner().invoke(main, ["scan", "g.fna", "-m", "all+marker"])
@@ -188,29 +188,29 @@ class TestExpandModes:
     def test_all_expands_to_isolate_modes(self):
         assert cli._expand_modes("all") == [
             "marker",
-            "panel",
-            "mash_refseq",
+            "ani",
+            "mash",
             "sourmash",
             "gtdbtk",
         ]
 
     def test_duplicates_are_dropped_in_order(self):
-        assert cli._expand_modes("marker+panel+marker") == ["marker", "panel"]
+        assert cli._expand_modes("marker+ani+marker") == ["marker", "ani"]
 
     def test_whitespace_is_tolerated(self):
         assert cli._expand_modes("marker + sourmash") == ["marker", "sourmash"]
 
 
 def _marker_family_db(root, name="food"):
-    path = root / "marker" / name
+    path = root / "D1_marker" / name
     path.mkdir(parents=True)
-    (path / "markers.fasta").write_text(">markers~~~g1~~~x marker\nACGTACGT\n")
+    (path / "markers.fasta").write_text(">gside|db=test|gene=g1|acc=t|func=primary")
     (path / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
     return path
 
 
 def _panel_family_db(root, name="lab2026"):
-    path = root / "panel" / name
+    path = root / "D2_ani" / name
     (path / "panel.sketch").mkdir(parents=True)
     (path / "panel.sketch" / "sketches.db").write_bytes(b"sketch")
     (path / "metadata.tsv").write_text("genome\tspecies\n")
@@ -253,24 +253,24 @@ class TestDbSelection:
                     "scan",
                     "g.fna",
                     "-m",
-                    "marker+panel",
+                    "marker+ani",
                     "-D",
                     str(tmp_path),
                     "-d",
                     "marker:food",
                     "-d",
-                    "panel:lab2026",
+                    "ani:lab2026",
                 ],
             )
         finally:
             cli._run_species = orig
         assert result.exit_code == 0
-        assert captured["kwargs"]["db_selections"] == {"marker": [marker], "panel": [panel]}
+        assert captured["kwargs"]["db_selections"] == {"marker": [marker], "ani": [panel]}
 
     def test_unknown_mode_prefix_is_usage_error(self, tmp_path):
         _marker_family_db(tmp_path)
         result = CliRunner().invoke(
-            main, ["scan", "g.fna", "-D", str(tmp_path), "-d", "panel:lab2026"]
+            main, ["scan", "g.fna", "-D", str(tmp_path), "-d", "ani:lab2026"]
         )
         assert result.exit_code == 2
         assert "not part of this invocation" in result.output
@@ -279,7 +279,7 @@ class TestDbSelection:
         _marker_family_db(tmp_path)
         result = CliRunner().invoke(
             main,
-            ["scan", "g.fna", "-m", "marker+panel", "-D", str(tmp_path), "-d", "food"],
+            ["scan", "g.fna", "-m", "marker+ani", "-D", str(tmp_path), "-d", "food"],
         )
         assert result.exit_code == 2
         assert "qualify the database" in result.output
@@ -288,3 +288,15 @@ class TestDbSelection:
         result = CliRunner().invoke(main, ["scan", "g.fna", "-m", "gtdbtk", "-d", "whatever"])
         assert result.exit_code == 2
         assert "no mode in this invocation supports named databases" in result.output
+
+
+class TestLegacyModeAliases:
+    def test_panel_normalizes_to_ani(self, monkeypatch):
+        calls = _capture(monkeypatch, "_run_species")
+        assert CliRunner().invoke(main, ["species", "g.fna", "-m", "panel"]).exit_code == 0
+        assert calls["args"][1] == "ani"
+
+    def test_mash_refseq_normalizes_to_mash(self, monkeypatch):
+        calls = _capture(monkeypatch, "_run_species")
+        assert CliRunner().invoke(main, ["species", "g.fq", "-m", "mash_refseq"]).exit_code == 0
+        assert calls["args"][1] == "mash"

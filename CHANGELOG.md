@@ -6,6 +6,27 @@
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-10
+
+### Added
+
+- **CPIN marker database (`-d cpin`)** covering the `data/CPIN.txt` species list: 17 bacterial targets extracted from verified RefSeq reference genomes by locus_tag plus 13 fungal ITS barcodes (30 rules, 55 sequences). Every rule is validated end-to-end against its reference genome plus adversarial near-neighbours; 12 rpoB/gyrB depth controls gate FASTQ screening (rule 4: no control-less false positives).
+- **`db setup -d [MODE:]default`** — install a mode's default database by mode vocabulary (`-t/--tier` remains the legacy spelling).
+
+### Changed
+
+- **Mode names mirror the tier directories**: `marker|ani|mash|sourmash|gtdbtk|all`; legacy `panel`/`mash_refseq` spellings normalize to `ani`/`mash` everywhere (`-m`, `-d`, JSON `methods.*` keys, `verdict.basis`).
+- **Database directory layout**: one subdirectory per database inside each tier (`D1_marker/default`, `D1_marker/cpin`, …); `(mode, name)` uniqueness is structural.
+- **Marker FASTA headers use the gspec-style pipe contract**: `>gside|db=<database>|gene=<gene>|acc=<accession>|func=<role>|note=<text>`; `marker_db.gene_from_seqid` is the single parser and legacy `~~~` headers keep working for user databases.
+- **Salmonella reports at genus level** in every tier (CPIN): typhoidal and non-typhoidal Salmonella, including every serovar, report as `Salmonella`; subspecific detail lands in `strain`; serovar typing belongs to gspec.
+- `db list`/`db status` render the mode→database view `-d` selects (`status` is now a hidden alias of `list`); JSON additionally carries installable `tiers`.
+- CPIN build content: cpin database ships with rpoB/gyrB controls; metadata `control_genes` covers all 17 bacterial species.
+
+### Fixed
+
+- `gside db setup --tier panel` (prebuilt sketch) publishes the taxa map into `default/` — panel hits no longer resolve to `Unknown` after a fresh install (follow-up to 0.2.3's fix, adapted to the new layout).
+- FASTQ marker screening runs minimap2 with `-c` (PAF columns 10/11 are approximate without base-level alignment).
+
 ## [0.2.3] - 2026-11-09
 
 ### Added

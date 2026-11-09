@@ -2,7 +2,7 @@
 
 所有 gside 输出为统一 JSON（stdout）。
 
-`marker` 方法的结果为扁平结构（无 `result` 包装）；`panel`、`mash_refseq`、
+`marker` 方法的结果为扁平结构（无 `result` 包装）；`ani`、`mash`、
 `sourmash` 的结果嵌套在 `result` 字段内。
 
 marker 结果额外携带 reads 模式深度门控字段（`control_gene`、`control_depth`、
@@ -29,7 +29,7 @@ marker 结果额外携带 reads 模式深度门控字段（`control_gene`、`con
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": {
@@ -70,7 +70,7 @@ marker 结果额外携带 reads 模式深度门控字段（`control_gene`、`con
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": { ... },
@@ -166,7 +166,7 @@ DEC/EIEC、志贺菌血清型等致病型/血清型分型属于 gspec，不在 g
 | sourmash | `...;s__Vibrio parahaemolyticus` | `Vibrio_parahaemolyticus` |
 | gtdbtk | `Vibrio cholerae` | `Vibrio_cholerae` |
 
-marker 注册标签本身即契约形式：`Salmonella_enterica`、
+marker 注册标签本身即契约形式：`Salmonella`、
 `Vibrio_parahaemolyticus`、`Escherichia_coli`、`Shigella`。志贺菌有意只到
 属级——种/血清型分型属于 gspec，并在 `methods.marker.notes` 中注明。菌株/登录号
 文本绝不拼进 `species`（点号会破坏下游匹配），统一放入 `strain`。
@@ -199,7 +199,7 @@ marker 注册标签本身即契约形式：`Salmonella_enterica`、
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.2.3", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.4", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},

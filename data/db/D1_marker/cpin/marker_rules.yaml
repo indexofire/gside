@@ -1,0 +1,193 @@
+rules:
+# ---- CPIN extension (data/CPIN.txt coverage) ----
+# Bacterial targets extracted from verified RefSeq reference genomes by
+# locus_tag (build notes in this block); rule thresholds come from measured
+# cross-BLAST identities against every existing marker and genome.
+- species: Brucella
+  genes: [bp26, omp25]
+  min_hits: 2
+  min_identity: 93
+  note: Genus rule from B. abortus 2308 (BP26/OMP28 + Omp25; DK47_RS01655/RS05110).
+    Classical genus targets; human-pathogenic species share >95% identity here.
+- species: Mycobacterium_tuberculosis
+  genes: [is6110]
+  min_hits: 1
+  min_identity: 96
+  note: IS6110 insertion sequence (longest copy from H37Rv). MTB-complex
+    specific; absent from other mycobacteria. Serotyping/DR typing belongs
+    to gspec-lineage tools.
+- species: Borrelia_burgdorferi
+  genes: [flab, ospa]
+  min_hits: 2
+  min_identity: 93
+  note: B. burgdorferi sensu lato (B31 reference; flagellin FlaB + OspA).
+    OspA varies across genospecies; 93 keeps the broad sensu-lato call.
+- species: Yersinia_pseudotuberculosis
+  genes: [inv-yptb, virf]
+  min_hits: 2
+  min_identity: 94
+  exclude_genes: [pla]
+  note: IP 32953 invasin + VirF. Y. pestis carries near-identical homologs,
+    so the pestis-specific plasmid pPCP1 marker pla suppresses this call
+    (caf1 and yada are shared with pseudotuberculosis and cannot exclude).
+- species: Citrobacter
+  genes: [gyrb-cf]
+  min_hits: 1
+  min_identity: 91
+  note: Genus-approximate barcode (C. freundii ATCC 8090 gyrB). rpoB was
+    rejected because of 97% identity to E. coli. Enterobacteriaceae neighbours sit at
+    <=89.5% on gyrB; coverage is freundii/youngae/farmeri-grade.
+- species: Bartonella
+  genes: [glta-bartonella, rpob-bh]
+  min_hits: 2
+  min_identity: 92
+  note: Genus rule (B. henselae citrate synthase + rpoB) - the standard
+    bartonella genotyping pair.
+- species: Rickettsiaceae
+  genes: [glta-rickettsia, ompb]
+  min_hits: 2
+  min_identity: 90
+  min_coverage: 55
+  note: Family rule (R. rickettsii gltA + OmpB) covering the spotted-fever
+    group; typhus group crosses at 88-92% and stays below the threshold.
+- species: Anaplasmataceae
+  genes: [groel-anaplasma]
+  min_hits: 1
+  min_identity: 90
+  note: Family rule (A. phagocytophilum GroEL); groEL is the conserved
+    anaplasma/ehrlichia serotyping target.
+- species: Chlamydia_psittaci
+  genes: [ompa-cps, ompa-cps2]
+  min_hits: 1
+  min_identity: 94
+  min_coverage: 55
+  note: MOMP/ompA (PZ860298.1 allele + 01DC12 fresh extract). ompA diverges
+    across serovars (~90-96%); 94 keeps the species call.
+- species: Chlamydia_pneumoniae
+  genes: [ompa-cp, ompa-cpn2]
+  min_hits: 1
+  min_identity: 94
+  min_coverage: 55
+  note: MOMP/ompA (Z31593.1 allele + J138 fresh extract); the species is
+    exceptionally uniform.
+- species: Escherichia_albertii
+  genes: [gyrb-eal]
+  min_hits: 1
+  min_identity: 92
+  note: Barcode (NCTC-class reference gyrB). rpoB rejected at 97% identity
+    to E. coli/Shigella; gyrB separates them at <=91%.
+- species: Plesiomonas_shigelloides
+  genes: [huga]
+  min_hits: 1
+  min_identity: 92
+  note: hugA hemoglobin receptor (type strain); the canonical shigelloides
+    target, no cross >=80% anywhere in the panel.
+- species: Vibrio_fluvialis
+  genes: [rpob-vf, gyrb-vf]
+  min_hits: 2
+  min_identity: 92
+  note: Dual barcode; V. parahaemolyticus rpoB sits at 87.6%.
+- species: Francisella_tularensis
+  genes: [tul4, fopa]
+  min_hits: 2
+  min_identity: 93
+  note: TUL4/LpnA + FopA (holarctica LVS). Reports the F. tularensis group;
+    F. novicida/F. philomiragia stay below the threshold.
+- species: Burkholderia_mallei
+  genes: [bima-bm]
+  min_hits: 1
+  min_identity: 95
+  priority_over: [Burkholderia_pseudomallei]
+  note: BimA(Bm) allele (ATCC 23344). The pseudomallei BimA(Bp) allele is
+    <85% identical, so glanders keeps a specific allele call; priority_over
+    resolves samples whose genomes retain both branches.
+- species: Burkholderia_gladioli
+  genes: [rpob-bg, gyrb-bg]
+  min_hits: 2
+  min_identity: 92
+  note: BSR3 dual barcode; nearest cross (B. pertussis rpoB) sits at 84.9%.
+- species: Nocardia
+  genes: [hsp65, gyrb-no]
+  min_hits: 2
+  min_identity: 90
+  min_coverage: 55
+  note: Genus rule (N. farcinica hsp65/GroEL paralog NFA_RS26175 + gyrB);
+    hsp65 is the standard nocardia sequencing barcode.
+- species: Cryptococcus
+  genes: [its-cryptococcus]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (C. neoformans H99); genus-level clinical call.
+- species: Aspergillus
+  genes: [its-aspergillus]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (A. fumigatus Af293); genus-level clinical call.
+- species: Pneumocystis
+  genes: [its-pneumocystis]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (P. jirovecii RU7); genus-level clinical call.
+- species: Coccidioides
+  genes: [its-coccidioides]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (C. immitis RS); genus-level clinical call.
+- species: Histoplasma
+  genes: [its-histoplasma]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (H. capsulatum G186AR); genus-level clinical call.
+- species: Blastomyces
+  genes: [its-blastomyces]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (B. dermatitidis ER-3); genus-level clinical call.
+- species: Paracoccidioides
+  genes: [its-paracoccidioides]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (P. lutzii Pb01); genus-level clinical call.
+- species: Talaromyces_marneffei
+  genes: [its-talaromyces]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (T. marneffei ATCC 18224); genus-level clinical call.
+- species: Rhinocladiella
+  genes: [its-rhinocladiella]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (R. mackenziei CBS 650.93); genus-level clinical call.
+- species: Cladophialophora
+  genes: [its-cladophialophora]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (C. bantiana CBS 173.52); genus-level clinical call.
+- species: Fusarium
+  genes: [its-fusarium]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (F. solani complex); genus-level clinical call.
+- species: Sporothrix
+  genes: [its-sporothrix]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (S. schenckii 1099-18); genus-level clinical call.
+- species: Candida
+  genes: [its-candida]
+  min_hits: 1
+  min_identity: 92
+  min_coverage: 50
+  note: ITS1-5.8S-ITS2 barcode (C. albicans SC5314); genus-level clinical call.

@@ -20,7 +20,10 @@ from gside.analysis.species_name import display_name
 
 HELP_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
-_ISOLATE_MODES = ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk"]
+_ISOLATE_MODES = ["marker", "ani", "mash", "sourmash", "gtdbtk"]
+# Legacy mode spellings accepted at the CLI surface and normalized
+# immediately; the canonical names mirror the tier directories.
+MODE_ALIASES = {"panel": "ani", "mash_refseq": "mash"}
 MODES = [*_ISOLATE_MODES, "all"]
 SCAN_MODES = MODES
 TIERS = ["mini", "panel", "mash", "sourmash", "all"]
@@ -131,8 +134,8 @@ _FASTQ_SUFFIXES = (".fq", ".fastq")
 # so it needs FASTA.
 _MODE_INPUTS: dict[str, frozenset[str]] = {
     "marker": frozenset({"fasta", "fastq"}),
-    "panel": frozenset({"fasta"}),
-    "mash_refseq": frozenset({"fasta", "fastq"}),
+    "ani": frozenset({"fasta"}),
+    "mash": frozenset({"fasta", "fastq"}),
     "sourmash": frozenset({"fasta", "fastq"}),
     "gtdbtk": frozenset({"fasta"}),
 }
@@ -206,8 +209,16 @@ def _supported_inputs(mode: str) -> frozenset[str]:
 
 
 def _split_modes(raw: str) -> list[str]:
-    """``marker+sourmash`` → ['marker', 'sourmash'] (order kept, dupes dropped)."""
-    return list(dict.fromkeys(part.strip() for part in raw.split("+") if part.strip()))
+    """``marker+sourmash`` → ['marker', 'sourmash'] (order kept, dupes dropped).
+
+    Legacy spellings (``panel``, ``mash_refseq``) normalize to the canonical
+    ``ani``/``mash`` before any validation, so the rest of the pipeline only
+    ever sees canonical mode names.
+    """
+    parts = (
+        MODE_ALIASES.get(part.strip(), part.strip()) for part in raw.split("+") if part.strip()
+    )
+    return list(dict.fromkeys(parts))
 
 
 def _expand_modes(raw: str) -> list[str]:
@@ -278,6 +289,8 @@ def _scan_dispatch(
 ) -> None:
     paths = list(files)
     resolved = mode or "marker"
+    # Normalize legacy spellings (panel→ani, mash_refseq→mash) once, here.
+    resolved = "+".join(_split_modes(resolved))
 
     if not paths:
         raise click.UsageError("missing input: pass one or more FASTA/FASTQ files")
@@ -351,10 +364,12 @@ def _scan_options(*, modes: list[str]) -> Any:
                 multiple=True,
                 metavar="[MODE:]NAME",
                 help=(
-                    "Database(s) to run per mode: a name under data/db/<family>/,"
-                    " an existing directory path, or MODE:NAME when several"
-                    " database-capable modes run together. Repeatable; the"
-                    " selected databases run and their results are merged."
+                    "Database(s) per mode: a name under the mode's tier directory"
+                    " (data/db/D1_marker|D2_ani|D3_mash|D4_sourmash/<name>),"
+                    " 'default', an existing directory path, or MODE:NAME when"
+                    " several database-capable modes run together (prefix takes"
+                    " the mode or its alias: panel:==ani:, mash_refseq:==mash:)."
+                    " Repeatable; selections run and their results merge."
                 ),
             ),
             _format_option(["json", "tsv", "md", "csv"], "Output format (rows for tsv/md/csv)."),
@@ -417,9 +432,11 @@ def scan_cmd(
     """Identify the species of one or more isolate genomes.
 
     The input type is inferred from the extension and must match the mode
-    (FASTA: marker/panel/mash_refseq/sourmash/gtdbtk/all; FASTQ:
-    marker/mash_refseq/sourmash). Metagenomic community profiling moved to
-    the gmeta tool (``gmeta run`` / ``gmeta report``).
+    (FASTA: marker/ani/mash/sourmash/gtdbtk/all; FASTQ:
+    marker/mash/sourmash). Every mode can run several databases
+    (``-d``; the tier directories D1_marker/D2_ani/D3_mash/D4_sourmash hold
+    one subdirectory per database, ``default`` plus named ones). Metagenomic
+    community profiling moved to the gmeta tool.
     """
     _scan_dispatch(
         files,
@@ -480,7 +497,7 @@ def db_group(ctx: click.Context) -> None:
         ctx.exit(0)
 
 
-@db_group.command("status", context_settings=HELP_SETTINGS)
+@db_group.command("status", hidden=True, context_settings=HELP_SETTINGS)
 @click.option(
     "-f",
     "--format",
@@ -491,7 +508,7 @@ def db_group(ctx: click.Context) -> None:
     help="Output format.",
 )
 def db_status_cmd(output_format: str) -> None:
-    """Show database readiness status."""
+    """Hidden alias of ``db list`` (same mode → database view)."""
     from .db import format_status
 
     print(format_status(output_format))
@@ -502,9 +519,17 @@ def db_status_cmd(output_format: str) -> None:
     "-t",
     "--tier",
     type=click.Choice(TIERS),
-    default="panel",
-    show_default=True,
-    help="Database tier to install (all = panel + mash; sourmash is separate).",
+    default=None,
+    help="Install by tier name (mini/panel/mash/sourmash/all). Legacy flag; prefer -d.",
+)
+@click.option(
+    "-d",
+    "--db",
+    "db_selection",
+    default=None,
+    metavar="[MODE:]default",
+    help="Install the default database of a mode: marker, panel, mash_refseq,"
+    " sourmash (or their aliases ani/mash), MODE:default, or 'all'.",
 )
 @click.option(
     "-s",
@@ -521,20 +546,63 @@ def db_status_cmd(output_format: str) -> None:
     show_default=True,
     help="Output format (json routes progress to stderr, result to stdout).",
 )
-def db_setup_cmd(tier: str, source: str, output_format: str) -> None:
-    """Install or update databases."""
+def db_setup_cmd(
+    tier: str | None,
+    db_selection: str | None,
+    source: str,
+    output_format: str,
+) -> None:
+    """Install or update the default database of a mode (its tier)."""
     from .db import db_setup, run_db_command
 
+    resolved = _resolve_setup_target(tier, db_selection)
+    if isinstance(resolved, click.UsageError):
+        raise resolved
     if output_format == "json":
         with contextlib.redirect_stdout(sys.stderr):
-            results = db_setup(tier, source)
+            results = db_setup(resolved, source)
         print(json.dumps(results, indent=2, ensure_ascii=False))
         sys.exit(1 if any("ERROR" in str(msg) for msg in results.values()) else 0)
 
-    args = ["setup", "--tier", tier]
+    args = ["setup", "--tier", resolved]
     if source:
         args += ["--source", source]
     sys.exit(run_db_command(args))
+
+
+_SETUP_MODE_TO_TIER = {
+    "marker": "mini",
+    "ani": "panel",
+    "mash": "mash",
+    "sourmash": "sourmash",
+    "all": "all",
+    # legacy spellings
+    "panel": "panel",
+    "mash_refseq": "mash",
+}
+
+
+def _resolve_setup_target(tier: str | None, db_selection: str | None) -> str | click.UsageError:
+    """``-d`` mode/alias/MODE:default vocabulary → tier name; ``-t`` legacy."""
+    if db_selection is not None and tier is not None:
+        return click.UsageError("-t/--tier and -d/--db are mutually exclusive")
+    if db_selection is not None:
+        raw = db_selection.strip()
+        if raw.endswith(":default"):
+            raw = raw[: -len(":default")]
+        if raw == "default":
+            return click.UsageError(
+                "bare 'default' is ambiguous; name the mode: -d marker, -d panel,"
+                " -d mash_refseq, -d sourmash"
+            )
+        mapped = _SETUP_MODE_TO_TIER.get(raw)
+        if mapped is None:
+            return click.UsageError(
+                f"unknown database {db_selection!r}; -d installs a mode's default:"
+                " marker, ani, mash, sourmash, all"
+            )
+        return mapped
+    return tier if tier is not None else "panel"
 
 
 @db_group.command("list", context_settings=HELP_SETTINGS)
@@ -548,10 +616,10 @@ def db_setup_cmd(tier: str, source: str, output_format: str) -> None:
     help="Output format.",
 )
 def db_list_cmd(output_format: str) -> None:
-    """List available database tiers."""
-    from .db import format_tiers
+    """List databases per mode (default + named) with readiness."""
+    from .db import format_databases
 
-    print(format_tiers(output_format))
+    print(format_databases(output_format))
 
 
 @db_group.command("validate", context_settings=HELP_SETTINGS)
@@ -856,10 +924,10 @@ def _render_row(payload: dict[str, Any], markdown: bool) -> str:
         _method_cell(methods, "marker", "species"),
         _method_cell(methods, "marker", "confidence"),
         methods.get("marker", {}).get("matched_rule", ""),
-        _method_cell(methods, "panel", "species"),
-        _method_cell(methods, "panel", "confidence"),
-        _method_cell(methods, "mash_refseq", "species"),
-        _method_cell(methods, "mash_refseq", "confidence"),
+        _method_cell(methods, "ani", "species"),
+        _method_cell(methods, "ani", "confidence"),
+        _method_cell(methods, "mash", "species"),
+        _method_cell(methods, "mash", "confidence"),
         _method_cell(methods, "sourmash", "species"),
         _method_cell(methods, "sourmash", "confidence"),
         errors,
@@ -1003,9 +1071,13 @@ def _identify_one(
                 if not marker_paths:
                     marker_path = marker_db
                     if marker_path is None and db_dir:
-                        candidate = Path(db_dir) / "D1_marker"
-                        if candidate.is_dir():
-                            marker_path = str(candidate)
+                        for candidate in (
+                            Path(db_dir) / "D1_marker" / "default",
+                            Path(db_dir) / "D1_marker",
+                        ):
+                            if candidate.is_dir():
+                                marker_path = str(candidate)
+                                break
                     if marker_path is not None:
                         marker_paths = [marker_path]
                 if marker_paths:
@@ -1016,7 +1088,7 @@ def _identify_one(
                     ).to_dict()
                 else:
                     results[m] = identify_multigene(reads, threads=threads).to_dict()
-            elif m in ("panel", "mash_refseq"):
+            elif m in ("ani", "mash"):
                 from gside.analysis.ani_identifier import identify_by_ani
 
                 results[m] = identify_by_ani(
@@ -1056,7 +1128,7 @@ def _identify_one(
     return payload
 
 
-_LAYER = {"gtdbtk": 3, "panel": 2, "mash_refseq": 2, "sourmash": 2, "marker": 1}
+_LAYER = {"gtdbtk": 3, "ani": 2, "mash": 2, "sourmash": 2, "marker": 1}
 _CONF_RANK = {"high": 2, "medium": 1, "low": 0}
 
 

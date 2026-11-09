@@ -7,7 +7,7 @@ first two tokens, so every tier must emit ``Genus_species``:
 * panel / mash_refseq — ``Streptococcus agalactiae 2603V/R`` → ``Streptococcus_agalactiae``
 * sourmash — ``...;s__Vibrio parahaemolyticus`` → ``Vibrio_parahaemolyticus``
 * gtdbtk — ``Vibrio cholerae`` → ``Vibrio_cholerae``
-* marker — already registry labels (``Salmonella_enterica``, ``Vibrio_parahaemolyticus``,
+* marker — already registry labels (``Salmonella``, ``Vibrio_parahaemolyticus``,
   ``Escherichia_coli``, ``Shigella``), emitted as-is.
 
 Strain / accession detail lives in a separate ``strain`` field; it is never
@@ -62,6 +62,13 @@ class SpeciesName:
 _UNKNOWN_NAME = SpeciesName(label=UNKNOWN, display=UNKNOWN, strain="")
 
 
+# Deliberate genus-level labels (CPIN): every entry point for these genera -
+# marker registry, panel metadata, GTDB lineages - collapses to the genus, so
+# e.g. typhoidal and non-typhoidal Salmonella all report as ``Salmonella``.
+# Subspecific detail (subspecies/serovar) lands in the ``strain`` field.
+_GENUS_COLLAPSE: dict[str, str] = {"salmonella": "Salmonella"}
+
+
 def _strip_rank(text: str) -> str:
     for prefix in _RANK_PREFIXES:
         if text.startswith(prefix):
@@ -107,6 +114,11 @@ def parse_species_name(raw: str) -> SpeciesName:
         return _UNKNOWN_NAME
 
     strain = text[matches[keep[2]].start() :].strip(" ._/-") if len(keep) > 2 else ""
+    collapsed = _GENUS_COLLAPSE.get(kept[0].lower())
+    if collapsed is not None:
+        epithet = kept[1] if len(kept) >= 2 else ""
+        strain = " ".join(part for part in (epithet, strain) if part)
+        return SpeciesName(label=collapsed, display=collapsed, strain=strain)
     return SpeciesName(
         label="_".join(kept[:2]),
         display=" ".join(kept[:2]),

@@ -35,7 +35,7 @@ pip install -e .      # gside 本体（或直接 pip install gside）
 ## 3. 验证
 
 ```bash
-gside -V              # gside, version 0.2.3
+gside -V              # gside, version 0.2.4
 gside db status       # mini（D1_marker）必须是 ✅
 ```
 

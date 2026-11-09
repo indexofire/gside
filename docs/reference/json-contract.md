@@ -2,7 +2,7 @@
 
 All gside output is unified JSON printed to stdout.
 
-## Single-Method Output (-m marker/panel/mash_refseq/sourmash)
+## Single-Method Output (-m marker/ani/mash/sourmash)
 
 Example with `-m marker` (marker results are flat; no `result` wrapper):
 
@@ -10,7 +10,7 @@ Example with `-m marker` (marker results are flat; no `result` wrapper):
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": {
@@ -74,7 +74,7 @@ A single-database selection (the default) omits `databases` entirely.
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": {},
@@ -176,7 +176,7 @@ gspec's job, not gside's.
 | sourmash | `...;s__Vibrio parahaemolyticus` | `Vibrio_parahaemolyticus` |
 | gtdbtk | `Vibrio cholerae` | `Vibrio_cholerae` |
 
-Marker registry labels are already in contract form: `Salmonella_enterica`,
+Marker registry labels are already in contract form: `Salmonella`,
 `Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`. Shigella is
 deliberately genus-level only — species/serotype discrimination belongs to
 gspec and is called out in `methods.marker.notes`. Strain/accession text is
@@ -212,7 +212,7 @@ gather CSV has no ANI column, the hash-fraction fallback (0.90/0.70) applies.
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.2.3", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.4", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},

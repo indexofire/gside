@@ -100,6 +100,24 @@ rules:
 `uidA+ipaH` 仍停留在 `Shigella` 属级；所有志贺菌规则均为 lacY 阴性
 （`exclude_genes: [lacy]`），EIEC 不会触发志贺菌判定。
 
+## CPIN 覆盖块
+
+规则文件中有一段标注的块，覆盖 `data/CPIN.txt` 物种清单。条目分三类：
+
+- **经典靶基因**：按 `locus_tag` 从经核验的 RefSeq 参考基因组提取
+  （IS6110、TUL4/FopA、侵袭素+VirF、BimA(Bm)、ompA、hugA、BP26/Omp25 等）。
+  规则 note 记录参考株与实测最近邻交叉同一性；阈值设在交叉之上。
+- **条码基因**（`Citrobacter`/`Escherichia_albertii` 用 `gyrB`，
+  `Vibrio_fluvialis`/`Burkholderia_gladioli` 用 `rpoB+gyrB`，
+  `Bartonella` 用 `gltA+rpoB`）：经典靶点无法区分近邻时使用 ——
+  肠杆菌科 `rpoB` 交叉高达 97%，因此改由 `gyrB`（交叉 ≤89.5%）承担。
+- **真菌 ITS 条码**（`its-*`，来自类型株/临床株记录的 ITS1 或
+  ITS1-5.8S-ITS2）：属级判定，92% 阈值 —— Onygenales 各属间交叉最高 90.5%。
+
+每条规则都经参考基因组端到端验证 + 近缘对抗基因组验证
+（鼠疫杆菌 vs 假结核耶尔森氏菌、鼻疽伯克霍尔德菌 vs 类鼻疽伯克霍尔德菌），
+见 `tests/integration/test_cpin_markers.py`。
+
 ## Reads 模式深度门控（FASTQ 输入） {: #reads-mode-depth-gate }
 
 FASTQ 输入时，标记引擎在一致性/覆盖规则之上叠加 gspec 风格的丰度门控。

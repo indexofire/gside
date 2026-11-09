@@ -23,7 +23,7 @@ class TestPanelSelfIdentity:
     def test_k12_against_own_panel(self):
         from gside.analysis.ani_identifier import identify_by_ani
 
-        r = identify_by_ani(str(_K12), mode="panel").result
+        r = identify_by_ani(str(_K12), mode="ani").result
         assert r["species"] == "Escherichia_coli"
         assert r["confidence"] == "high"
         assert r["ani"] >= 99.0
@@ -41,7 +41,7 @@ class TestMashSelfIdentity:
     def test_k12_against_own_sketch(self):
         from gside.analysis.ani_identifier import identify_by_ani
 
-        r = identify_by_ani(str(_K12), mode="mash_refseq").result
+        r = identify_by_ani(str(_K12), mode="mash").result
         assert r["top_hits"], "expected at least one mash hit"
         assert 0.0 <= r["identity"] <= 1.0
 
@@ -57,7 +57,7 @@ class TestPanelTaxaMap:
 
 
 _MASH_GOLDENS = {
-    "GCF_000006945.2_ASM694v2_genomic.fna": ("Salmonella_enterica", 1.0),
+    "GCF_000006945.2_ASM694v2_genomic.fna": ("Salmonella", 1.0),
     "GCF_000009085.1_ASM908v1_genomic.fna": ("Campylobacter_jejuni", 1.0),
     "GCF_000465235.1_ASM46523v1_genomic.fna": ("Campylobacter_coli", 0.99),
     "GCF_000005845.2_ASM584v2_genomic.fna": ("Escherichia_coli", 1.0),
@@ -75,7 +75,7 @@ class TestMashGoldens:
         if not genome.is_file():
             pytest.skip("genome missing")
         want_species, want_identity = expected
-        r = identify_by_ani(str(genome), mode="mash_refseq").result
+        r = identify_by_ani(str(genome), mode="mash").result
         assert r["species"].startswith(want_species)
         assert r["confidence"] == "high"
         assert r["identity"] >= want_identity

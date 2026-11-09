@@ -14,7 +14,7 @@ import pytest
 from gside.config import which as _which
 
 _REPO = Path(__file__).resolve().parents[2]
-CONTIGS = _REPO / "data" / "db" / "D1_marker" / "markers.fasta"
+CONTIGS = _REPO / "data" / "db" / "D1_marker" / "default" / "markers.fasta"
 _HAS_BLASTN = _which("blastn") is not None
 
 
@@ -25,9 +25,9 @@ def _gene_seq(prefix: str) -> str:
 
 
 def _custom_db(root: Path, name: str, gene: str, species: str, seq: str) -> Path:
-    path = root / "marker" / name
+    path = root / "D1_marker" / name
     path.mkdir(parents=True)
-    (path / "markers.fasta").write_text(f">markers~~~{gene}~~~x marker {gene}\n{seq}\n")
+    (path / "markers.fasta").write_text(f">gside|db=test|gene={gene}|acc=x\n{seq}\n")
     (path / "marker_rules.yaml").write_text(
         f"rules:\n- species: {species}\n  genes: [{gene}]\n  min_hits: 1\n"
     )
@@ -42,14 +42,22 @@ class TestMultiDatabaseMarker:
         from gside.analysis.multigene_identifier import identify_multigene
 
         db_a = _custom_db(
-            tmp_path, "dbA", "inva", "Salmonella_enterica", _gene_seq("markers~~~inva~~~")
+            tmp_path,
+            "dbA",
+            "inva",
+            "Salmonella",
+            _gene_seq("gside|db=species_markers_v2|gene=inva|acc="),
         )
         db_b = _custom_db(
-            tmp_path, "dbB", "tlh", "Vibrio_parahaemolyticus", _gene_seq("markers~~~tlh~~~")
+            tmp_path,
+            "dbB",
+            "tlh",
+            "Vibrio_parahaemolyticus",
+            _gene_seq("gside|db=species_markers_v2|gene=tlh|acc="),
         )
         q = tmp_path / "union.fna"
         q.write_text(
-            f">inva_q\n{_gene_seq('markers~~~inva~~~')}\n>tlh_q\n{_gene_seq('markers~~~tlh~~~')}\n"
+            f">inva_q\n{_gene_seq('gside|db=species_markers_v2|gene=inva|acc=')}\n>tlh_q\n{_gene_seq('gside|db=species_markers_v2|gene=tlh|acc=')}\n"
         )
         payload = identify_multigene(str(q), marker_db=[str(db_a), str(db_b)]).to_dict()
         assert payload["databases"] == [
@@ -60,7 +68,7 @@ class TestMultiDatabaseMarker:
         # Both genes are detected; the species is one of the two rules
         # (arbitration over identical identities keeps the first-seen rule).
         assert {m["gene"] for m in payload["detected_markers"]} == {"inva", "tlh"}
-        assert payload["species"] in {"Salmonella_enterica", "Vibrio_parahaemolyticus"}
+        assert payload["species"] in {"Salmonella", "Vibrio_parahaemolyticus"}
 
     def test_cli_d_flag_selects_named_databases(self, tmp_path):
         """`-d` names resolve under the family dir of the -D root."""
@@ -68,13 +76,19 @@ class TestMultiDatabaseMarker:
 
         from gside.cli import main
 
-        _custom_db(tmp_path, "food", "inva", "Salmonella_enterica", _gene_seq("markers~~~inva~~~"))
+        _custom_db(
+            tmp_path,
+            "food",
+            "inva",
+            "Salmonella",
+            _gene_seq("gside|db=species_markers_v2|gene=inva|acc="),
+        )
         q = tmp_path / "inva.fna"
-        q.write_text(f">inva_q\n{_gene_seq('markers~~~inva~~~')}\n")
+        q.write_text(f">inva_q\n{_gene_seq('gside|db=species_markers_v2|gene=inva|acc=')}\n")
         result = CliRunner().invoke(
             main,
             ["scan", str(q), "-D", str(tmp_path), "-d", "food", "-f", "json"],
         )
         assert result.exit_code == 0, result.output
-        assert '"species": "Salmonella_enterica"' in result.output
+        assert '"species": "Salmonella"' in result.output
         assert '"name": "food"' in result.output

@@ -26,6 +26,12 @@ from typing import Any
 import yaml
 
 MARKER_DB_SCHEMA = "gside.marker-db/1"
+
+# Header contract (gspec-style pipe format):
+#   >gside|db=<database>|gene=<gene>|acc=<accession>|func=<role>|note=<text>
+# ``gene_from_seqid`` is the single parser; legacy ``markers~~~gene~~~acc``
+# headers keep working for user databases built against older gside.
+_HEADER_GENE_RE = None  # compiled lazily below (keep import-time light)
 DEFAULT_MARKER_NAME = "species_markers_v2"
 _REQUIRED_HEADER_PARTS = 3
 
@@ -119,11 +125,17 @@ class MarkerDatabase:
                 if seq_id in seen:
                     errors.append(f"duplicate FASTA id: {seq_id}")
                 seen.add(seq_id)
-                parts = seq_id.split("~~~")
-                if len(parts) < _REQUIRED_HEADER_PARTS or not parts[1]:
-                    errors.append(f"FASTA id {seq_id!r} must be markers~~~<gene>~~~<accession>")
+                gene = gene_from_seqid(seq_id)
+                pipe_ok = seq_id.startswith("gside|") and "|gene=" in seq_id
+                legacy_ok = len(seq_id.split("~~~")) >= _REQUIRED_HEADER_PARTS
+                if not gene or not (pipe_ok or legacy_ok):
+                    errors.append(
+                        f"FASTA id {seq_id!r} must be"
+                        " gside|db=..|gene=..|acc=..|func=.. (or legacy"
+                        " markers~~~<gene>~~~<accession>)"
+                    )
                 else:
-                    genes.add(parts[1].lower())
+                    genes.add(gene.lower())
 
         rules: list[Any] = []
         if self.rules.is_file():
@@ -192,6 +204,25 @@ class MarkerDatabase:
         }
 
 
+def gene_from_seqid(seqid: str) -> str:
+    """Gene token from a marker FASTA header.
+
+    Supports the gspec-style pipe format (``gside|db=..|gene=..``) and the
+    legacy ``markers~~~<gene>~~~<acc>`` triple-tilde format.
+    """
+    if seqid.startswith("gside|") or "|" in seqid.split()[0]:
+        for field in seqid.split("|"):
+            if field.startswith("gene="):
+                return field[len("gene=") :]
+        parts = seqid.split(None, 1)
+        return parts[0] if parts else seqid
+    parts = seqid.split("~~~")
+    if len(parts) >= 2:
+        return parts[1]
+    first = seqid.split(None, 1)
+    return first[0] if first else seqid
+
+
 def _content_version(fasta: Path, rules: Path) -> str:
     digest = hashlib.sha256()
     for path in (fasta, rules):
@@ -217,7 +248,7 @@ def default_marker_db(path: str | Path | None = None) -> MarkerDatabase:
         return resolved
     from gside.config import SPECIES_DB_DIR
 
-    db = MarkerDatabase.from_path(SPECIES_DB_DIR / "D1_marker")
+    db = MarkerDatabase.from_path(SPECIES_DB_DIR / "D1_marker" / "default")
     return MarkerDatabase(
         root=db.root,
         fasta=db.fasta,

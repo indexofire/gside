@@ -113,6 +113,29 @@ signature, while the plain `uidA+ipaH` signature stays at the `Shigella` genus
 and every Shigella rule is lacY-negative (`exclude_genes: [lacy]`) so EIEC
 never fires a Shigella call.
 
+## CPIN coverage block
+
+The rules file carries a marked block covering the `data/CPIN.txt` species
+list. Its entries follow two patterns:
+
+- **Classical targets** extracted from verified RefSeq reference genomes by
+  `locus_tag` (IS6110, TUL4/FopA, invasin+VirF, BimA(Bm), ompA, hugA,
+  BCSP31-family genes, …). Rule notes record the reference strain and the
+  measured nearest cross-identity; thresholds sit above the measured cross.
+- **Barcodes** (`gyrB` for `Citrobacter`/`Escherichia_albertii`,
+  `rpoB+gyrB` for `Vibrio_fluvialis`/`Burkholderia_gladioli`,
+  `gltA+rpoB` for `Bartonella`) where classical targets do not separate
+  neighbours: Enterobacteriaceae `rpoB` cross-identity reaches 97%, so
+  `gyrB` (≤89.5% cross) carries those rules instead.
+- **Fungal ITS barcodes** (`its-*`, ITS1/ITS1-5.8S-ITS2 from type or
+  clinical-strain records) provide genus-level calls at 92% identity — the
+  Onygenales genera cross at up to 90.5%.
+
+Every rule was validated end-to-end against its reference genome plus
+near-neighbour adversarial genomes (`Y. pestis` vs `Y. pseudotuberculosis`,
+`B. mallei` vs `B. pseudomallei`); see
+`tests/integration/test_cpin_markers.py`.
+
 ## Reads-Mode Depth Gate (FASTQ input)
 
 On FASTQ input the marker engine applies a gspec-style abundance gate on top

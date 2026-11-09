@@ -73,11 +73,11 @@ class TestSetupLogging:
 
 class TestMethodCell:
     def test_missing_mode(self):
-        assert _method_cell({}, "panel", "species") == ""
+        assert _method_cell({}, "ani", "species") == ""
 
     def test_nested_result(self):
-        methods = {"panel": {"result": {"species": "X", "confidence": "high"}}}
-        assert _method_cell(methods, "panel", "species") == "X"
+        methods = {"ani": {"result": {"species": "X", "confidence": "high"}}}
+        assert _method_cell(methods, "ani", "species") == "X"
 
     def test_none_becomes_empty(self):
         assert _method_cell({"m": {"species": None}}, "m", "species") == ""
@@ -149,8 +149,8 @@ class TestRunSpeciesBatch:
         assert payload["verdict"]["confidence"] == "low"
 
     def test_identify_one_mash_missing_db_surfaces_error(self, tmp_path):
-        payload = _identify_one("q.fna", "mash_refseq", db_dir=str(tmp_path))
-        assert "gside db setup --tier mash" in payload["methods"]["mash_refseq"]["error"]
+        payload = _identify_one("q.fna", "mash", db_dir=str(tmp_path))
+        assert "gside db setup --tier mash" in payload["methods"]["mash"]["error"]
         assert payload["verdict"]["species"] == "Unknown"
         assert payload["verdict"]["confidence"] == "low"
 
@@ -271,7 +271,7 @@ class TestIdentifyModes:
             gmod, "identify_by_gtdbtk", lambda c, threads=4: _FakeResult("G", "high")
         )
         payload = climod._identify_one("x.fna", "all", None)
-        assert set(payload["methods"]) == {"marker", "panel", "mash_refseq", "sourmash", "gtdbtk"}
+        assert set(payload["methods"]) == {"marker", "ani", "mash", "sourmash", "gtdbtk"}
         assert payload["verdict"]["basis"] == ["gtdbtk"]
 
     def test_branch_error_entry(self, monkeypatch):
@@ -380,90 +380,75 @@ class TestSpeciesOutputOption:
 
 
 class TestDbOutputFormats:
-    _STATUS = {
-        "D1_marker": {
-            "ready": True,
-            "path": "/p/D1_marker",
-            "tier": "mini",
-            "inputs": "FASTA/FASTQ",
-        },
-        "D2_ani": {"ready": False, "path": "/p/D2_ani", "tier": "panel", "inputs": "FASTA"},
-    }
-
-    _TIERS = {
-        "mini": {
-            "description": "Marker rules + sequences (bundled)",
-            "size": "~1MB",
-            "items": ["D1_marker"],
-        },
-    }
-
-    def test_status_tsv_machine_readable(self, monkeypatch):
+    def _root(self, tmp_path, monkeypatch):
         import gside.db as dbmod
 
-        monkeypatch.setattr(dbmod, "db_status", lambda: self._STATUS)
+        root = tmp_path / "db"
+        root.mkdir()
+        marker = root / "D1_marker" / "default"
+        marker.mkdir(parents=True)
+        (marker / "markers.fasta").write_text(">gside|db=test|gene=g1|acc=t|func=primary")
+        (marker / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
+        named = root / "D1_marker" / "food"
+        named.mkdir(parents=True)
+        (named / "markers.fasta").write_text(">gside|db=test|gene=g2|acc=t|func=primary")
+        (named / "marker_rules.yaml").write_text("rules:\n- species: Y\n  genes: [g2]\n")
+        monkeypatch.setattr(dbmod, "SPECIES_DB_DIR", root)
+        return root
+
+    def test_status_tsv_machine_readable(self, tmp_path, monkeypatch):
+        self._root(tmp_path, monkeypatch)
         result = CliRunner().invoke(main, ["db", "status", "--format", "tsv"])
         assert result.exit_code == 0
         lines = result.output.splitlines()
-        assert lines[0] == "COMPONENT\tREADY\tTIER\tINPUTS\tPATH"
-        assert lines[1] == "D1_marker\tready\tmini\tFASTA/FASTQ\t/p/D1_marker"
-        assert lines[2] == "D2_ani\tmissing\tpanel\tFASTA\t/p/D2_ani"
+        assert lines[0] == "MODE\tDATABASE\tREADY\tINPUTS\tPATH"
+        assert "marker\tdefault\tready\tFASTA/FASTQ" in result.output
+        assert "marker\tfood\tready\tFASTA/FASTQ" in result.output
+        assert "ani\tdefault\tmissing\tFASTA" in result.output
         assert "✅" not in result.output
-        assert "db setup" not in result.output
 
-    def test_status_tsv_short_flag(self, monkeypatch):
-        import gside.db as dbmod
-
-        monkeypatch.setattr(dbmod, "db_status", lambda: self._STATUS)
+    def test_status_tsv_short_flag(self, tmp_path, monkeypatch):
+        self._root(tmp_path, monkeypatch)
         result = CliRunner().invoke(main, ["db", "status", "-f", "tsv"])
         assert result.exit_code == 0
-        assert result.output.splitlines()[0] == "COMPONENT\tREADY\tTIER\tINPUTS\tPATH"
+        assert result.output.splitlines()[0] == "MODE\tDATABASE\tREADY\tINPUTS\tPATH"
 
-    def test_status_json_roundtrip(self, monkeypatch):
-        import gside.db as dbmod
-
-        monkeypatch.setattr(dbmod, "db_status", lambda: self._STATUS)
+    def test_status_json_roundtrip(self, tmp_path, monkeypatch):
+        self._root(tmp_path, monkeypatch)
         result = CliRunner().invoke(main, ["db", "status", "--format", "json"])
         assert result.exit_code == 0
-        assert json.loads(result.output) == self._STATUS
+        payload = json.loads(result.output)
+        assert set(payload) == {"modes", "tiers"}
+        assert [d["name"] for d in payload["modes"]["marker"]] == ["default", "food"]
+        assert payload["modes"]["marker"][0]["ready"] is True
+        assert payload["modes"]["ani"][0]["ready"] is False
+        assert payload["tiers"]["panel"]["items"] == ["D2_ani"]
 
-    def test_status_table_default_has_borders_and_hint(self, monkeypatch):
-        import gside.db as dbmod
-
-        monkeypatch.setattr(dbmod, "db_status", lambda: self._STATUS)
+    def test_status_table_default_has_borders_and_hint(self, tmp_path, monkeypatch):
+        self._root(tmp_path, monkeypatch)
         result = CliRunner().invoke(main, ["db", "status"])
         assert result.exit_code == 0
-        assert "gside database status" in result.output
-        assert "│ COMPONENT" in result.output
+        assert "gside databases" in result.output  # status renders the list view
+        assert "│ MODE" in result.output
         assert "┌" in result.output and "└" in result.output
         assert "ready" in result.output and "missing" in result.output
         assert "gside db setup --tier <tier>" in result.output
 
-    def test_list_tsv(self, monkeypatch):
-        import gside.db as dbmod
-
-        monkeypatch.setattr(dbmod, "_TIERS", self._TIERS)
-        monkeypatch.setattr(dbmod, "db_status", lambda: self._STATUS)
+    def test_list_tsv(self, tmp_path, monkeypatch):
+        self._root(tmp_path, monkeypatch)
         result = CliRunner().invoke(main, ["db", "list", "--format", "tsv"])
         assert result.exit_code == 0
-        assert result.output.splitlines() == [
-            "NAME\tREADY\tSIZE\tINPUTS\tDESCRIPTION",
-            "mini\tready\t~1MB\tFASTA/FASTQ\tMarker rules + sequences (bundled)",
-        ]
+        assert result.output.splitlines()[0] == "MODE\tDATABASE\tREADY\tINPUTS\tPATH"
+        assert any(line.startswith("sourmash\tdefault\t") for line in result.output.splitlines())
 
-    def test_list_json(self, monkeypatch):
-        import gside.db as dbmod
-
-        monkeypatch.setattr(dbmod, "_TIERS", self._TIERS)
-        monkeypatch.setattr(dbmod, "db_status", lambda: self._STATUS)
+    def test_list_json_carries_tiers(self, tmp_path, monkeypatch):
+        self._root(tmp_path, monkeypatch)
         result = CliRunner().invoke(main, ["db", "list", "-f", "json"])
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["mini"]["inputs"] == "FASTA/FASTQ"
-        assert {k: v for k, v in payload["mini"].items() if k != "inputs"} == {
-            **self._TIERS["mini"],
-            "ready": True,
-        }
+        assert payload["tiers"]["mini"]["items"] == ["D1_marker"]
+        assert payload["tiers"]["mini"]["inputs"] == "FASTA/FASTQ"
+        assert payload["modes"]["marker"][1]["name"] == "food"
 
 
 class TestDbSetupShortFlags:
@@ -534,9 +519,7 @@ class TestRemainingBranches:
         from gside.cli import main
 
         monkeypatch.setattr(dbmod, "SPECIES_DB_DIR", tmp_path / "db")
-        result = CliRunner().invoke(
-            main, ["db", "setup", "--tier", "panel", "--source", str(tmp_path)]
-        )
+        result = CliRunner().invoke(main, ["db", "setup", "-d", "ani", "--source", str(tmp_path)])
         assert result.exit_code in (0, 1)
 
 
@@ -565,7 +548,7 @@ class TestDbSetupJsonFormat:
             return {"D2_ani": "downloaded (fake)"}
 
         monkeypatch.setattr(dbmod, "db_setup", fake_setup)
-        result = CliRunner().invoke(main, ["db", "setup", "-t", "panel", "-f", "json"])
+        result = CliRunner().invoke(main, ["db", "setup", "-d", "ani", "-f", "json"])
         assert result.exit_code == 0
         assert json.loads(result.stdout) == {"D2_ani": "downloaded (fake)"}
         assert "downloading fake tier" in result.stderr
@@ -575,7 +558,7 @@ class TestDbSetupJsonFormat:
         import gside.db as dbmod
 
         monkeypatch.setattr(dbmod, "db_setup", lambda tier, source="": {"D2_ani": "ERROR: boom"})
-        result = CliRunner().invoke(main, ["db", "setup", "-t", "panel", "-f", "json"])
+        result = CliRunner().invoke(main, ["db", "setup", "-d", "ani", "-f", "json"])
         assert result.exit_code == 1
         assert json.loads(result.stdout) == {"D2_ani": "ERROR: boom"}
 
@@ -732,7 +715,7 @@ class TestSpeciesParallelism:
             ),
         )
         cli._identify_one("q.fna", "marker", None, threads=8)
-        cli._identify_one("q.fna", "panel", None, threads=8)
+        cli._identify_one("q.fna", "ani", None, threads=8)
         assert cap["mg"] == 8 and cap["ani"] == 8
 
 
@@ -825,8 +808,8 @@ class TestStructuredErrorFields:
         assert method["error"].startswith("sourmash GTDB database not found")
 
     def test_mash_missing_db_gets_structured_fields(self, tmp_path):
-        payload = _identify_one("q.fna", "mash_refseq", db_dir=str(tmp_path))
-        method = payload["methods"]["mash_refseq"]
+        payload = _identify_one("q.fna", "mash", db_dir=str(tmp_path))
+        method = payload["methods"]["mash"]
         assert method["missing_tier"] == "mash"
         assert method["suggested_command"] == "gside db setup --tier mash"
         assert method["estimated_size"] == "~179MB"
@@ -903,15 +886,15 @@ class TestAutoSetup:
 
         def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             calls.append(mode)
-            return _missing_db_payload(contigs, method="mash_refseq", tier="mash", size="~179MB")
+            return _missing_db_payload(contigs, method="mash", tier="mash", size="~179MB")
 
         monkeypatch.setattr(cli, "_identify_one", fake_identify)
         monkeypatch.setattr(cli, "_setup_missing_tier", lambda tier: setups.append(tier))
-        assert _run_species(["q.fna"], "mash_refseq", None, auto_setup=True) == 0
+        assert _run_species(["q.fna"], "mash", None, auto_setup=True) == 0
         payload = json.loads(capsys.readouterr().out)
-        assert calls == ["mash_refseq", "mash_refseq"]
+        assert calls == ["mash", "mash"]
         assert setups == ["mash"]
-        assert payload["methods"]["mash_refseq"]["missing_tier"] == "mash"
+        assert payload["methods"]["mash"]["missing_tier"] == "mash"
 
     def test_no_missing_tier_no_setup(self, monkeypatch, capsys):
         setups = []
@@ -991,7 +974,7 @@ class TestGtdbtkMode:
     def test_modes_list_order(self):
         from gside.cli import MODES
 
-        assert MODES == ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk", "all"]
+        assert MODES == ["marker", "ani", "mash", "sourmash", "gtdbtk", "all"]
 
     def test_cli_accepts_gtdbtk_mode(self, monkeypatch):
         seen = {}
@@ -1019,7 +1002,7 @@ class TestGtdbtkMode:
         verdict = _arbitrate(
             {
                 "marker": {"species": "M", "confidence": "high"},
-                "panel": {"result": {"species": "P", "confidence": "high"}},
+                "ani": {"result": {"species": "P", "confidence": "high"}},
                 "gtdbtk": {"result": {"species": "G", "confidence": "medium"}},
             }
         )
@@ -1153,7 +1136,7 @@ class TestCustomMarkerDb:
         monkeypatch.setattr(climod, "_run_species", fake)
         marker_dir = tmp_path / "db"
         marker_dir.mkdir()
-        (marker_dir / "markers.fasta").write_text(">markers~~~g1~~~x marker\nACGT\n")
+        (marker_dir / "markers.fasta").write_text(">gside|db=test|gene=g1|acc=t|func=primary")
         (marker_dir / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
         result = CliRunner().invoke(main, ["scan", "sample.fna", "--marker-db", str(marker_dir)])
         assert result.exit_code == 0, result.output
@@ -1187,7 +1170,7 @@ class TestCustomMarkerDb:
     def test_db_validate_json_valid(self, tmp_path):
         db = tmp_path / "db"
         db.mkdir()
-        (db / "markers.fasta").write_text(">markers~~~geneA~~~refA\nACGT\n")
+        (db / "markers.fasta").write_text(">gside|db=test|gene=geneA|acc=t|func=primary")
         (db / "marker_rules.yaml").write_text(
             "rules:\n- species: X\n  genes: [geneA]\n  min_hits: 1\n"
         )
@@ -1226,7 +1209,7 @@ class TestCoverageLeftovers:
     def test_db_validate_text_valid_with_description(self, tmp_path):
         db = tmp_path / "db"
         db.mkdir()
-        (db / "markers.fasta").write_text(">markers~~~geneA~~~refA\nACGT\n")
+        (db / "markers.fasta").write_text(">gside|db=test|gene=geneA|acc=t|func=primary")
         (db / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [geneA]\n")
         (db / "metadata.yaml").write_text("description: in-house panel\n")
         result = CliRunner().invoke(main, ["db", "validate", str(db)])
@@ -1296,3 +1279,66 @@ class TestFinalCoverage:
         out = tmp_path / "doc.json"
         assert _write_json_document({"a": 1}, str(out)) == 0
         assert json_mod.loads(out.read_text()) == {"a": 1}
+
+
+class TestDbSetupTargetResolution:
+    """-d/--db mode vocabulary maps to tiers; -t stays as legacy spelling."""
+
+    def test_mode_names_and_aliases_map_to_tiers(self):
+        from gside.cli import _resolve_setup_target as resolve
+
+        assert resolve(None, "marker") == "mini"
+        assert resolve(None, "panel") == "panel"
+        assert resolve(None, "ani") == "panel"
+        assert resolve(None, "mash") == "mash"
+        assert resolve(None, "mash_refseq") == "mash"
+        assert resolve(None, "sourmash") == "sourmash"
+        assert resolve(None, "all") == "all"
+        assert resolve(None, "panel:default") == "panel"
+
+    def test_legacy_tier_still_works_and_defaults_to_panel(self):
+        from gside.cli import _resolve_setup_target as resolve
+
+        assert resolve("sourmash", None) == "sourmash"
+        assert resolve(None, None) == "panel"
+
+    def test_mutually_exclusive_flags(self):
+        import click
+
+        from gside.cli import _resolve_setup_target as resolve
+
+        result = resolve("panel", "marker")
+        assert isinstance(result, click.UsageError)
+        assert "mutually exclusive" in result.message
+
+    def test_bare_default_is_ambiguous(self):
+        import click
+
+        from gside.cli import _resolve_setup_target as resolve
+
+        result = resolve(None, "default")
+        assert isinstance(result, click.UsageError)
+        assert "ambiguous" in result.message
+
+    def test_unknown_database_rejected(self):
+        import click
+
+        from gside.cli import _resolve_setup_target as resolve
+
+        result = resolve(None, "gtdbtk")
+        assert isinstance(result, click.UsageError)
+        assert "unknown database" in result.message
+
+    def test_cli_short_flag_installs_mode_default(self, monkeypatch):
+        seen: dict[str, str] = {}
+        import gside.db as dbmod
+
+        monkeypatch.setattr(dbmod, "db_setup", lambda tier, source="": seen.update(tier=tier) or {})
+        result = CliRunner().invoke(main, ["db", "setup", "-d", "marker"])
+        assert result.exit_code == 0, result.output
+        assert seen["tier"] == "mini"
+
+    def test_setup_bad_db_prints_usage_error(self):
+        result = CliRunner().invoke(main, ["db", "setup", "-d", "wat"])
+        assert result.exit_code == 2
+        assert "unknown database" in result.output

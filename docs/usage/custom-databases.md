@@ -4,7 +4,7 @@
 
 `gside` modes draw on databases. Besides the bundled/setup tiers
 (`D1_marker`, `D2_ani`, `D3_mash`, `D4_sourmash`), every database-capable
-mode — `marker`, `panel`, `mash_refseq`, `sourmash` — accepts additional
+mode — `marker`, `ani`, `mash`, `sourmash` — accepts additional
 named databases, and one identification run can select several of them.
 
 ## Selecting databases
@@ -38,18 +38,29 @@ root (`data/db/` unless `--db-dir` moves it):
 
 ```text
 data/db/
-├── D1_marker/               # marker default tier (bundled)
-├── D2_ani/                  # panel default tier (db setup --tier panel)
-├── D3_mash/                 # mash_refseq default tier
-├── D4_sourmash/             # sourmash default tier
-├── marker/<name>/           # custom marker DBs (layout below)
-├── panel/<name>/            # panel.sketch/ + metadata.tsv
-├── mash_refseq/<name>/      # mash.msh
-└── sourmash/<name>/         # gtdb-reps-k31.zip + lineages.csv
+├── D1_marker/               # marker tier: one subdirectory per database
+│   ├── default/             # bundled default (markers.fasta + rules + blastdb)
+│   └── cpin/                # bundled CPIN extension (ships with gside)
+├── D2_ani/                  # panel tier (default/ holds panel.sketch; genomes/ is build input)
+│   └── <name>/              # your named panel databases
+├── D3_mash/                 # mash tier (default/mash.msh; <name>/ for more)
+└── D4_sourmash/             # sourmash tier (default/; <name>/ for more)
 ```
 
-`gside db list` enumerates them ("named databases" section, and a
-`custom_databases` key in `--format json`). Modes without local databases
+Every mode owns exactly one tier directory, and databases live inside it —
+one subdirectory per database, `default` plus any named ones. The
+`(mode, name)` pair is unique because names cannot repeat inside a single
+directory. The `-d MODE:` prefix takes the mode name (`panel:lab`) or its
+alias (`ani:lab`) — they resolve identically.
+
+**Multiple bundled databases per mode** ship exactly like user databases,
+as sibling subdirectories of `default/` — `D1_marker/cpin` is the shipped
+example (git-tracked, validated by the same layout rules). Add yours next to
+it (`D1_marker/my-panel/`) or point `-d` at any directory path.
+
+`gside db list` / `gside db status` enumerate them: every database `-d`
+can select appears as a `MODE / DATABASE` row (JSON: `modes`, plus
+installable `tiers`). Modes without local databases
 (`gtdbtk`) reject `-d` with an actionable error.
 
 ### Merge semantics
@@ -80,10 +91,10 @@ my-markers/
 
 ### `markers.fasta`
 
-Headers must keep the existing three-part contract:
+Headers follow the gspec-style pipe contract:
 
 ```text
->markers~~~<gene>~~~<accession> <description>
+>gside|db=<database>|gene=<gene>|acc=<accession>|func=<role>|note=<text>
 ```
 
 Example:
@@ -228,6 +239,8 @@ with `+` when several databases ran), so downstream JSON remains traceable.
 
 - Named databases are supported for `marker`, `panel`, `mash_refseq`, and
   `sourmash`; `gtdbtk` (external GTDB-Tk database) does not accept `-d`.
+- `db setup -d marker|ani|mash|sourmash` installs a mode's default
+  (its tier); `-t/--tier` remains as the legacy spelling.
 - Custom databases do not participate in `db setup` / `db status`; `db list`
   shows named databases, `db validate` checks marker layouts.
 - The default gseek path and the shadow comparison use the same custom FASTA;

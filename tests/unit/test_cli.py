@@ -34,8 +34,8 @@ class TestRenderTable:
     def test_error_cell(self):
         payload = {
             "contigs": "b.fna",
-            "methods": {"panel": {"method": "panel", "error": "db missing"}},
-            "verdict": {"species": "Unknown", "confidence": "low", "basis": ["panel"]},
+            "methods": {"ani": {"method": "ani", "error": "db missing"}},
+            "verdict": {"species": "Unknown", "confidence": "low", "basis": ["ani"]},
         }
         row = _render_table([payload], markdown=False).splitlines()[1].split("\t")
         assert row[1] == "Unknown" and "db missing" in row[13]
@@ -46,15 +46,15 @@ class TestArbitrate:
         verdict = _arbitrate(
             {
                 "marker": {"species": "X_marker", "confidence": "high"},
-                "panel": {"result": {"species": "Y_ani", "confidence": "high"}},
+                "ani": {"result": {"species": "Y_ani", "confidence": "high"}},
             }
         )
         assert verdict["species"] == "Y_ani"
-        assert verdict["basis"] == ["panel"]
+        assert verdict["basis"] == ["ani"]
 
     def test_errors_skipped(self):
         verdict = _arbitrate(
-            {"panel": {"error": "db missing"}, "marker": {"species": "M", "confidence": "high"}}
+            {"ani": {"error": "db missing"}, "marker": {"species": "M", "confidence": "high"}}
         )
         assert verdict["species"] == "M"
 
@@ -63,8 +63,8 @@ class TestArbitrateRanking:
     def test_medium_beats_low_within_same_layer(self):
         verdict = _arbitrate(
             {
-                "mash_refseq": {"result": {"species": "Mash_low", "confidence": "low"}},
-                "panel": {"result": {"species": "Panel_medium", "confidence": "medium"}},
+                "mash": {"result": {"species": "Mash_low", "confidence": "low"}},
+                "ani": {"result": {"species": "Panel_medium", "confidence": "medium"}},
             }
         )
         assert verdict["species"] == "Panel_medium"
@@ -73,20 +73,18 @@ class TestArbitrateRanking:
         verdict = _arbitrate(
             {
                 "marker": {"species": "Streptococcus_agalactiae", "confidence": "high"},
-                "panel": {
+                "ani": {
                     "result": {
                         "species": "Streptococcus_agalactiae",
                         "confidence": "high",
                         "strain": "2603V/R",
                     }
                 },
-                "mash_refseq": {
-                    "result": {"species": "Staphylococcus_aureus", "confidence": "medium"}
-                },
+                "mash": {"result": {"species": "Staphylococcus_aureus", "confidence": "medium"}},
             }
         )
         assert verdict["species"] == "Streptococcus_agalactiae"
-        assert verdict["basis"] == ["panel"]
+        assert verdict["basis"] == ["ani"]
         assert verdict["supporting"] == ["marker"]
         assert verdict["agreement"] == "2/3"
         assert verdict["strain"] == "2603V/R"
@@ -95,7 +93,7 @@ class TestArbitrateRanking:
         verdict = _arbitrate(
             {
                 "marker": {"species": "Salmonella", "confidence": "high"},
-                "panel": {"result": {"species": "Unknown", "confidence": "low"}},
+                "ani": {"result": {"species": "Unknown", "confidence": "low"}},
             }
         )
         assert verdict["supporting"] == []
@@ -117,7 +115,7 @@ class TestSingleModeVerdict:
 
         verdict = _verdict_for(
             {
-                "panel": {
+                "ani": {
                     "result": {
                         "species": "Escherichia_coli",
                         "confidence": "high",

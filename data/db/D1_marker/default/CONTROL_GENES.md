@@ -27,7 +27,7 @@ comparable.  MAPQ filtering happens before aggregation.
 | Campylobacter_jejuni | lpxa | C. jejuni allele + C. coli lpxA_2 allele |
 | Campylobacter_coli | lpxa | shared with C. jejuni |
 | **Confirm markers (pre-existing)** | | |
-| Salmonella_enterica | rpoD | confirm marker |
+| Salmonella | rpoD | confirm marker |
 | Listeria_monocytogenes | prs | confirm marker |
 | Staphylococcus_aureus | femA | confirm marker |
 | Klebsiella_pneumoniae | gyrb-kpn | confirm marker |

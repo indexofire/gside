@@ -1,0 +1,45 @@
+schema: gside.marker-db/1
+name: cpin_markers
+description: CPIN (data/CPIN.txt) coverage extension - 17 bacterial targets from verified
+  RefSeq reference genomes plus 13 fungal ITS barcodes. Select with "gside scan -m
+  marker -d cpin" or merge with the default via repeatable -d selections (default
+  and cpin).
+control_genes:
+  Plesiomonas_shigelloides:
+  - rpob-plesiomonas_shigelloides
+  Yersinia_pseudotuberculosis:
+  - rpob-yersinia_pseudotuberculosis
+  Citrobacter:
+  - gyrb-cf
+  Escherichia_albertii:
+  - gyrb-eal
+  Vibrio_fluvialis:
+  - gyrb-vf
+  Burkholderia_gladioli:
+  - gyrb-bg
+  Nocardia:
+  - gyrb-no
+  Brucella:
+  - rpob-brucella
+  Mycobacterium_tuberculosis:
+  - rpob-mycobacterium_tuberculosis
+  Borrelia_burgdorferi:
+  - rpob-borrelia_burgdorferi
+  Burkholderia_mallei:
+  - rpob-burkholderia_mallei
+  Chlamydia_psittaci:
+  - rpob-chlamydia_psittaci
+  Chlamydia_pneumoniae:
+  - rpob-chlamydia_pneumoniae
+  Bartonella:
+  - rpob-bartonella
+  Rickettsiaceae:
+  - rpob-rickettsiaceae
+  Anaplasmataceae:
+  - rpob-anaplasmataceae
+  Francisella_tularensis:
+  - rpob-francisella_tularensis
+reads:
+  min_depth: 5.0
+  min_relative_depth: 0.1
+  min_mapq: 20

@@ -13,13 +13,15 @@ from gside.analysis._envelope import MethodEnvelope
 from gside.analysis._thresholds import ANI_HIGH, ANI_MEDIUM
 from gside.analysis.read_screening import is_fastq
 from gside.analysis.species_name import apply_species_name
-from gside.config import SPECIES_DB_DIR
 from gside.engine.backends.skani import AniHit
 
 _DB_BY_MODE = {
-    "panel": "D2_ani",
-    "mash_refseq": "D3_mash",
+    "ani": "D2_ani",
+    "mash": "D3_mash",
 }
+
+# Legacy mode spellings accepted at the API surface and normalized.
+_MODE_ALIASES = {"panel": "ani", "mash_refseq": "mash"}
 
 _AF_MIN = 0.65
 _MASH_IDENTITY_HIGH = 0.97
@@ -305,6 +307,7 @@ def identify_by_ani(
     threads: int = 4,
     dbs: Sequence[str | Path] | None = None,
 ) -> AniIdResult:
+    mode = _MODE_ALIASES.get(mode, mode)
     if mode not in _DB_BY_MODE:
         raise ValueError(f"unsupported ANI mode {mode!r}; expected one of {sorted(_DB_BY_MODE)}")
     db_name = _DB_BY_MODE[mode]
@@ -316,16 +319,33 @@ def identify_by_ani(
         base = selected[0]
         name = base.name
     else:
-        base = Path(db_dir) if db_dir else SPECIES_DB_DIR / db_name
+        base = _default_base(db_dir, mode)
         name = db_name
     taxa = _load_taxa_map(base)
     database = {"name": name, "version": _db_version(base, name)}
 
-    if mode == "mash_refseq":
+    if mode == "mash":
         result = _mash_result(base, contigs, taxa, threads)
     else:
         result = _panel_result(base, contigs, taxa, threads)
     return AniIdResult(method=mode, database=database, result=result)
+
+
+def _default_base(db_dir: str | Path | None, mode: str) -> Path:
+    """Default database dir: ``<root>/<tier>/default``.
+
+    A ``db_dir`` (``-D``) is treated as the database root; when the tier
+    default is absent the value itself is the base directory (legacy layout
+    or a custom directory holding the files directly).
+    """
+    from gside.db_registry import default_db_dir
+
+    if db_dir is None:
+        return default_db_dir(mode)
+    candidate = default_db_dir(mode, root=db_dir)
+    if candidate.is_dir():
+        return candidate
+    return Path(db_dir)
 
 
 def _identify_multi(
@@ -348,7 +368,7 @@ def _identify_multi(
         "version": "+".join(d["version"] for d in databases),
     }
 
-    if mode == "mash_refseq":
+    if mode == "mash":
         rows: list[tuple[str, float]] = []
         for base in bases:
             rows.extend(_mash_rows(base, contigs, threads))

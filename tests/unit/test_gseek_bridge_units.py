@@ -50,7 +50,7 @@ def test_engine_mode_rejects_unknown_value(monkeypatch):
 def _record(**overrides):
     values = {
         "query_id": "q1",
-        "target_id": "markers~~~inva~~~x",
+        "target_id": "gside|db=test|gene=inva|acc=t|func=primary",
         "identity": 99.5,
         "aligned_length": 90,
         "query_length": 100,
@@ -71,7 +71,7 @@ def _record(**overrides):
 def test_record_to_hit_preserves_gside_formulas_and_coordinates():
     hit = bridge.record_to_hit(_record())
     assert hit.query_id == "q1"
-    assert hit.subject_id == "markers~~~inva~~~x"
+    assert hit.subject_id == "gside|db=test|gene=inva|acc=t|func=primary"
     assert hit.identity == 99.5
     assert hit.query_coverage == pytest.approx(90.0)
     assert hit.subject_coverage == pytest.approx(30.0)
@@ -96,7 +96,7 @@ def test_aggregate_screen_unions_spans_and_weights_identity():
     assert hit["coverage"] == pytest.approx(83.3)
     assert hit["identity"] == pytest.approx(98.33)
     assert hit["ref_len"] == 300
-    assert hit["seqid"] == "markers~~~inva~~~x"
+    assert hit["seqid"] == "gside|db=test|gene=inva|acc=t|func=primary"
 
 
 def test_aggregate_screen_skips_records_without_coordinates():
@@ -492,8 +492,8 @@ def test_log_sourmash_shadow_warns_on_diff(caplog):
 
 
 def test_log_blast_shadow_warns_on_diff(caplog):
-    legacy = [SimpleNamespace(subject_id="mk~~~g1~~~x", identity=99.0)]
-    new = [SimpleNamespace(subject_id="mk~~~g2~~~y", identity=98.0)]
+    legacy = [SimpleNamespace(subject_id="gside|db=t|gene=g1|acc=t", identity=99.0)]
+    new = [SimpleNamespace(subject_id="gside|db=t|gene=g2|acc=t", identity=98.0)]
     with caplog.at_level("WARNING"):
         bridge.log_blast_shadow(legacy, new)
     assert "BLAST differs" in caplog.text
