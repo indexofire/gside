@@ -11,13 +11,25 @@ marker 结果额外携带 reads 模式深度门控字段（`control_gene`、`con
 `notes` 中（见[标记规则格式](marker-rules.md#reads-mode-depth-gate)的「Reads 模式深度门控」一节）。
 组装输入的这些门控字段为空。
 
+当一个方法通过 `-d` 运行多个选中数据库时，其 `database` 字段报告合并溯源
+（`{"name": "food+lab2026", ...}`），并用 `databases` 数组列出每个参与的库：
+
+```json
+"databases": [
+  {"name": "food", "version": "9c1f2ab3", "path": "/data/db/marker/food"},
+  {"name": "lab2026", "version": "2026.1", "path": "/data/db/marker/lab2026"}
+]
+```
+
+单库选择（默认）完全不输出 `databases` 字段。
+
 ## 单方法输出（-m marker）
 
 ```json
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": {
@@ -58,7 +70,7 @@ marker 结果额外携带 reads 模式深度门控字段（`control_gene`、`con
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": { ... },
@@ -127,9 +139,8 @@ tsv`/`md`/`csv` 每个样本渲染一行，而非嵌套对象。
 | `methods.<mode>.result` | dict | ANI/sourmash 方法的嵌套结果（marker 无此层） |
 | `methods.<mode>.error` | str | 方法执行错误（仅失败时出现） |
 | `methods.<mode>.suggested_command` | str | 缺库时的修复命令 |
-| `methods.<mode>.missing_tier` | str | 需要安装的档位（`panel` / `mash` / `sourmash` / `meta` / `meta_sylph`） |
+| `methods.<mode>.missing_tier` | str | 需要安装的档位（`panel` / `mash` / `sourmash`） |
 | `methods.<mode>.estimated_size` | str | 该档位的近似下载体积 |
-| `methods.<mode>.help_url` | str | 可下载档位（`meta` / `meta_sylph`）的上游页面 |
 | `verdict.species` | str | 最终仲裁判定（规范名 `Genus_species`） |
 | `verdict.display_name` | str | 同一判定的可读形式（空格分隔，如 `Escherichia coli`） |
 | `verdict.strain` | str \| null | 胜出方法给出的菌株信息 |
@@ -181,51 +192,6 @@ marker 注册标签本身即契约形式：`Salmonella_enterica`、
 置信度按 containment ANI 的 95/93 分界（与 panel 一致）；若 gather CSV 无 ANI
 列，则回退到哈希比例 0.90/0.70。
 
-## 宏基因组输出（`gside scan --meta`）
-
-```json
-{
-  "analysis_type": "metagenomic_profiling",
-  "tool": "gside",
-  "version": "0.2.2",
-  "input": {"files": ["reads_R1.fq", "reads_R2.fq"], "type": "fastq_paired"},
-  "methods": {
-    "kraken2": {"method": "kraken2_bracken", "database": {"name": "D5_kraken2", "path": "..."},
-      "result": {"top_species": [{"name": "Escherichia coli", "taxid": 562, "reads": 850,
-        "fraction": 0.85, "confidence": "high"}], "total_reads": 10000,
-        "classified_reads": 9870, "n_species": 4}},
-    "sylph": {"method": "sylph_ani", "database": {"name": "D6_sylph", "path": "..."},
-      "result": {"species": [{"name": "Escherichia coli str. K-12", "ani": 99.9,
-        "abundance": 0.86, "coverage": 120.0, "confidence": "high"}], "n_species": 1}}
-  },
-  "verdict": {
-    "top_species": [{"name": "Escherichia_coli", "display_name": "Escherichia coli",
-      "strain": "str. K-12", "method": "sylph", "abundance": 0.86,
-      "confidence": "high", "ani": 99.9, "species_raw": "Escherichia coli str. K-12"}],
-    "richness": 1,
-    "basis": ["kraken2", "sylph"]
-  }
-}
-```
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `input.files` / `input.type` | list / str | 输入与识别类型（`fastq_paired`、`fastq_single`、`fasta`） |
-| `methods.<mode>.result` | dict | 各方法结果（kraken2 为 `top_species`，sylph 为 `species`） |
-| `verdict.top_species[].name` | str | 规范 `Genus_species`（与 `scan` 同一契约） |
-| `verdict.top_species[].display_name` | str | 空格形式 |
-| `verdict.top_species[].strain` | str \| null | 胜出方法给出的菌株信息 |
-| `verdict.top_species[].method` | str | `kraken2` 或 `sylph`（置信度高者优先，同置信 sylph 胜） |
-| `verdict.top_species[].abundance` | float | 分数 0-1（sylph 的百分比已归一化） |
-| `verdict.top_species[].confidence` | str | high / medium / low |
-| `verdict.top_species[].ani` | float \| null | sylph 的 ANI（若有） |
-| `verdict.top_species[].species_raw` | str | 原始工具标签，仅在与规范名不同时出现 |
-| `verdict.richness` | int | 合并后的物种数 |
-| `verdict.basis` | list[str] | 参与合并的方法 |
-
-批量（`--samples manifest.tsv`）输出 **JSON 数组**，每个对象带 `sample` 键；
-`tsv`/`csv`/`md` 每行前置一列 `sample`。
-
 ## 基因组质量输出（`gside validate`）
 
 ```json
@@ -233,7 +199,7 @@ marker 注册标签本身即契约形式：`Salmonella_enterica`、
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.2.2", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.3", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},

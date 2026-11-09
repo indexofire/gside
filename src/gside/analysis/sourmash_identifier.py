@@ -152,11 +152,33 @@ def _db_version(db_dir: Path) -> str:
 
 
 def identify_by_sourmash(
-    contigs: str | Path | Sequence[str | Path], db_dir: str | Path | None = None
+    contigs: str | Path | Sequence[str | Path],
+    db_dir: str | Path | None = None,
+    dbs: Sequence[str | Path] | None = None,
 ) -> SourmashIdResult:
-    base = Path(db_dir) if db_dir else SPECIES_DB_DIR / "D4_sourmash"
-    partition = _gather_and_tax(contigs, base)
-    database = {"name": "D4_sourmash", "version": _db_version(base)}
+    multi_dbs: list[Path] = [Path(d) for d in dbs] if dbs is not None else []
+    if len(multi_dbs) > 1:
+        bases = multi_dbs
+        partition: list[dict[str, Any]] = []
+        for base in bases:
+            partition.extend(_gather_and_tax(contigs, base))
+        partition.sort(key=lambda hit: hit["f_unique_weighted"], reverse=True)
+        database = {
+            "name": "+".join(base.name for base in bases),
+            "version": "+".join(_db_version(base) for base in bases),
+        }
+        databases = [
+            {"name": base.name, "version": _db_version(base), "path": str(base)} for base in bases
+        ]
+    else:
+        base = (
+            multi_dbs[0]
+            if multi_dbs
+            else (Path(db_dir) if db_dir else SPECIES_DB_DIR / "D4_sourmash")
+        )
+        partition = _gather_and_tax(contigs, base)
+        database = {"name": base.name, "version": _db_version(base)}
+        databases = []
 
     best = partition[0] if partition else None
     best_fuw = best["f_unique_weighted"] if best else 0.0
@@ -191,4 +213,6 @@ def identify_by_sourmash(
         "flags": flags,
     }
     apply_species_name(result, species or "Mixed/Unknown")
-    return SourmashIdResult(method="sourmash", database=database, result=result)
+    return SourmashIdResult(
+        method="sourmash", database=database, result=result, databases=databases
+    )

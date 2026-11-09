@@ -47,8 +47,6 @@ class TestStatus:
             "D2_ani",
             "D3_mash",
             "D4_sourmash",
-            "D5_kraken2",
-            "D6_sylph",
         }
         assert [status[k]["tier"] for k in ("D1_marker", "D2_ani", "D3_mash")] == [
             "mini",
@@ -63,11 +61,6 @@ class TestStatus:
         _touch(root / "D3_mash" / "payload.bin")
         _touch(root / "D4_sourmash" / "gtdb-reps-k31.zip")
         _touch(root / "D4_sourmash" / "lineages.csv")
-        _touch(root / "D5_kraken2" / "hash.k2d")
-        _touch(root / "D5_kraken2" / "taxo.k2d")
-        _touch(root / "D5_kraken2" / "opts.k2d")
-        _touch(root / "D5_kraken2" / "database150mers.kmer_distrib")
-        _touch(root / "D6_sylph" / "gtdb-r226.syldb")
         status = db_status()
         assert all(v["ready"] for v in status.values())
 
@@ -296,7 +289,7 @@ class TestFormatTiers:
 
     def test_json_roundtrip_with_ready(self):
         data = json.loads(db.format_tiers("json"))
-        assert set(data) == set(db._TIERS)
+        assert set(data) == {*db._TIERS, "custom_databases"}
         assert data["mini"]["ready"] is True
         assert isinstance(data["panel"]["ready"], bool)
 
@@ -365,156 +358,6 @@ class TestSourmashTier:
         _touch(src / "gtdb-reps-k31.zip")
         _touch(src / "lineages.csv")
         assert db_setup("sourmash", source=str(tmp_path))["D4_sourmash"].startswith("copied from")
-
-
-class TestMetaTiers:
-    def test_tiers_declared(self):
-        assert db._TIERS["meta"]["items"] == ["D5_kraken2"]
-        assert db._TIERS["meta_sylph"]["items"] == ["D6_sylph"]
-
-    def test_status_rows(self, root):
-        status = db_status()
-        assert status["D5_kraken2"]["tier"] == "meta"
-        assert status["D6_sylph"]["tier"] == "meta_sylph"
-        assert not status["D5_kraken2"]["ready"]
-        assert not status["D6_sylph"]["ready"]
-
-    def test_kraken2_needs_bracken_distribution(self, root):
-        for name in ("hash.k2d", "taxo.k2d", "opts.k2d"):
-            _touch(root / "D5_kraken2" / name)
-        assert not db_status()["D5_kraken2"]["ready"]
-        _touch(root / "D5_kraken2" / "database150mers.kmer_distrib")
-        assert db_status()["D5_kraken2"]["ready"]
-
-    def test_sylph_ready_for_syldb(self, root):
-        _touch(root / "D6_sylph" / "gtdb-r226.syldb")
-        assert db_status()["D6_sylph"]["ready"]
-
-    def test_sylph_ready_for_syl2db(self, root):
-        _touch(root / "D6_sylph" / "gtdb-r226.syl2db")
-        assert db_status()["D6_sylph"]["ready"]
-
-    def test_sylph_empty_dir_not_ready(self, root):
-        (root / "D6_sylph").mkdir(parents=True)
-        assert not db_status()["D6_sylph"]["ready"]
-
-    def test_setup_already_ready(self, root):
-        for name in ("hash.k2d", "taxo.k2d", "opts.k2d", "database150mers.kmer_distrib"):
-            _touch(root / "D5_kraken2" / name)
-        _touch(root / "D6_sylph" / "db.syldb")
-        assert db_setup("meta") == {"D5_kraken2": "already ready"}
-        assert db_setup("meta_sylph") == {"D6_sylph": "already ready"}
-
-    def test_setup_from_source_copies(self, root, tmp_path):
-        for name in ("hash.k2d", "taxo.k2d", "opts.k2d", "database150mers.kmer_distrib"):
-            _touch(tmp_path / "D5_kraken2" / name)
-        msg = db_setup("meta", source=str(tmp_path))["D5_kraken2"]
-        assert msg.startswith("copied from")
-        assert (root / "D5_kraken2" / "hash.k2d").is_file()
-
-    def test_setup_error_exits_1(self, root, monkeypatch, capsys):
-        monkeypatch.setattr(db, "_install_kraken2", lambda dst: "ERROR: boom")
-        assert run_db_command(["setup", "--tier", "meta"]) == 1
-        assert "ERROR: boom" in capsys.readouterr().out
-
-
-class TestKraken2Installer:
-    _FILES = {
-        "hash.k2d": b"hash",
-        "taxo.k2d": b"taxo",
-        "opts.k2d": b"opts",
-        "database150mers.kmer_distrib": b"distrib",
-    }
-
-    def _prepare(self, tmp_path, files=None):
-        import tarfile
-
-        files = files or self._FILES
-        archive = tmp_path / "prepared.tar.gz"
-        src = tmp_path / "src"
-        src.mkdir(exist_ok=True)
-        with tarfile.open(archive, "w:gz") as tf:
-            for name, data in files.items():
-                path = src / name
-                path.write_bytes(data)
-                tf.add(path, arcname=name)
-        return archive
-
-    def _manifest(self, files=None):
-        import hashlib as _hashlib
-
-        files = files or self._FILES
-        return {name: _hashlib.md5(data).hexdigest() for name, data in files.items()}
-
-    def test_download_extract_and_verify(self, root, monkeypatch, tmp_path):
-        archive = self._prepare(tmp_path)
-        monkeypatch.setattr(db, "_download_file", lambda url, dst: shutil.copy2(archive, dst))
-        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: self._manifest())
-        msg = db_setup("meta")["D5_kraken2"]
-        assert msg.startswith("downloaded Kraken2 Standard-8")
-        assert (root / "D5_kraken2" / "database150mers.kmer_distrib").is_file()
-        assert db_status()["D5_kraken2"]["ready"]
-
-    def test_checksum_mismatch_rejected(self, root, monkeypatch, tmp_path):
-        archive = self._prepare(tmp_path)
-        monkeypatch.setattr(db, "_download_file", lambda url, dst: shutil.copy2(archive, dst))
-        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: {"hash.k2d": "0" * 32})
-        assert db_setup("meta")["D5_kraken2"] == "ERROR: MD5 mismatch for hash.k2d"
-
-    def test_nested_archive_is_flattened(self, root, monkeypatch, tmp_path):
-        import tarfile
-
-        archive = tmp_path / "nested.tar.gz"
-        src = tmp_path / "nested_src" / "k2_db"
-        src.mkdir(parents=True)
-        with tarfile.open(archive, "w:gz") as tf:
-            for name, data in self._FILES.items():
-                path = src / name
-                path.write_bytes(data)
-                tf.add(path, arcname=f"k2_db/{name}")
-        monkeypatch.setattr(db, "_download_file", lambda url, dst: shutil.copy2(archive, dst))
-        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: self._manifest())
-        assert db_setup("meta")["D5_kraken2"].startswith("downloaded")
-        assert (root / "D5_kraken2" / "hash.k2d").is_file()
-
-    def test_download_failure_reports(self, root, monkeypatch):
-        def boom(url, dst):
-            raise OSError("offline")
-
-        monkeypatch.setattr(db, "_download_file", boom)
-        msg = db_setup("meta")["D5_kraken2"]
-        assert msg.startswith("ERROR: Kraken2 download failed")
-
-    def test_corrupt_archive_reports(self, root, monkeypatch, tmp_path):
-        bad = tmp_path / "bad.tar.gz"
-        bad.write_bytes(b"not a tarball")
-        monkeypatch.setattr(db, "_download_file", lambda url, dst: shutil.copy2(bad, dst))
-        assert db_setup("meta")["D5_kraken2"].startswith("ERROR: unsafe or corrupt archive")
-
-
-class TestSylphInstaller:
-    def test_download_and_verify(self, root, monkeypatch):
-        payload = b"syl2db-bytes"
-        monkeypatch.setattr(db, "_download_file", lambda url, dst: Path(dst).write_bytes(payload))
-        monkeypatch.setattr(db, "SYLPH_DB_MD5", __import__("hashlib").md5(payload).hexdigest())
-        msg = db_setup("meta_sylph")["D6_sylph"]
-        assert msg.startswith("downloaded GTDB r226")
-        assert db_status()["D6_sylph"]["ready"]
-
-    def test_checksum_mismatch_rejected(self, root, monkeypatch):
-        monkeypatch.setattr(db, "_download_file", lambda url, dst: Path(dst).write_bytes(b"x"))
-        monkeypatch.setattr(db, "SYLPH_DB_MD5", "0" * 32)
-        assert db_setup("meta_sylph")["D6_sylph"] == (
-            f"ERROR: MD5 mismatch for {db.SYLPH_DB_FILENAME}"
-        )
-        assert not (root / "D6_sylph" / db.SYLPH_DB_FILENAME).exists()
-
-    def test_download_failure_reports(self, root, monkeypatch):
-        def boom(url, dst):
-            raise OSError("offline")
-
-        monkeypatch.setattr(db, "_download_file", boom)
-        assert db_setup("meta_sylph")["D6_sylph"].startswith("ERROR: sylph download failed")
 
 
 class TestSetupDownloadPaths:
@@ -836,58 +679,6 @@ class _FakeResponse:
         return False
 
 
-class TestManifestAndVerification:
-    def test_manifest_parsing(self, monkeypatch):
-        body = (
-            b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  hash.k2d\n"
-            b"not a manifest line\n"
-            b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  *database150mers.kmer_distrib\n"
-        )
-        monkeypatch.setattr(db.urllib.request, "urlopen", lambda *a, **k: _FakeResponse([body]))
-        manifest = db._published_md5_manifest("https://example.invalid/x.md5")
-        assert manifest == {
-            "hash.k2d": "a" * 32,
-            "database150mers.kmer_distrib": "b" * 32,
-        }
-
-    def test_manifest_fetch_failure_warns_and_skips(self, monkeypatch, tmp_path):
-        def boom(url):
-            raise OSError("offline")
-
-        monkeypatch.setattr(db, "_published_md5_manifest", boom)
-        assert db._verify_kraken2_files(tmp_path) is None
-
-    def test_empty_manifest_skips(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: {})
-        assert db._verify_kraken2_files(tmp_path) is None
-
-    def test_missing_file_is_ignored(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: {"absent.k2d": "0" * 32})
-        assert db._verify_kraken2_files(tmp_path) is None
-
-    def test_incomplete_archive_reports(self, root, monkeypatch, tmp_path):
-        import tarfile
-
-        archive = tmp_path / "partial.tar.gz"
-        src = tmp_path / "partial"
-        src.mkdir()
-        with tarfile.open(archive, "w:gz") as tf:
-            for name in ("hash.k2d", "taxo.k2d", "opts.k2d"):
-                path = src / name
-                path.write_bytes(b"x")
-                tf.add(path, arcname=name)
-        monkeypatch.setattr(db, "_download_file", lambda url, dst: shutil.copy2(archive, dst))
-        monkeypatch.setattr(db, "_published_md5_manifest", lambda url: {})
-        assert db_setup("meta")["D5_kraken2"].startswith("ERROR: archive did not contain")
-
-    def test_sylph_download_without_file_reports(self, root, monkeypatch):
-        monkeypatch.setattr(db, "_download_file", lambda url, dst: None)
-        monkeypatch.setattr(db, "SYLPH_DB_MD5", "")
-        assert db_setup("meta_sylph")["D6_sylph"] == (
-            "ERROR: sylph database missing after download"
-        )
-
-
 class TestDownloadFile:
     def test_streams_chunks_and_reports_progress(self, tmp_path, monkeypatch, capsys):
         response = _FakeResponse([b"abc", b"def", b""], {"Content-Length": "6"})
@@ -956,30 +747,85 @@ class TestStatusCsv:
         assert text[1].startswith("D1_marker,ready,mini,FASTA/FASTQ,")
 
 
-class TestInputKinds:
-    def test_status_has_inputs_column(self, root):
-        _touch(root / "D1_marker" / "markers.fasta")
-        lines = db.format_status("tsv").splitlines()
-        assert lines[0] == "COMPONENT\tREADY\tTIER\tINPUTS\tPATH"
-        assert lines[1].split("\t")[3] == "FASTA/FASTQ"
-        by_component = {ln.split("\t")[0]: ln.split("\t") for ln in lines[1:]}
-        assert by_component["D2_ani"][3] == "FASTA"
-        assert by_component["D6_sylph"][3] == "FASTQ"
+class TestNamedDatabasesListing:
+    def _named_marker_db(self, root):
+        path = Path(root) / "marker" / "food"
+        path.mkdir(parents=True)
+        (path / "markers.fasta").write_text(">markers~~~g1~~~x marker\nACGTACGT\n")
+        (path / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
+        return path
 
-    def test_status_json_carries_inputs(self, root):
-        data = json.loads(db.format_status("json"))
-        assert data["D1_marker"]["inputs"] == "FASTA/FASTQ"
-        assert data["D2_ani"]["inputs"] == "FASTA"
+    def test_json_includes_custom_databases(self, root):
+        import json as json_mod
 
-    def test_tiers_have_inputs_column(self):
+        self._named_marker_db(root)
+        payload = json_mod.loads(db.format_tiers("json"))
+        custom = payload["custom_databases"]["marker"]
+        assert [entry["name"] for entry in custom] == ["food"]
+        assert custom[0]["path"].endswith("marker/food")
+
+    def test_table_appends_named_section(self, root):
+        self._named_marker_db(root)
+        text = db.format_tiers("table")
+        assert "named databases" in text
+        assert "food" in text
+
+    def test_no_named_databases_omit_section(self, root):
+        assert "named databases" not in db.format_tiers("table")
+        payload = json.loads(db.format_tiers("json"))
+        assert payload["custom_databases"] == {}
+
+    def test_tsv_unchanged(self, root):
+        self._named_marker_db(root)
         lines = db.format_tiers("tsv").splitlines()
         assert lines[0] == "NAME\tREADY\tSIZE\tINPUTS\tDESCRIPTION"
-        by_name = {ln.split("\t")[0]: ln.split("\t") for ln in lines[1:]}
-        assert by_name["mini"][3] == "FASTA/FASTQ"
-        assert by_name["panel"][3] == "FASTA"
-        assert by_name["meta_sylph"][3] == "FASTQ"
+        assert all(len(line.split("\t")) == 5 for line in lines)
 
-    def test_tiers_json_carries_inputs(self):
-        data = json.loads(db.format_tiers("json"))
-        assert data["panel"]["inputs"] == "FASTA"
-        assert data["meta"]["inputs"] == "FASTA/FASTQ"
+
+class TestFlattenIfNested:
+    def test_moves_files_up_from_single_nested_dir(self, tmp_path):
+        nested = tmp_path / "inner"
+        (nested / "panel.sketch").mkdir(parents=True)
+        (nested / "panel.sketch" / "sketches.db").write_bytes(b"x")
+        db._flatten_if_nested(tmp_path, "panel.sketch/sketches.db")
+        assert (tmp_path / "panel.sketch" / "sketches.db").is_file()
+        assert not nested.exists()
+
+    def test_noop_when_marker_present(self, tmp_path):
+        (tmp_path / "panel.sketch").mkdir()
+        (tmp_path / "panel.sketch" / "sketches.db").write_bytes(b"x")
+        db._flatten_if_nested(tmp_path, "panel.sketch/sketches.db")
+        assert (tmp_path / "panel.sketch" / "sketches.db").is_file()
+
+
+class TestBuildFromManifestErrors:
+    def test_genome_download_error_short_circuits(self, monkeypatch, tmp_path):
+        manifests = tmp_path / "manifests"
+        manifests.mkdir()
+        (manifests / "panel_accessions.tsv").write_text("accession\torganism\nGCF_1\tX\n")
+        (manifests / "metadata.tsv").write_text("fna\tspecies\n")
+        monkeypatch.setattr(db, "_MANIFEST_DIR", manifests)
+        monkeypatch.setattr(db, "which", lambda tool: f"/bin/{tool}")
+        monkeypatch.setattr(
+            db, "_download_panel_genomes", lambda *a, **k: "ERROR: NCBI datasets download failed"
+        )
+        assert db._build_panel_from_manifest(tmp_path / "dst").startswith("ERROR: NCBI")
+
+
+class TestDownloadPanelGenomes:
+    def test_ncbi_failure_is_actionable(self, monkeypatch, tmp_path):
+        import types as _types
+
+        dst = tmp_path / "dst"
+        genomes = tmp_path / "genomes"
+        dst.mkdir()
+        genomes.mkdir()
+        failed = _types.SimpleNamespace(returncode=1, stderr="quota exceeded")
+
+        def fake_run(cmd, **kwargs):
+            return failed
+
+        monkeypatch.setattr(db.subprocess, "run", fake_run)
+        error = db._download_panel_genomes("/bin/datasets", ["GCF_1"], dst, genomes)
+        assert error is not None
+        assert error.startswith("ERROR: NCBI datasets download failed")

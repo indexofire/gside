@@ -2,19 +2,15 @@
 
 ## gside scan
 
-两种工作流的统一入口：默认识别单基因组物种，加 `--meta` 分析宏基因组群落。
 
 ### 用法
 
 ```bash
 gside scan <files...> [选项]
-gside scan --meta <reads...> [选项]
-gside scan --meta --samples samples.tsv [选项]
 ```
 
 ### 模式与输入矩阵
 
-| 模式 | `--meta` | FASTA | FASTQ | 说明 |
 |---|---|---|---|---|
 | `marker` | 否 | ✅ | ✅ | FASTQ：minimap2（`sr`/`map-ont`）比对，基因 breadth 取所有读段比对区间的并集——约 1× 基因组覆盖即可 |
 | `panel` | 否 | ✅ | ❌ | skani ANI |
@@ -22,24 +18,18 @@ gside scan --meta --samples samples.tsv [选项]
 | `sourmash` | 否 | ✅ | ✅ | 对读段签名做 gather（1.6Mb 的 10× 数据约 4 分钟）；基于 containment ANI |
 | `gtdbtk` | 否 | ✅ | ❌ | 系统发育 placement |
 | `all` | 否 | ✅ | ❌ | 全部物种层 + 仲裁（panel/gtdbtk 仅接受组装） |
-| `kraken2` | 是 | ✅ | ✅ | 读段或 contigs |
-| `sylph` | 是 | ❌ | ✅ | 仅读段 |
-| `all` | 是 | ❌ | ✅ | kraken2+sylph；contigs 请用 `-m kraken2` |
+| `all` | 是 | ❌ | ❌ | 全部单菌层级（需 FASTA） |
 
-`-m` 支持 `+` 组合（如 `marker+sourmash`、`kraken2+sylph`）；重复项自动去重，
 顺序保留。`all` 表示当前上下文的全部模式，不能与其他模式组合。
 
 输入类型由扩展名推断（`.fna/.fa/.fasta` 与 `.fq/.fastq`，支持 `.gz`），并在
-**任何工具启动前**校验：不匹配时退出码 2 并指出具体模式。`--meta` 同样拒绝
-单菌株模式，单菌株模式也拒绝 `kraken2`/`sylph`。由于 `all` 含 sylph，
-`--meta -m all` 需要 FASTQ；contigs 请用 `-m kraken2`。
+宏基因组（群落）分析已移至 gmeta 工具（`gmeta run` / `gmeta net build`）。
 
 **双端 FASTQ 算一个样本。** 位置参数中带配对标记的文件（`_R1`/`_R2`、
 `_1`/`_2`、`.1`/`.2`、`-1`/`-2`，可带 `_001`，大小写不敏感，支持 `.gz`）会
 自动合并：两条 mate 一起送入 `marker`（一次 minimap2）、`mash_refseq` 与
 `sourmash`（各一次 sketch），输出中的 `contigs` 取第一条 mate。未配对的文件
 各自成样本，因此 `gside scan A_R1.fq A_R2.fq B_R1.fq B_R2.fq -m marker`
-是 **2** 个样本而不是 4 个。FASTA 永不配对。`--meta` 下两个位置参数文件始终
 视为一个样本；文件更多时同样按 mate 名分组。
 
 ### 解读 verdict
@@ -72,17 +62,14 @@ gside scan --meta --samples samples.tsv [选项]
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| `files` | 位置参数 | — | 一个或多个 FASTA/FASTQ；FASTQ 的 mate 自动合并（`_R1/_R2`、`_1/_2`、`.1/.2`）；未配对文件各自成样本（`--meta` 下 2 个文件 = 一个样本） |
-| `-m`，`--mode` | 选项 | `marker` / `all` | 方法（默认 `marker`，`--meta` 时默认 `all`） |
-| `--meta` | 开关 | 关 | 输入视为宏基因组群落 |
 | `-D`，`--db-dir` | 选项 | 自动 | 数据库根目录 |
+| `-d`，`--db` | 选项 | — | 可重复的 `[MODE:]NAME` 数据库选择：`data/db/<family>/` 下的命名库、目录路径或 `default`。选中的库全部运行并合并结果；见[自定义数据库](custom-databases.md) |
+| `--marker-db` | 选项 | — | 自定义 marker 库目录（`markers.fasta` + `marker_rules.yaml`），即 `-d marker:PATH` 别名；见[自定义数据库](custom-databases.md) |
 | `-f`，`--format` | 选项 | `json` | `json` / `tsv` / `md` / `csv` |
 | `-o`，`--output PATH` | 选项 | stdout | 报告写入 PATH；所有格式（json/tsv/csv/md）均随样本完成流式写入 |
-| `-j`，`--jobs N` | 选项 | `1` | 并发样本数（单菌株批量、位置参数 `--meta` 批量或 `--samples`） |
 | `-t`，`--threads N` | 选项 | `4` | 每次工具调用的线程数 |
 | `-n`，`--no-header` | 选项 | 关 | 隐藏表头行（tsv/csv/md） |
 | `-a`，`--auto-setup` | 选项 | 关 | 自动安装缺失档位并重试该方法一次 |
-| `-s`，`--samples PATH` | 选项 | — | `--meta` 批量清单：`sample_id<TAB>reads [<TAB>reads2]` |
 
 多样本且 stderr 为 TTY 时会显示进度条。流式输出行会交给进度条协调：每次写入前
 暂停进度条、写完再恢复，因此 JSON/TSV/CSV/MD 结果会实时出现且不会被下一次刷新
@@ -99,11 +86,6 @@ gside scan *.fna -m marker -j 8 -o results.tsv
 
 # 长读长单菌株（marker 把读段当序列比对）
 gside scan ont_reads.fastq -m marker
-
-# 宏基因组群落
-gside scan reads_R1.fq reads_R2.fq --meta                 # kraken2 + sylph
-gside scan contigs.fna --meta -m kraken2 -f md
-gside scan --meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 ```
 
 ## gside db
@@ -147,13 +129,12 @@ gside db list -f tsv       # TIER	READY	SIZE	DESCRIPTION
 
 | 选项 | 默认 | 说明 |
 |---|---|---|
-| `-t`，`--tier` | `panel` | `mini|panel|mash|sourmash|meta|meta_sylph|all` |
+| `-t`，`--tier` | `panel` | `mini|panel|mash|sourmash|all` |
 | `-s`，`--source` | — | 从本地已有数据库目录复制，而不是下载 |
 | `-f`，`--format` | `text` | `text` / `json`（json 把进度写到 stderr） |
 
 - `mini` 随包分发（始终就绪）
 - `all` = **panel + mash**；`sourmash` 需单独安装（约 3.9GB）
-- `meta`（Kraken2 Standard-8 + Bracken，约 5.5GB）与 `meta_sylph`
   （GTDB r226 `.syl2db`，约 14GB）会自动下载并校验
 - CheckM2 与 GTDB-Tk **不是** tier；见
   [数据库](../installation/databases.md)
@@ -229,7 +210,7 @@ gside validate <contigs.fasta> -o <输出目录> [选项]
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.2.2", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.3", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},
@@ -261,8 +242,6 @@ CLI 命令并返回同样的 JSON 文本；失败返回 `isError` 包络，不�
 
 ## gside species / gside meta（别名）
 
-隐藏兼容别名：`gside species` = 不带 `--meta` 的 `gside scan`；
-`gside meta` = `gside scan --meta`。模式选择仍按上下文（单菌株/宏数据）限定。
 新脚本请使用 `scan`。
 
 ## 环境变量
@@ -290,16 +269,12 @@ CLI 命令并返回同样的 JSON 文本；失败返回 `isError` 包络，不�
 
 ## 从 0.1.4 升级
 
-- `gside species` / `gside meta` 仍作为 `gside scan`（不带/带 `--meta`）的
-  隐藏别名可用。
+- `gside species` 仍作为 `scan` 的隐藏别名可用。
 - 物种标签改为规范 `Genus_species`（`verdict.species`、
   `methods.<mode>.species`）；展示名移到 `verdict.display_name`，菌株移到
   `verdict.strain`。verdict 新增 `supporting` 与 `agreement`。
-- 宏基因组行使用同一规范 `name`，并带 `display_name`/`strain` 与分数
-  （0-1）形式的 `abundance`。
 - `validate` 不再有 `-m/--mode`；`-o/--output-dir` 为必填，`validation.json`
   新增 schema/genome/parameters/software/tools/status/errors/created_at。
-- `--meta -m all` 需要 FASTQ（含 sylph）；contigs 请用 `-m kraken2`。
 
 ## gside --version
 
@@ -308,8 +283,8 @@ JSON。
 
 ```bash
 gside -V
-# gside, version 0.2.2
+# gside, version 0.2.3
 
 gside --version --json     # 或 -V -J
-# {"tool": "gside", "version": "0.2.2"}
+# {"tool": "gside", "version": "0.2.3"}
 ```

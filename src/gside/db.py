@@ -53,21 +53,6 @@ SOURMASH_LINEAGES_SHA256 = "98bceab27a50f08b2f777ca7bdfb57c88aabe5ce1fa54cfb103d
 SOURMASH_FARM_BASE = "https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs226"
 SOURMASH_SIG_URL = f"{SOURMASH_FARM_BASE}/gtdb-rs226-reps.k31.sig.zip"
 SOURMASH_LINEAGES_URL = f"{SOURMASH_FARM_BASE}/gtdb-rs226-reps.lineages.csv"
-# Upstream landing pages referenced by db setup / error hints.
-K2_INDEXES_URL = "https://benlangmead.github.io/aws-indexes/k2"
-SYLPH_DOCS_URL = "https://sylph-docs.github.io/"
-
-# Auto-downloadable metagenomic tiers (Ben Langmead's Kraken2 packages include
-# the Bracken 50-300-mer distributions; sylph ships pre-sketched GTDB DBs).
-K2_STANDARD8_URL = "https://genome-idx.s3.amazonaws.com/kraken/k2_standard_08_GB_20260626.tar.gz"
-K2_STANDARD8_MD5_URL = (
-    "https://genome-idx.s3.amazonaws.com/kraken/standard_08_GB_20260626/standard_08_GB.md5"
-)
-SYLPH_DB_URL = "https://storage.googleapis.com/sylph-stuff/gtdb-r226-c200-dbv2.syl2db"
-SYLPH_DB_FILENAME = "gtdb-r226-c200-dbv2.syl2db"
-# GCS publishes the object MD5 (x-goog-hash) for this 14GB blob.
-SYLPH_DB_MD5 = "1815389774987c7ce3d713c975a8853f"
-
 _TIERS: dict[str, dict[str, Any]] = {
     "mini": {
         "description": "Marker rules + sequences (bundled)",
@@ -89,18 +74,6 @@ _TIERS: dict[str, dict[str, Any]] = {
         "size": "~3.9GB",
         "items": ["D4_sourmash"],
     },
-    "meta": {
-        "description": "Kraken2 Standard-8 prebuilt index (metagenomic profiling)",
-        "size": "~5.5GB",
-        "items": ["D5_kraken2"],
-        "help_url": K2_INDEXES_URL,
-    },
-    "meta_sylph": {
-        "description": "sylph GTDB-r226 database (ANI-based metagenomic profiling)",
-        "size": "~14GB",
-        "items": ["D6_sylph"],
-        "help_url": SYLPH_DOCS_URL,
-    },
     "all": {
         "description": "panel + mash",
         "size": "~310MB sketches",
@@ -115,8 +88,6 @@ _COMPONENT_INPUTS: dict[str, str] = {
     "D2_ani": "FASTA",
     "D3_mash": "FASTA/FASTQ",
     "D4_sourmash": "FASTA/FASTQ",
-    "D5_kraken2": "FASTA/FASTQ",
-    "D6_sylph": "FASTQ",
 }
 
 _TIER_INPUTS: dict[str, str] = {
@@ -124,8 +95,6 @@ _TIER_INPUTS: dict[str, str] = {
     "panel": "FASTA",
     "mash": "FASTA/FASTQ",
     "sourmash": "FASTA/FASTQ",
-    "meta": "FASTA/FASTQ",
-    "meta_sylph": "FASTQ",
     "all": "FASTA/FASTQ",
 }
 
@@ -133,15 +102,6 @@ _DOWNLOAD_TIMEOUT = 3600
 _CHUNK = 1024 * 1024
 
 
-def _has_sylph_db(db_dir: Path) -> bool:
-    """True when any sylph database lives under ``db_dir`` (either format)."""
-    return any(db_dir.glob("*.syldb")) or any(db_dir.glob("*.syl2db"))
-
-
-# Database components in `db status` order — key: (tier, directory under
-# SPECIES_DB_DIR, readiness probes relative to the directory). Ready when
-# every file of one probe group is present; ``is_file`` probes require a
-# regular file, ``exists`` probes match any path type.
 _COMPONENTS: dict[str, tuple[str, str, list[list[tuple[str, Callable[[Path], bool]]]]]] = {
     "D1_marker": ("mini", "D1_marker", [[("markers.fasta", Path.exists)]]),
     "D2_ani": (
@@ -155,20 +115,6 @@ _COMPONENTS: dict[str, tuple[str, str, list[list[tuple[str, Callable[[Path], boo
         "D4_sourmash",
         [[("gtdb-reps-k31.zip", Path.exists), ("lineages.csv", Path.exists)]],
     ),
-    "D5_kraken2": (
-        "meta",
-        "D5_kraken2",
-        [
-            [
-                ("hash.k2d", Path.exists),
-                ("taxo.k2d", Path.exists),
-                ("opts.k2d", Path.exists),
-                # Bracken needs the distribution matching our read length (150).
-                ("database150mers.kmer_distrib", Path.exists),
-            ],
-        ],
-    ),
-    "D6_sylph": ("meta_sylph", "D6_sylph", [[("", _has_sylph_db)]]),
 }
 
 
@@ -215,10 +161,6 @@ def db_setup(tier: str = "panel", source: str = "") -> dict[str, str]:
         results["D3_mash"] = _setup_component("D3_mash", _download_mash_zenodo, source)
     if tier == "sourmash":
         results["D4_sourmash"] = _setup_component("D4_sourmash", _download_sourmash_farm, source)
-    if tier == "meta":
-        results["D5_kraken2"] = _setup_component("D5_kraken2", _install_kraken2, source)
-    if tier == "meta_sylph":
-        results["D6_sylph"] = _setup_component("D6_sylph", _install_sylph, source)
     if not results:
         results["info"] = "mini tier ships with repo"
     return results
@@ -278,80 +220,6 @@ def _flatten_if_nested(dst: Path, marker: str) -> None:
         for child in nested[0].iterdir():
             shutil.move(str(child), str(dst / child.name))
         nested[0].rmdir()
-
-
-def _published_md5_manifest(url: str) -> dict[str, str]:
-    """``<md5>  <filename>`` lines (Kraken2 style) → {filename: md5}."""
-    with urllib.request.urlopen(url, timeout=_DOWNLOAD_TIMEOUT) as resp:
-        text = resp.read().decode("utf-8", "replace")
-    manifest: dict[str, str] = {}
-    for line in text.splitlines():
-        parts = line.split()
-        if len(parts) == 2 and len(parts[0]) == 32:
-            manifest[parts[1].lstrip("*")] = parts[0].lower()
-    return manifest
-
-
-def _verify_kraken2_files(dst: Path) -> str | None:
-    """Compare every extracted file against the published MD5 manifest."""
-    try:
-        manifest = _published_md5_manifest(K2_STANDARD8_MD5_URL)
-    except Exception as e:  # noqa: BLE001 — network fallback: warn, keep the DB
-        print(f"  WARNING: could not fetch Kraken2 checksums ({e}); skipping verification")
-        return None
-    if not manifest:
-        print("  WARNING: empty Kraken2 checksum manifest; skipping verification")
-        return None
-    for name, expected in manifest.items():
-        target = dst / name
-        if not target.is_file():
-            continue
-        if _file_md5(target) != expected:
-            return f"ERROR: MD5 mismatch for {name}"
-    return None
-
-
-def _install_kraken2(dst: Path) -> str:
-    """Download the Kraken2 Standard-8 archive (includes Bracken distributions)."""
-    archive = dst / "k2_standard_08_GB.tar.gz"
-    print("  downloading Kraken2 Standard-8 (~5.5GB, includes Bracken)...")
-    try:
-        _download_file(K2_STANDARD8_URL, archive)
-    except Exception as e:  # noqa: BLE001 — setup boundary: report, don't crash
-        archive.unlink(missing_ok=True)
-        return f"ERROR: Kraken2 download failed: {e}"
-    print("  extracting...")
-    try:
-        with tarfile.open(archive, "r:gz") as tf:
-            tf.extractall(dst, filter="data")
-    except tarfile.TarError as e:
-        archive.unlink(missing_ok=True)
-        return f"ERROR: unsafe or corrupt archive: {e}"
-    archive.unlink(missing_ok=True)
-    _flatten_if_nested(dst, "hash.k2d")
-    error = _verify_kraken2_files(dst)
-    if error:
-        return error
-    if not _component_ready("D5_kraken2"):
-        return "ERROR: archive did not contain a complete Kraken2 + Bracken database"
-    return "downloaded Kraken2 Standard-8 (index + Bracken 150-mer)"
-
-
-def _install_sylph(dst: Path) -> str:
-    """Download a pre-sketched sylph GTDB database (-c 200, two-stage)."""
-    target = dst / SYLPH_DB_FILENAME
-    print("  downloading sylph GTDB r226 (~14GB, resumable by hand if it fails)...")
-    try:
-        _download_file(SYLPH_DB_URL, target)
-    except Exception as e:  # noqa: BLE001 — setup boundary: report, don't crash
-        target.unlink(missing_ok=True)
-        return f"ERROR: sylph download failed: {e}"
-    if SYLPH_DB_MD5 and _file_md5(target) != SYLPH_DB_MD5:
-        target.unlink(missing_ok=True)
-        return f"ERROR: MD5 mismatch for {target.name}"
-    if not _has_sylph_db(dst):
-        return "ERROR: sylph database missing after download"
-    return "downloaded GTDB r226 (c200, two-stage .syl2db)"
 
 
 def _download_sourmash_farm(dst: Path) -> str:
@@ -630,6 +498,22 @@ def format_status(fmt: str) -> str:
     )
 
 
+def _named_databases() -> dict[str, list[dict[str, str]]]:
+    """Valid named databases per mode (``default`` tiers excluded)."""
+    from gside.db_registry import DEFAULT_NAME, enumerate_databases
+
+    named: dict[str, list[dict[str, str]]] = {}
+    for mode, choices in enumerate_databases(root=SPECIES_DB_DIR).items():
+        entries = [
+            {"name": choice.name, "path": str(choice.path)}
+            for choice in choices
+            if choice.name != DEFAULT_NAME
+        ]
+        if entries:
+            named[mode] = entries
+    return named
+
+
 def format_tiers(fmt: str) -> str:
     """Render ``db list`` output as table (human), tsv, csv, or json."""
     _check_format(fmt)
@@ -644,12 +528,14 @@ def format_tiers(fmt: str) -> str:
         )
         for name, info in _TIERS.items()
     ]
+    named = _named_databases()
     if fmt == "json":
         payload = {
             name: {**info, "ready": ready == "ready", "inputs": _TIER_INPUTS[name]}
             for (name, ready, _, _, _), (name_tier, info) in zip(rows, _TIERS.items(), strict=True)
             if name == name_tier
         }
+        payload["custom_databases"] = named
         return json.dumps(payload, indent=2, ensure_ascii=False)
     if fmt == "tsv":
         lines = ["NAME\tREADY\tSIZE\tINPUTS\tDESCRIPTION"]
@@ -661,11 +547,32 @@ def format_tiers(fmt: str) -> str:
         writer.writerow(["NAME", "READY", "SIZE", "INPUTS", "DESCRIPTION"])
         writer.writerows(rows)
         return out.getvalue().rstrip("\n")
+    caption = "Tiers marked ready can be used without downloading."
+    if named:
+        named_rows = [
+            (mode, entry["name"], entry["path"])
+            for mode, entries in named.items()
+            for entry in entries
+        ]
+        return (
+            _render_table(
+                "gside database tiers",
+                ("TIER", "READY", "SIZE", "INPUTS", "DESCRIPTION"),
+                rows,
+                caption=caption,
+            )
+            + "\n\n"
+            + _render_table(
+                "named databases (select with -d [MODE:]NAME)",
+                ("MODE", "NAME", "PATH"),
+                named_rows,
+            )
+        )
     return _render_table(
         "gside database tiers",
         ("TIER", "READY", "SIZE", "INPUTS", "DESCRIPTION"),
         rows,
-        caption="Tiers marked ready can be used without downloading.",
+        caption=caption,
     )
 
 

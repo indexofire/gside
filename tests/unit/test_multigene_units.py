@@ -705,3 +705,114 @@ def test_detected_marker_ties_are_gene_sorted(monkeypatch, tmp_path):
     # No rule is required to exercise detected_markers ordering.
     result = mg.identify_multigene(str(tmp_path / "g.fna"))
     assert [m["gene"] for m in result.detected_markers] == ["a", "b"]
+
+
+def _custom_db_dir(tmp_path: Path, name: str, *, species: str, gene: str) -> Path:
+    root = tmp_path / name
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "markers.fasta").write_text(f">markers~~~{gene}~~~x marker\nACGTACGT\n")
+    (root / "marker_rules.yaml").write_text(
+        f"rules:\n- species: {species}\n  genes: [{gene}]\n  min_hits: 1\n"
+    )
+    (root / "metadata.yaml").write_text(f"name: {name}\nversion: '7'\n")
+    return root
+
+
+class TestMultiDatabase:
+    def test_two_dbs_union_rules_and_hits(self, monkeypatch, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        db_a = _custom_db_dir(tmp_path, "dbA", species="Species_A", gene="ga")
+        # dbB needs two genes; only one hits, so only Species_A's rule fires.
+        db_b = _custom_db_dir(tmp_path, "dbB", species="Species_B", gene="gb")
+        (db_b / "marker_rules.yaml").write_text(
+            "rules:\n- species: Species_B\n  genes: [gb, gb2]\n  min_hits: 2\n"
+        )
+        per_db_hits = {
+            str(db_a): [{"gene": "ga", "identity": 99.0, "coverage": 100.0}],
+            str(db_b): [{"gene": "gb", "identity": 98.0, "coverage": 100.0}],
+        }
+
+        def fake_blast(path, threads=4, marker_db=None):
+            return list(per_db_hits[str(marker_db.root)])
+
+        monkeypatch.setattr(mg, "_blast_contigs", fake_blast)
+        payload = identify_multigene("g.fna", marker_db=[str(db_a), str(db_b)]).to_dict()
+
+        # Both rules compete over the pooled hits; Species_A wins on identity.
+        assert payload["species"] == "Species_A"
+        assert {m["gene"] for m in payload["detected_markers"]} == {"ga", "gb"}
+        # Provenance: joined name/version plus per-database detail.
+        assert payload["database"] == {"name": "dbA+dbB", "version": "7+7"}
+        assert [(d["name"], d["version"], Path(d["path"]).name) for d in payload["databases"]] == [
+            ("dbA", "7", "dbA"),
+            ("dbB", "7", "dbB"),
+        ]
+
+    def test_single_element_sequence_keeps_single_db_shape(self, monkeypatch, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        db_a = _custom_db_dir(tmp_path, "dbA", species="Species_A", gene="ga")
+        monkeypatch.setattr(
+            mg,
+            "_blast_contigs",
+            lambda path, threads=4, marker_db=None: [
+                {"gene": "ga", "identity": 99.0, "coverage": 100.0}
+            ],
+        )
+        payload = identify_multigene("g.fna", marker_db=[str(db_a)]).to_dict()
+        assert payload["database"] == {"name": "dbA", "version": "7"}
+        assert "databases" not in payload
+
+    def test_reads_mode_runs_screening_per_db(self, monkeypatch, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        db_a = _custom_db_dir(tmp_path, "dbA", species="Species_A", gene="ga")
+        db_b = _custom_db_dir(tmp_path, "dbB", species="Species_B", gene="gb")
+        fastas: list[str] = []
+
+        def fake_screen(reads, markers, threads=4, min_mapq=20):
+            fastas.append(str(markers))
+            gene = "ga" if "dbA" in str(markers) else "gb"
+            return [{"gene": gene, "identity": 99.0, "coverage": 100.0}]
+
+        monkeypatch.setattr(mg, "screen_reads", fake_screen)
+        fq = tmp_path / "reads.fq"
+        fq.write_text("@r1\nACGT\n+\nIIII\n")
+        payload = identify_multigene(str(fq), marker_db=[str(db_a), str(db_b)]).to_dict()
+        assert sorted(Path(f).name for f in fastas) == ["markers.fasta", "markers.fasta"]
+        assert {m["gene"] for m in payload["detected_markers"]} == {"ga", "gb"}
+
+
+class TestCoerceMarkerDbs:
+    def test_sequence_mixed_entries(self, tmp_path):
+        from gside.marker_db import MarkerDatabase
+
+        db_obj = MarkerDatabase.from_path(_custom_db_dir(tmp_path, "dbA", species="X", gene="g1"))
+        path_db = _custom_db_dir(tmp_path, "dbB", species="Y", gene="g2")
+        dbs = mg._coerce_marker_dbs([None, db_obj, str(path_db)])
+        assert dbs == [db_obj, MarkerDatabase.from_path(path_db)]
+
+    def test_multi_dbs_merge_controls_first_wins(self, monkeypatch, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        first = _custom_db_dir(tmp_path, "dbA", species="Species_A", gene="ga")
+        (first / "metadata.yaml").write_text(
+            "control_genes:\n  Species_A: [rpod]\nreads:\n  min_depth: 3.0\n"
+        )
+        second = _custom_db_dir(tmp_path, "dbB", species="Species_B", gene="gb")
+        (second / "metadata.yaml").write_text(
+            "control_genes:\n  Species_B: [gyrb]\nreads:\n  min_depth: 9.0\n"
+        )
+        monkeypatch.setattr(
+            mg,
+            "_blast_contigs",
+            lambda path, threads=4, marker_db=None: [
+                {"gene": "ga", "identity": 99.0, "coverage": 100.0}
+            ],
+        )
+        payload = identify_multigene("g.fna", marker_db=[str(first), str(second)]).to_dict()
+        # min_depth comes from the first database that defines it.
+        assert "min_depth=3x" in payload["depth_gate"] or payload["depth_gate"] == ""
+        controls, _defaults = mg._control_config(mg.MarkerDatabase.from_path(first))
+        assert controls == {"Species_A": ["rpod"]}

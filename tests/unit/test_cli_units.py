@@ -114,18 +114,27 @@ class TestRenderTable:
 
 class TestRunSpeciesBatch:
     def test_json_single_is_object(self, monkeypatch, capsys):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         assert _run_species(["a.fna"], "marker", None) == 0
         assert json.loads(capsys.readouterr().out)["contigs"] == "a.fna"
 
     def test_json_multi_is_array(self, monkeypatch, capsys):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         assert _run_species(["a.fna", "b.fna"], "marker", None) == 0
         docs = json.loads(capsys.readouterr().out)
         assert [d["contigs"] for d in docs] == ["a.fna", "b.fna"]
 
     def test_tsv_and_md(self, monkeypatch, capsys):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         assert _run_species(["a.fna"], "marker", None, "tsv") == 0
         assert capsys.readouterr().out.startswith("contigs\t")
         assert _run_species(["a.fna"], "marker", None, "md") == 0
@@ -251,7 +260,9 @@ class TestIdentifyModes:
 
         monkeypatch.setattr(mg, "identify_multigene", lambda c, threads=4: _FakeResult("M", "high"))
         monkeypatch.setattr(
-            ani, "identify_by_ani", lambda c, mode, db_dir=None, threads=4: _FakeResult("A", "high")
+            ani,
+            "identify_by_ani",
+            lambda c, mode, db_dir=None, threads=4, dbs=None: _FakeResult("A", "high"),
         )
         monkeypatch.setattr(
             smod, "identify_by_sourmash", lambda c, db_dir=None: _FakeResult("S", "high")
@@ -290,7 +301,7 @@ class TestCommandsEndToEnd:
 
         import gside.cli as climod
 
-        monkeypatch.setattr(climod, "_run_species", lambda *a: 0)
+        monkeypatch.setattr(climod, "_run_species", lambda *a, **k: 0)
         assert CliRunner().invoke(main, ["species", "x.fna"]).exit_code == 0
 
     def test_validate_command(self, monkeypatch, tmp_path):
@@ -319,7 +330,7 @@ class TestCommandsEndToEnd:
 class TestSpeciesShortFlags:
     def test_short_flags_parse_like_long(self, monkeypatch):
         seen = []
-        monkeypatch.setattr(cli, "_run_species", lambda *a: seen.append(a) or 0)
+        monkeypatch.setattr(cli, "_run_species", lambda *a, **k: seen.append(a) or 0)
         short = CliRunner().invoke(
             main, ["species", "-m", "marker", "-f", "tsv", "-D", "/db", "x.fna"]
         )
@@ -334,7 +345,10 @@ class TestSpeciesShortFlags:
 
 class TestSpeciesOutputOption:
     def test_output_writes_file_stdout_clean_stderr_notice(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         out = tmp_path / "out.json"
         result = CliRunner().invoke(main, ["species", "--output", str(out), "a.fna"])
         assert result.exit_code == 0
@@ -343,7 +357,10 @@ class TestSpeciesOutputOption:
         assert f"Results written to {out}" in result.stderr
 
     def test_output_short_flag_multi_file_array(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         out = tmp_path / "o.json"
         result = CliRunner().invoke(main, ["species", "-o", str(out), "a.fna", "b.fna"])
         assert result.exit_code == 0
@@ -351,7 +368,10 @@ class TestSpeciesOutputOption:
         assert "Results written to" in result.stderr
 
     def test_output_tsv_payload(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         out = tmp_path / "o.tsv"
         result = CliRunner().invoke(main, ["species", "-f", "tsv", "-o", str(out), "a.fna"])
         assert result.exit_code == 0
@@ -564,7 +584,7 @@ class TestStreamingOutput:
     def test_output_tsv_rows_appear_as_files_complete(self, monkeypatch, tmp_path):
         seen_during_run = {}
 
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             if contigs == "b.fna":
                 seen_during_run["mid"] = (tmp_path / "out.tsv").read_text()
             return _payload(contigs)
@@ -577,7 +597,7 @@ class TestStreamingOutput:
     def test_output_md_rows_stream(self, monkeypatch, tmp_path):
         seen_during_run = {}
 
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             if contigs == "b.fna":
                 seen_during_run["mid"] = (tmp_path / "out.md").read_text()
             return _payload(contigs)
@@ -590,7 +610,7 @@ class TestStreamingOutput:
     def test_stdout_rows_stream(self, monkeypatch, capsys):
         seen = {}
 
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             if contigs == "b.fna":
                 seen["mid"] = capsys.readouterr().out
             return _payload(contigs)
@@ -603,7 +623,7 @@ class TestStreamingOutput:
     def test_output_json_streams_per_input(self, monkeypatch, tmp_path):
         seen_during_run = {}
 
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             if contigs == "b.fna":
                 seen_during_run["mid"] = (tmp_path / "out.json").read_text()
             return _payload(contigs)
@@ -617,14 +637,17 @@ class TestStreamingOutput:
         assert [payload["contigs"] for payload in report] == ["a.fna", "b.fna"]
 
     def test_output_json_single_input_is_one_object(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         cli._run_species(["a.fna"], "marker", None, "json", str(tmp_path / "out.json"))
         report = json.loads((tmp_path / "out.json").read_text())
         assert isinstance(report, dict)
         assert report["contigs"] == "a.fna"
 
     def test_midbatch_failure_persists_prefix(self, monkeypatch, tmp_path):
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             if contigs == "b.fna":
                 raise RuntimeError("boom mid-batch")
             return _payload(contigs)
@@ -656,7 +679,7 @@ class TestSpeciesParallelism:
 
         done = []
 
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             if contigs == "a.fna":
                 time.sleep(0.25)
             done.append(contigs)
@@ -674,7 +697,7 @@ class TestSpeciesParallelism:
 
         seen = {}
 
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             if contigs == "a.fna":
                 time.sleep(0.25)
             if contigs == "c.fna":
@@ -704,7 +727,9 @@ class TestSpeciesParallelism:
         monkeypatch.setattr(
             ani,
             "identify_by_ani",
-            lambda c, mode, db_dir=None, threads=4: cap.setdefault("ani", threads) or _Stub(),
+            lambda c, mode, db_dir=None, threads=4, dbs=None: (
+                cap.setdefault("ani", threads) or _Stub()
+            ),
         )
         cli._identify_one("q.fna", "marker", None, threads=8)
         cli._identify_one("q.fna", "panel", None, threads=8)
@@ -754,13 +779,16 @@ class TestSpeciesProgress:
 class TestNoHeaderOption:
     def test_no_header_flag_parses(self, monkeypatch):
         seen = {}
-        monkeypatch.setattr(cli, "_run_species", lambda *a: seen.update(args=a) or 0)
+        monkeypatch.setattr(cli, "_run_species", lambda *a, **k: seen.update(args=a) or 0)
         result = CliRunner().invoke(main, ["species", "--no-header", "x.fna"])
         assert result.exit_code == 0
         assert seen["args"][7] is True
 
     def test_tsv_no_header_omits_header_row(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         cli._run_species(["a.fna"], "marker", None, "tsv", None, no_header=True)
         # stdout was consumed by capsys in _run_species; verify via file
         cli._run_species(["a.fna"], "marker", None, "tsv", str(tmp_path / "o.tsv"), no_header=True)
@@ -769,13 +797,19 @@ class TestNoHeaderOption:
         assert "a.fna" in lines[0]
 
     def test_tsv_with_header_default(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         cli._run_species(["a.fna"], "marker", None, "tsv", str(tmp_path / "o.tsv"))
         lines = (tmp_path / "o.tsv").read_text().strip().splitlines()
         assert lines[0].split("\t")[0] == "contigs"
 
     def test_md_no_header_still_has_header(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         cli._run_species(["a.fna"], "marker", None, "md", str(tmp_path / "o.md"), no_header=True)
         lines = (tmp_path / "o.md").read_text().strip().splitlines()
         assert lines[0].startswith("| contigs")
@@ -826,7 +860,7 @@ class TestStructuredErrorFields:
 class TestAutoSetup:
     def test_flag_parses_and_defaults_off(self, monkeypatch):
         seen = []
-        monkeypatch.setattr(cli, "_run_species", lambda *a: seen.append(a) or 0)
+        monkeypatch.setattr(cli, "_run_species", lambda *a, **k: seen.append(a) or 0)
         assert CliRunner().invoke(main, ["species", "--auto-setup", "x.fna"]).exit_code == 0
         assert CliRunner().invoke(main, ["species", "x.fna"]).exit_code == 0
         assert seen[0][8] is True
@@ -835,7 +869,7 @@ class TestAutoSetup:
     def test_missing_tier_triggers_setup_and_retry(self, monkeypatch, capsys):
         calls, setups = [], []
 
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             calls.append(mode)
             if len(calls) == 1:
                 return _missing_db_payload(contigs)
@@ -852,7 +886,11 @@ class TestAutoSetup:
 
     def test_disabled_leaves_error_untouched(self, monkeypatch, capsys):
         setups = []
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _missing_db_payload(c))
+
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _missing_db_payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         monkeypatch.setattr(cli, "_setup_missing_tier", lambda tier: setups.append(tier))
         assert _run_species(["q.fna"], "sourmash", None) == 0
         payload = json.loads(capsys.readouterr().out)
@@ -863,7 +901,7 @@ class TestAutoSetup:
     def test_retries_only_once(self, monkeypatch, capsys):
         calls, setups = [], []
 
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             calls.append(mode)
             return _missing_db_payload(contigs, method="mash_refseq", tier="mash", size="~179MB")
 
@@ -877,7 +915,11 @@ class TestAutoSetup:
 
     def test_no_missing_tier_no_setup(self, monkeypatch, capsys):
         setups = []
-        monkeypatch.setattr(cli, "_identify_one", lambda c, m, d, threads=4: _payload(c))
+
+        def _identify_stub(c, m, d, threads=4, marker_db=None, db_selections=None):
+            return _payload(c)
+
+        monkeypatch.setattr(cli, "_identify_one", _identify_stub)
         monkeypatch.setattr(cli, "_setup_missing_tier", lambda tier: setups.append(tier))
         assert _run_species(["q.fna"], "marker", None, auto_setup=True) == 0
         json.loads(capsys.readouterr().out)
@@ -886,7 +928,7 @@ class TestAutoSetup:
     def test_setup_failure_keeps_error_entry(self, monkeypatch, capsys):
         calls = []
 
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             calls.append(mode)
             return _missing_db_payload(contigs)
 
@@ -906,7 +948,7 @@ class TestAutoSetup:
 
         calls = []
 
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             calls.append(mode)
             if len(calls) == 1:
                 return _missing_db_payload(contigs)
@@ -927,7 +969,7 @@ class TestAutoSetup:
     def test_all_mode_verdict_recomputed_after_retry(self, monkeypatch, capsys):
         setups = []
 
-        def fake_identify(contigs, mode, db_dir, threads=4):
+        def fake_identify(contigs, mode, db_dir, threads=4, marker_db=None, db_selections=None):
             if mode == "all":
                 payload = _payload(contigs, species="M", conf="high")
                 payload["methods"]["sourmash"] = _missing_db_payload(contigs)["methods"]["sourmash"]
@@ -953,7 +995,7 @@ class TestGtdbtkMode:
 
     def test_cli_accepts_gtdbtk_mode(self, monkeypatch):
         seen = {}
-        monkeypatch.setattr(cli, "_run_species", lambda *a: seen.update(mode=a[1]) or 0)
+        monkeypatch.setattr(cli, "_run_species", lambda *a, **k: seen.update(mode=a[1]) or 0)
         result = CliRunner().invoke(main, ["species", "-m", "gtdbtk", "x.fna"])
         assert result.exit_code == 0
         assert seen["mode"] == "gtdbtk"
@@ -1008,7 +1050,7 @@ class TestCompositeIdentify:
                 }
             )
 
-        def fake_sourmash(contigs, db_dir=None):
+        def fake_sourmash(contigs, db_dir=None, dbs=None):
             return types.SimpleNamespace(
                 to_dict=lambda: {
                     "species": "Salmonella",
@@ -1109,10 +1151,11 @@ class TestCustomMarkerDb:
             return 0
 
         monkeypatch.setattr(climod, "_run_species", fake)
-        (tmp_path / "db").mkdir()
-        result = CliRunner().invoke(
-            main, ["scan", "sample.fna", "--marker-db", str(tmp_path / "db")]
-        )
+        marker_dir = tmp_path / "db"
+        marker_dir.mkdir()
+        (marker_dir / "markers.fasta").write_text(">markers~~~g1~~~x marker\nACGT\n")
+        (marker_dir / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
+        result = CliRunner().invoke(main, ["scan", "sample.fna", "--marker-db", str(marker_dir)])
         assert result.exit_code == 0, result.output
         assert seen["kwargs"]["marker_db"] == str(tmp_path / "db")
 
@@ -1153,3 +1196,103 @@ class TestCustomMarkerDb:
         payload = json.loads(result.output)
         assert payload["errors"] == []
         assert payload["schema"] == "gside.marker-db/1"
+
+
+class TestCoverageLeftovers:
+    def test_gz_fastq_input_kind(self):
+        from gside.cli import _input_kind
+
+        assert _input_kind("r.fastq.gz") == "fastq"
+        assert _input_kind("c.fna.gz") == "fasta"
+
+    def test_group_pairs_both_mates(self):
+        from gside.cli import _group_read_samples
+
+        assert _group_read_samples(["S_R1.fq", "S_R2.fq"]) == [["S_R1.fq", "S_R2.fq"]]
+        assert _group_read_samples(["S_R1.fq", "other.fq"]) == [["S_R1.fq"], ["other.fq"]]
+        assert _group_read_samples(["S_R1.fq.gz", "S_R2.fq.gz"]) == [["S_R1.fq.gz", "S_R2.fq.gz"]]
+
+    def test_all_mode_accepts_fasta(self, monkeypatch):
+        monkeypatch.setattr(cli, "_run_species", lambda *a, **k: 0)
+        assert CliRunner().invoke(main, ["scan", "g.fna", "-m", "all"]).exit_code == 0
+
+    def test_db_validate_missing_layout_is_click_error(self, tmp_path):
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        result = CliRunner().invoke(main, ["db", "validate", str(empty)])
+        assert result.exit_code == 1
+        assert "markers.fasta" in result.output
+
+    def test_db_validate_text_valid_with_description(self, tmp_path):
+        db = tmp_path / "db"
+        db.mkdir()
+        (db / "markers.fasta").write_text(">markers~~~geneA~~~refA\nACGT\n")
+        (db / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [geneA]\n")
+        (db / "metadata.yaml").write_text("description: in-house panel\n")
+        result = CliRunner().invoke(main, ["db", "validate", str(db)])
+        assert result.exit_code == 0
+        assert "about:   in-house panel" in result.output
+        assert "status:  valid" in result.output
+
+    def test_write_text_document_bar_paths(self, tmp_path, capsys):
+        from gside.cli import _write_text_document
+
+        seen: list[str] = []
+
+        class _Bar:
+            def write(self, text):
+                seen.append("write:" + text)
+
+            def notice(self, text):
+                seen.append("notice:" + text)
+
+        assert _write_text_document("doc", None, _Bar()) == 0
+        assert seen == ["write:doc"]
+
+        out = tmp_path / "doc.txt"
+        assert _write_text_document("doc", str(out), _Bar()) == 0
+        assert out.read_text() == "doc"
+        assert seen[-1].startswith("notice:")
+        _write_text_document("doc", str(tmp_path / "doc2.txt"))
+        assert "Results written to" in capsys.readouterr().err
+
+    def test_structured_missing_db_fields_with_size_and_url(self, monkeypatch):
+        from gside import db as dbmod
+        from gside.cli import _structured_missing_db_fields
+
+        monkeypatch.setattr(
+            dbmod,
+            "_TIERS",
+            {
+                "panel": {
+                    "items": ["D2_ani"],
+                    "size": "~1GB",
+                    "help_url": "https://example.com/panel",
+                }
+            },
+        )
+        fields = _structured_missing_db_fields("(run: gside db setup --tier panel)")
+        assert fields["estimated_size"] == "~1GB"
+        assert fields["help_url"] == "https://example.com/panel"
+
+
+class TestFinalCoverage:
+    def test_bz2_input_kind(self):
+        from gside.cli import _input_kind
+
+        assert _input_kind("r.fastq.bz2") == "fastq"
+
+    def test_write_text_document_stdout_no_bar(self, capsys):
+        from gside.cli import _write_text_document
+
+        assert _write_text_document("plain", None) == 0
+        assert capsys.readouterr().out == "plain"
+
+    def test_write_json_document_to_file(self, tmp_path):
+        import json as json_mod
+
+        from gside.cli import _write_json_document
+
+        out = tmp_path / "doc.json"
+        assert _write_json_document({"a": 1}, str(out)) == 0
+        assert json_mod.loads(out.read_text()) == {"a": 1}

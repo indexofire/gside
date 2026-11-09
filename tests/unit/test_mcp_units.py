@@ -59,8 +59,6 @@ _STATUS: dict[str, dict[str, Any]] = {
     "D2_ani": {"ready": False, "path": "/repo/data/db/D2_ani", "tier": "panel"},
     "D3_mash": {"ready": False, "path": "/repo/data/db/D3_mash", "tier": "mash"},
     "D4_sourmash": {"ready": False, "path": "/repo/data/db/D4_sourmash", "tier": "sourmash"},
-    "D5_kraken2": {"ready": False, "path": "/repo/data/db/D5_kraken2", "tier": "meta"},
-    "D6_sylph": {"ready": False, "path": "/repo/data/db/D6_sylph", "tier": "meta_sylph"},
 }
 
 
@@ -92,7 +90,7 @@ class TestServeProtocol:
     def test_tools_list_advertises_every_tool(self):
         (response,) = exchange({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         names = [tool["name"] for tool in response["result"]["tools"]]
-        assert names == ["species", "meta", "db_status", "db_list", "db_setup"]
+        assert names == ["species", "db_status", "db_list", "db_setup"]
 
     def test_unknown_tool_gets_32602(self):
         (response,) = exchange(_call("nope", {}))
@@ -202,8 +200,9 @@ class TestToolHandlers:
         from gside import db as dbmod
 
         monkeypatch.setattr(dbmod, "db_status", lambda: _STATUS)
+        monkeypatch.setattr(dbmod, "_named_databases", lambda: {})
         payload = json.loads(TOOL_HANDLERS["db_list"]({}))
-        assert set(payload) == set(TIERS)
+        assert set(payload) == {*TIERS, "custom_databases"}
         assert payload["mini"]["ready"] is True
         assert payload["panel"]["ready"] is False
 
@@ -369,36 +368,33 @@ class TestCliRegistration:
         assert response["result"]["tools"]
 
 
-class TestMetaTool:
-    def test_returns_meta_payload(self, monkeypatch):
-        seen: dict[str, Any] = {}
+class TestReadsArgument:
+    def test_rejects_non_list(self):
+        from gside.mcp_tools import _reads
 
-        def fake_payload(reads, mode, db_dir, threads=4):
-            seen.update(reads=reads, mode=mode, db_dir=db_dir, threads=threads)
-            return {"analysis_type": "metagenomic_profiling", "verdict": {"richness": 0}}
+        with pytest.raises(ValueError, match="array of file path strings"):
+            _reads({"reads": "r1.fq"})
 
-        monkeypatch.setattr(cli, "_meta_payload", fake_payload)
-        (response,) = exchange(_call("meta", {"reads": ["r1.fq", "r2.fq"], "mode": "sylph"}))
-        payload = json.loads(response["result"]["content"][0]["text"])
-        assert payload["analysis_type"] == "metagenomic_profiling"
-        assert seen == {"reads": ["r1.fq", "r2.fq"], "mode": "sylph", "db_dir": None, "threads": 4}
+    def test_rejects_non_string_item(self):
+        from gside.mcp_tools import _reads
 
-    def test_rejects_unknown_mode(self):
-        (response,) = exchange(_call("meta", {"reads": ["r.fq"], "mode": "bogus"}))
-        assert response["result"]["isError"] is True
-        assert "kraken2, sylph, all" in response["result"]["content"][0]["text"]
+        with pytest.raises(ValueError, match="array of file path strings"):
+            _reads({"reads": [1]})
 
-    def test_rejects_empty_reads(self):
-        (response,) = exchange(_call("meta", {"reads": []}))
-        assert response["result"]["isError"] is True
+    def test_rejects_empty(self):
+        from gside.mcp_tools import _reads
 
-    def test_rejects_more_than_two_reads(self):
-        (response,) = exchange(_call("meta", {"reads": ["a.fq", "b.fq", "c.fq"]}))
-        assert response["result"]["isError"] is True
+        with pytest.raises(ValueError, match="at least one"):
+            _reads({"reads": []})
 
+    def test_rejects_more_than_two(self):
+        from gside.mcp_tools import _reads
 
-class TestMetaReadsValidation:
-    def test_reads_must_be_array(self):
-        (response,) = exchange(_call("meta", {"reads": "r.fq"}))
-        assert response["result"]["isError"] is True
-        assert "array of file path strings" in response["result"]["content"][0]["text"]
+        with pytest.raises(ValueError, match="at most 2"):
+            _reads({"reads": ["a.fq", "b.fq", "c.fq"]})
+
+    def test_accepts_one_or_two(self):
+        from gside.mcp_tools import _reads
+
+        assert _reads({"reads": ["a.fq"]}) == ["a.fq"]
+        assert _reads({"reads": ["a.fq", "b.fq"]}) == ["a.fq", "b.fq"]

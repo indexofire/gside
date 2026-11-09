@@ -1,25 +1,71 @@
-# 自定义 marker 数据库
+# 自定义数据库
 
 [English](https://indexofire.github.io/gside/usage/custom-databases/) | **简体中文**
 
-`gside` 自带一个 marker 数据库（`D1_marker`），同时允许用户用自己的序列库复用
-同一套 marker 算法。算法本身不变：BLAST/minimap2 命中被规范化，应用基因阈值，
-再由 `marker_rules.yaml` 决定物种判定；变化的只是 marker 序列和规则。
+`gside` 的各模式依赖数据库。除内置/安装的 tier（`D1_marker`、`D2_ani`、
+`D3_mash`、`D4_sourmash`）外,所有支持本地数据库的模式 —— `marker`、
+`panel`、`mash_refseq`、`sourmash` —— 都可以添加命名数据库,并且一次鉴定
+可以选择其中的多个。
 
-## 内置 tier 与自定义 marker 数据库
+## 选择数据库
 
-| 概念 | `mini` tier / `D1_marker` | 自定义 marker 数据库 |
-| --- | --- | --- |
-| 是什么 | 随包数据库 | 用户自己的目录 |
-| 安装 | 随 gside 分发 | 无需下载，直接指向 |
-| 管理 | `gside db setup` | 用户/流水线自己管理 |
-| 使用 | `-m marker` 默认 | `--marker-db PATH` 或 `$GSIDE_MARKER_DB` |
-| 适用模式 | marker | 仅 marker |
+`scan` 接受可重复的 `-d/--db [MODE:]NAME` 参数,取值按以下顺序解析:
 
-`db list` / `db status` 描述内置 tier 与组件，不会枚举所有自定义数据库；自定义库
-请用 `gside db validate` 显式校验。
+1. 已存在的目录路径 → 直接使用;
+2. `data/db/<family>/<name>/` 下的命名库(见下);
+3. 保留名 `default` → 该模式的内置 tier。
 
-## 目录结构
+```bash
+# 单模式时 MODE: 前缀可省略
+gside scan sample.fna -m marker -d food
+
+# 一次跑两个 marker 库:规则与命中合并后统一仲裁
+gside scan sample.fna -m marker -d food -d lab2026
+
+# 组合模式必须带前缀
+gside scan sample.fna -m marker+panel -d marker:food -d panel:lab2026
+
+# 目录路径也可以(按 family 布局校验)
+gside scan sample.fna -m panel -d /opt/dbs/my-panel
+```
+
+`--marker-db PATH` 保留为 `-d marker:PATH` 的兼容别名。
+
+### family 目录
+
+命名数据库放在数据库根目录(`data/db/`,`--db-dir` 可整体移动)下各模式的
+family 子目录中:
+
+```text
+data/db/
+├── D1_marker/               # marker 默认 tier(随包)
+├── D2_ani/                  # panel 默认 tier(db setup --tier panel)
+├── D3_mash/                 # mash_refseq 默认 tier
+├── D4_sourmash/             # sourmash 默认 tier
+├── marker/<name>/           # 自定义 marker 库(布局见下)
+├── panel/<name>/            # panel.sketch/ + metadata.tsv
+├── mash_refseq/<name>/      # mash.msh
+└── sourmash/<name>/         # gtdb-reps-k31.zip + lineages.csv
+```
+
+`gside db list` 会枚举它们(table 格式的「named databases」小节,以及
+`--format json` 的 `custom_databases` 键)。没有本地数据库的模式
+(`gtdbtk`)传入 `-d` 会得到可操作的报错。
+
+### 合并语义
+
+同一模式选中多个数据库时会**全部运行**并合并:
+
+- `marker`:各库规则在合并后的命中上共同竞争 —— 等价于一个合并数据库。
+  对照基因与 reads 默认值按选择顺序 first-wins 合并。
+- `panel` / `mash_refseq` / `sourmash`:逐库检索,命中合并重排,判定由
+  全局最优命中一次导出。taxa 映射 first-wins 合并。
+
+方法的 `database` 字段报告合并后的溯源(`{"name": "food+lab2026", ...}`),
+`databases` 数组列出每个参与的库(name/version/path)。单选时输出与单库
+形态完全一致。
+
+## marker 数据库目录结构
 
 ```text
 my-markers/
@@ -134,10 +180,13 @@ GSIDE_MARKER_DB=./my-markers gside scan sample.fna -m marker
 
 # 数据库根目录，其中包含 D1_marker
 gside scan sample.fna -m marker --db-dir ./my-db-root
+
+# 命名/多库选择（见上文「选择数据库」）
+gside scan sample.fna -m marker -d food -d lab2026
 ```
 
 在 `-m marker+sourmash` 这类组合模式中，`--marker-db` 只影响 marker 方法，其他
-方法仍使用各自 tier。
+方法仍使用各自 tier。`--db marker:food` 同理。
 
 `--auto-setup` 不会安装自定义数据库；自定义库由用户管理，支持用 `db validate`
 检查。
@@ -158,17 +207,21 @@ print(result.database_name, result.database_version)
 print(result.to_dict())
 ```
 
-也可以直接传路径：
+也可以直接传路径，或传列表一次运行并合并多个库：
 
 ```python
 result = identify_multigene("sample.fna", marker_db="my-markers")
+merged = identify_multigene("sample.fna", marker_db=["my-markers", "other"])
 ```
 
-结果的 `database` 对象会报告自定义 `name` 与 `version`，下游 JSON 仍可追溯。
+结果的 `database` 对象会报告自定义 `name` 与 `version`（多库时以 `+` 连接），
+下游 JSON 仍可追溯。
 
 ## 限制
 
-- 自定义数据库仅支持 `marker` 模式。
-- 不参与 `db list` / `db status` / `db setup`。
+- 命名数据库支持 `marker`、`panel`、`mash_refseq`、`sourmash`；`gtdbtk`
+  （外部 GTDB-Tk 库）不接受 `-d`。
+- 自定义库不参与 `db setup` / `db status`；`db list` 会列出命名库，
+  `db validate` 校验 marker 布局。
 - 默认 gseek 路径与 shadow 对比使用同一个自定义 FASTA；legacy BLAST 路径使用自定义索引。
 - marker rules 不能改变算法行为，只负责从 gene 命中里选择物种。

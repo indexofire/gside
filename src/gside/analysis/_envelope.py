@@ -20,11 +20,15 @@ class MethodEnvelope:
     method: str = ""
     database: dict[str, str] = field(default_factory=dict)
     result: dict[str, Any] = field(default_factory=dict)
+    databases: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "analysis_type": self.analysis_type,
             "method": self.method,
             "database": self.database,
             "result": self.result,
         }
+        if self.databases:
+            payload["databases"] = self.databases
+        return payload

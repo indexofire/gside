@@ -393,3 +393,42 @@ def test_mash_tie_breaks_by_ref(monkeypatch, taxadb):
     )
     result = identify_by_ani("q.fna", mode="mash_refseq", db_dir=taxadb).result
     assert [hit["genome"] for hit in result["top_hits"][:2]] == ["A", "B"]
+
+
+class TestAniConfidence:
+    def test_bands(self):
+        from gside.analysis._thresholds import ani_confidence
+
+        assert ani_confidence(95.0) == "high"
+        assert ani_confidence(93.0) == "medium"
+        assert ani_confidence(91.0) == "low"
+
+
+class TestMainGuards:
+    def test_main_json_and_text(self, monkeypatch, capsys, tmp_path):
+        import gside.analysis.ani_identifier as ani_mod
+
+        genome = tmp_path / "g.fna"
+        genome.write_text(">c1\nACGT\n")
+        monkeypatch.setattr(
+            ani_mod,
+            "identify_by_ani",
+            lambda c, mode, db_dir=None, threads=4, dbs=None: ani.AniIdResult(
+                method=mode,
+                database={"name": "D2_ani"},
+                result={
+                    "species": "Escherichia_coli",
+                    "confidence": "high",
+                    "top_hits": [{"genome": "GCF_A", "ani": 99.5}],
+                },
+            ),
+        )
+        monkeypatch.setattr("sys.argv", ["ani", str(genome), "--mode", "panel", "--json"])
+        ani_mod.main()
+        assert "Escherichia_coli" in capsys.readouterr().out
+
+        monkeypatch.setattr("sys.argv", ["ani", str(genome), "--mode", "panel"])
+        ani_mod.main()
+        out = capsys.readouterr().out
+        assert "via panel" in out
+        assert "GCF_A: 99.5" in out

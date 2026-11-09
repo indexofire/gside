@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import statistics
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -48,9 +49,10 @@ class MultiGeneResult:
     control_depth: float | None = None
     control_source: str = ""
     depth_gate: str = ""
+    databases: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "species": self.species,
             "confidence": self.confidence,
             "method": self.method,
@@ -64,6 +66,9 @@ class MultiGeneResult:
             "notes": self.notes,
             "interpretation": self._interpret(),
         }
+        if self.databases:
+            payload["databases"] = self.databases
+        return payload
 
     def _interpret(self) -> str:
         if self.species == "Unknown":
@@ -72,14 +77,31 @@ class MultiGeneResult:
         return f"Identified as {self.species} based on: {', '.join(markers)}"
 
 
-def _coerce_marker_db(
-    marker_db: str | Path | MarkerDatabase | None,
-) -> MarkerDatabase | None:
-    if marker_db is None:
-        return resolve_marker_db(None)
+def _coerce_marker_dbs(
+    marker_db: str | Path | MarkerDatabase | Sequence[str | Path | MarkerDatabase] | None,
+) -> list[MarkerDatabase]:
+    """Normalize the ``marker_db`` argument to a list of databases.
+
+    ``None`` (bundled default), a single path/database, and a sequence of
+    them are all accepted; a one-element sequence collapses to a single run
+    so its output stays identical to the single-database path.
+    """
     if isinstance(marker_db, MarkerDatabase):
-        return marker_db
-    return MarkerDatabase.from_path(marker_db)
+        return [marker_db]
+    if marker_db is None or isinstance(marker_db, (str, Path)):
+        if marker_db is None:
+            resolved = resolve_marker_db(None)
+            return [resolved] if resolved is not None else []
+        return [MarkerDatabase.from_path(marker_db)]
+    dbs: list[MarkerDatabase] = []
+    for item in marker_db:
+        if item is None:
+            continue
+        if isinstance(item, MarkerDatabase):
+            dbs.append(item)
+        else:
+            dbs.append(MarkerDatabase.from_path(item))
+    return dbs
 
 
 def _db_version(marker_db: MarkerDatabase | None = None) -> str:
@@ -412,7 +434,7 @@ def _pick_rule(
 def identify_multigene(
     contigs_fasta: str | list[str],
     threads: int = 4,
-    marker_db: str | Path | MarkerDatabase | None = None,
+    marker_db: str | Path | MarkerDatabase | Sequence[str | Path | MarkerDatabase] | None = None,
     min_depth: float | None = None,
     min_relative_depth: float | None = None,
     min_mapq: int | None = None,
@@ -428,10 +450,31 @@ def identify_multigene(
     conserved single-copy control gene.  Assembly mode keeps the legacy
     BLAST identity/coverage rules (depth is not available from BLAST hits).
     """
-    db = _coerce_marker_db(marker_db)
-    markers_fasta = db.fasta if db is not None else _MARKERS_FASTA
+    dbs = _coerce_marker_dbs(marker_db)
+    multi = len(dbs) > 1
+    db = dbs[0] if len(dbs) == 1 else None
     files = [contigs_fasta] if isinstance(contigs_fasta, str) else list(contigs_fasta)
-    controls, read_defaults = _control_config(db)
+    reads_mode = is_fastq(files[0])
+    reads: str | list[str] = files[0] if len(files) == 1 else files
+
+    if multi:
+        # Union semantics: rules from every database compete over the pooled
+        # hits; control genes and reads defaults merge first-wins so the
+        # selection order stays deterministic.
+        rules: list[dict[str, Any]] = []
+        controls: dict[str, list[str]] = {}
+        read_defaults: dict[str, Any] = {}
+        for entry in dbs:
+            rules.extend(_load_rules(entry))
+            entry_controls, entry_defaults = _control_config(entry)
+            for species_key, genes in entry_controls.items():
+                controls.setdefault(species_key, genes)
+            for key, value in entry_defaults.items():
+                read_defaults.setdefault(key, value)
+    else:
+        controls, read_defaults = _control_config(db)
+        rules = _load_rules(db) if db is not None else _load_rules()
+
     if min_depth is None:
         min_depth = float(read_defaults.get("min_depth", _MIN_DEPTH))
     if min_relative_depth is None:
@@ -439,16 +482,20 @@ def identify_multigene(
     if min_mapq is None:
         min_mapq = int(read_defaults.get("min_mapq", _MIN_MAPQ))
 
-    reads_mode = is_fastq(files[0])
-    if reads_mode:
-        reads: str | list[str] = files[0] if len(files) == 1 else files
+    raw_hits: list[dict[str, Any]] = []
+    if multi:
+        for entry in dbs:
+            if reads_mode:
+                raw_hits.extend(screen_reads(reads, entry.fasta, threads, min_mapq=min_mapq))
+            else:
+                raw_hits.extend(_blast_contigs(files[0], threads, entry))
+    elif reads_mode:
+        markers_fasta = db.fasta if db is not None else _MARKERS_FASTA
         raw_hits = screen_reads(reads, markers_fasta, threads, min_mapq=min_mapq)
     elif db is not None:
         raw_hits = _blast_contigs(files[0], threads, db)
     else:
         raw_hits = _blast_contigs(files[0], threads)
-
-    rules = _load_rules(db) if db is not None else _load_rules()
 
     # Pick the control gene set from the preliminary (ungated) call, then gate.
     prelim_significant = _best_per_gene(raw_hits, _MIN_IDENTITY, _MIN_COVERAGE)
@@ -466,9 +513,22 @@ def identify_multigene(
     hits = gate.hits
     significant = _best_per_gene(hits, _MIN_IDENTITY, _MIN_COVERAGE)
 
+    if multi:
+        databases_meta = [
+            {"name": entry.name, "version": _db_version(entry), "path": str(entry.root)}
+            for entry in dbs
+        ]
+        database_name = "+".join(d["name"] for d in databases_meta)
+        database_version = "+".join(d["version"] for d in databases_meta)
+    else:
+        databases_meta = []
+        database_name = db.name if db is not None else "species_markers_v2"
+        database_version = _db_version(db) if db is not None else _db_version()
+
     result = MultiGeneResult(
-        database_version=_db_version(db) if db is not None else _db_version(),
-        database_name=db.name if db is not None else "species_markers_v2",
+        database_version=database_version,
+        database_name=database_name,
+        databases=databases_meta,
         control_gene=gate.control_gene,
         control_depth=round(gate.control_depth, 2) if gate.control_depth is not None else None,
         control_source=gate.control_source,

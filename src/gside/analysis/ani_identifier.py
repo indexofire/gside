@@ -192,13 +192,12 @@ def _db_version(db_dir: Path, name: str) -> str:
     return "unknown"
 
 
-def _mash_result(
+def _mash_rows(
     base: Path,
     contigs: str | Path | Sequence[str | Path],
-    taxa: dict[str, str],
     threads: int,
-) -> dict[str, Any]:
-    """mash_refseq: nearest RefSeq sketch by MinHash identity."""
+) -> list[tuple[str, float]]:
+    """Unsorted ``(reference, identity)`` rows from one mash sketch DB."""
     msh = base / "mash.msh"
     if not msh.exists():
         msh = base / "payload.bin"
@@ -207,10 +206,18 @@ def _mash_result(
 
     files = [contigs] if isinstance(contigs, (str, Path)) else list(contigs)
     if is_fastq(files[0]):
-        mash_rows = _mash_dist_reads(files, msh, threads)
-    else:
-        mash_rows = _mash_dist(files[0], msh, threads)
-    mash_top = sorted(mash_rows, key=lambda r: (-r[1], r[0]))[:_TOP_N]
+        return _mash_dist_reads(files, msh, threads)
+    return _mash_dist(files[0], msh, threads)
+
+
+def _mash_result(
+    base: Path,
+    contigs: str | Path | Sequence[str | Path],
+    taxa: dict[str, str],
+    threads: int,
+) -> dict[str, Any]:
+    """mash_refseq: nearest RefSeq sketch by MinHash identity."""
+    mash_top = sorted(_mash_rows(base, contigs, threads), key=lambda r: (-r[1], r[0]))[:_TOP_N]
     best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)
     raw_species = taxa.get(best_ref, _mash_species(best_ref)) if best_ref else "Unknown"
 
@@ -239,6 +246,17 @@ def _taxa_lookup(taxa: dict[str, str], ref: str) -> str:
     return ""
 
 
+def _panel_hits(
+    base: Path,
+    contigs: str | Path | Sequence[str | Path],
+    threads: int,
+) -> list[AniHit]:
+    """skani hits from one panel database (unsorted)."""
+    query = contigs if isinstance(contigs, (str, Path)) else contigs[0]
+    skani_db = base / "panel.sketch" if (base / "panel.sketch").exists() else base
+    return _skani_search(query, skani_db, threads)
+
+
 def _panel_result(
     base: Path,
     contigs: str | Path | Sequence[str | Path],
@@ -246,12 +264,12 @@ def _panel_result(
     threads: int,
 ) -> dict[str, Any]:
     """panel: skani ANI against the curated reference panel."""
-    query = contigs if isinstance(contigs, (str, Path)) else contigs[0]
-    skani_db = base / "panel.sketch" if (base / "panel.sketch").exists() else base
-    skani_hits = sorted(
-        _skani_search(query, skani_db, threads),
-        key=lambda h: (-h.ani, -h.aligned_fraction, h.ref),
-    )
+    return _panel_result_from_hits(_panel_hits(base, contigs, threads), taxa)
+
+
+def _panel_result_from_hits(hits: list[AniHit], taxa: dict[str, str]) -> dict[str, Any]:
+    """Derive the panel verdict from (possibly multi-database) skani hits."""
+    skani_hits = sorted(hits, key=lambda h: (-h.ani, -h.aligned_fraction, h.ref))
     top = skani_hits[:_TOP_N]
     best = top[0] if top else None
 
@@ -285,19 +303,73 @@ def identify_by_ani(
     mode: str,
     db_dir: str | Path | None = None,
     threads: int = 4,
+    dbs: Sequence[str | Path] | None = None,
 ) -> AniIdResult:
     if mode not in _DB_BY_MODE:
         raise ValueError(f"unsupported ANI mode {mode!r}; expected one of {sorted(_DB_BY_MODE)}")
     db_name = _DB_BY_MODE[mode]
-    base = Path(db_dir) if db_dir else SPECIES_DB_DIR / db_name
+
+    selected: list[Path] = [Path(d) for d in dbs] if dbs is not None else []
+    if len(selected) > 1:
+        return _identify_multi(contigs, mode, selected, threads)
+    if selected:
+        base = selected[0]
+        name = base.name
+    else:
+        base = Path(db_dir) if db_dir else SPECIES_DB_DIR / db_name
+        name = db_name
     taxa = _load_taxa_map(base)
-    database = {"name": db_name, "version": _db_version(base, db_name)}
+    database = {"name": name, "version": _db_version(base, name)}
 
     if mode == "mash_refseq":
         result = _mash_result(base, contigs, taxa, threads)
     else:
         result = _panel_result(base, contigs, taxa, threads)
     return AniIdResult(method=mode, database=database, result=result)
+
+
+def _identify_multi(
+    contigs: str | Path | Sequence[str | Path],
+    mode: str,
+    bases: list[Path],
+    threads: int,
+) -> AniIdResult:
+    """Run every selected database and merge: best hit wins, taxa first-wins."""
+    taxa: dict[str, str] = {}
+    for base in bases:
+        for key, species in _load_taxa_map(base).items():
+            taxa.setdefault(key, species)
+    databases = [
+        {"name": base.name, "version": _db_version(base, base.name), "path": str(base)}
+        for base in bases
+    ]
+    database = {
+        "name": "+".join(d["name"] for d in databases),
+        "version": "+".join(d["version"] for d in databases),
+    }
+
+    if mode == "mash_refseq":
+        rows: list[tuple[str, float]] = []
+        for base in bases:
+            rows.extend(_mash_rows(base, contigs, threads))
+        mash_top = sorted(rows, key=lambda r: (-r[1], r[0]))[:_TOP_N]
+        best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)
+        raw_species = taxa.get(best_ref, _mash_species(best_ref)) if best_ref else "Unknown"
+        confidence = "high" if best_identity >= _MASH_IDENTITY_HIGH else "low"
+        if _MASH_IDENTITY_MEDIUM <= best_identity < _MASH_IDENTITY_HIGH:
+            confidence = "medium"
+        result = {
+            "confidence": confidence,
+            "identity": best_identity,
+            "top_hits": [{"genome": r, "identity": i} for r, i in mash_top],
+        }
+        result = apply_species_name(result, raw_species or "Unknown")
+    else:
+        hits: list[AniHit] = []
+        for base in bases:
+            hits.extend(_panel_hits(base, contigs, threads))
+        result = _panel_result_from_hits(hits, taxa)
+    return AniIdResult(method=mode, database=database, result=result, databases=databases)
 
 
 def main() -> None:

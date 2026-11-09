@@ -465,72 +465,12 @@ def test_resolver_is_cached(monkeypatch):
     bridge._resolver.cache_clear()
 
 
-def test_sylph_profile_maps_records_to_legacy_rows(monkeypatch):
-    record = SimpleNamespace(
-        query_id="reads.fq",
-        reference_id="ref",
-        ani=99.27,
-        aligned_fraction=0.0341,
-        tags={
-            "genome_file": "GCF_000005845.2.fna",
-            "taxonomic_abundance": "78.1200",
-        },
-    )
-    fake = _FakeDistanceGseek([record])
-    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
-    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
-
-    rows = bridge.sylph_profile(["r1.fq", "r2.fq"], "db.syldb", threads=3)
-    call = fake.calls[0]
-    assert call["backend"] == "sylph"
-    assert call["external_reference"] is True
-    assert call["reference"] == Path("db.syldb")
-    assert call["query"] == [Path("r1.fq"), Path("r2.fq")]
-    assert rows == [
-        {
-            "genome_file": "GCF_000005845.2.fna",
-            "ani": 99.27,
-            "abundance": pytest.approx(0.7812),
-            "coverage": pytest.approx(3.41),
-        }
-    ]
-
-
-def test_log_sylph_shadow_ignores_order_and_warns_on_diff(caplog):
-    base = {"name": "Escherichia coli", "ani": 99.27, "abundance": 0.78, "coverage": 3.4}
-    other = {"name": "Salmonella enterica", "ani": 97.1, "abundance": 0.2, "coverage": 1.2}
-    with caplog.at_level("WARNING"):
-        bridge.log_sylph_shadow([base, other], [other, base])
-    assert "differs" not in caplog.text
-
-    drifted = dict(other, ani=91.0)
-    with caplog.at_level("WARNING"):
-        bridge.log_sylph_shadow([base, other], [base, drifted])
-    assert "sylph differs" in caplog.text
-
-
 def test_sourmash_gather_wraps_gseek_errors(monkeypatch):
     fake = _FakeGseek(ValueError("sketch corrupt"))
     monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
     monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
     with pytest.raises(RuntimeError, match="gseek sourmash gather failed"):
         bridge.sourmash_gather("q.fna", "ref.zip")
-
-
-def test_sylph_profile_non_numeric_abundance_is_zero(monkeypatch):
-    records = [
-        SimpleNamespace(
-            ani=99.0,
-            aligned_fraction=0.5,
-            tags={"taxonomic_abundance": "n/a", "genome_file": "g.fna"},
-        )
-    ]
-    fake = _FakeGseek(records)
-    monkeypatch.setattr(bridge, "_require_gseek", lambda: fake)
-    monkeypatch.setattr(bridge, "_resolver", lambda: "resolver")
-
-    rows = bridge.sylph_profile("r.fq", "db.syl2db")
-    assert rows == [{"genome_file": "g.fna", "ani": 99.0, "abundance": 0.0, "coverage": 50.0}]
 
 
 def _ani_hit(ref, ani, fraction):

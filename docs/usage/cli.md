@@ -3,19 +3,15 @@
 ## gside scan
 
 Single entry point for both workflows: identify the species in one genome
-(default) or profile a metagenomic community (`--meta`).
 
 ### Usage
 
 ```bash
 gside scan <files...> [options]
-gside scan --meta <reads...> [options]
-gside scan --meta --samples samples.tsv [options]
 ```
 
 ### Mode / input matrix
 
-| Mode | `--meta` | FASTA | FASTQ | Notes |
 |---|---|---|---|---|
 | `marker` | no | ✅ | ✅ | FASTQ: reads mapped with minimap2 (`sr`/`map-ont`); per-gene breadth is the union of read alignments — ~1x genome coverage suffices |
 | `panel` | no | ✅ | ❌ | skani ANI |
@@ -23,27 +19,19 @@ gside scan --meta --samples samples.tsv [options]
 | `sourmash` | no | ✅ | ✅ | gather on read sketches (~4 min for a 10x 1.6Mb set); containment-ANI based |
 | `gtdbtk` | no | ✅ | ❌ | phylogenetic placement |
 | `all` | no | ✅ | ❌ | every species tier + arbitration (panel/gtdbtk are assembly-only) |
-| `kraken2` | yes | ✅ | ✅ | reads or contigs |
-| `sylph` | yes | ❌ | ✅ | reads only |
-| `all` | yes | ❌ | ✅ | kraken2+sylph; for contigs use `-m kraken2` |
+| `all` | yes | ❌ | ❌ | every isolate tier (needs FASTA) |
 
 `-m` accepts a `+`-joined combination (e.g. `marker+sourmash`,
-`kraken2+sylph`); duplicates collapse and order is preserved. `all` means
 every mode for the current context and cannot be combined with others.
 
 The input type is inferred from the extension (`.fna/.fa/.fasta` vs
 `.fq/.fastq`, `.gz` allowed) and validated **before** any tool runs: a
-mismatch exits 2 and names the offending mode. `--meta` likewise rejects
-isolate modes, and isolate mode rejects `kraken2`/`sylph`. Because `all`
-includes sylph, `--meta -m all` needs FASTQ; use `-m kraken2` for contigs.
-
-**Paired-end FASTQ is one sample.** Positional files whose names carry a mate
+Community profiling moved to the gmeta tool.
 marker (`_R1`/`_R2`, `_1`/`_2`, `.1`/`.2`, `-1`/`-2`, optional `_001`,
 case-insensitive, `.gz` allowed) are grouped: both mates go to `marker`
 (one minimap2 run), `mash_refseq` and `sourmash` (one sketch each), and the
 payload reports the first mate as `contigs`. Unmatched files stay separate
 samples, so `gside scan A_R1.fq A_R2.fq B_R1.fq B_R2.fq -m marker` is **two**
-samples, not four. FASTA files are never paired. In `--meta` mode exactly two
 positional files are always one sample; with more files the same mate grouping
 applies.
 
@@ -78,18 +66,14 @@ applies.
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `files` | positional | — | One or more FASTA/FASTQ files; FASTQ mates are auto-grouped (`_R1/_R2`, `_1/_2`, `.1/.2`); unmatched files are separate samples (`--meta`: 2 files = one sample) |
-| `-m`, `--mode` | option | `marker` / `all` | Method (defaults to `marker`, or `all` with `--meta`) |
-| `--meta` | flag | off | Treat the input as a metagenomic community |
 | `-D`, `--db-dir` | option | auto | Database root (`$GSIDE_DB_DIR` or `data/db`) |
-| `--marker-db` | option | — | Custom marker DB directory (`markers.fasta` + `marker_rules.yaml`); see [Custom marker databases](custom-databases.md) |
+| `-d`, `--db` | option | — | Repeatable `[MODE:]NAME` database selection: a name under `data/db/<family>/`, a directory path, or `default`. Selected databases run and their results are merged; see [Custom databases](custom-databases.md) |
+| `--marker-db` | option | — | Custom marker DB directory (`markers.fasta` + `marker_rules.yaml`); alias for `-d marker:PATH`; see [Custom databases](custom-databases.md) |
 | `-f`, `--format` | option | `json` | `json` / `tsv` / `md` / `csv` |
 | `-o`, `--output PATH` | option | stdout | Write the report to PATH; every format (json/tsv/csv/md) streams as samples complete |
-| `-j`, `--jobs N` | option | `1` | Concurrent samples (isolate batch, positional `--meta` batch, or `--samples`) |
 | `-t`, `--threads N` | option | `4` | Threads per tool invocation |
 | `-n`, `--no-header` | option | off | Suppress the header row (tsv/csv/md) |
 | `-a`, `--auto-setup` | option | off | Install a missing database tier, then retry that method once |
-| `-s`, `--samples PATH` | option | — | `--meta` batch manifest: `sample_id<TAB>reads [<TAB>reads2]` |
 
 With more than one sample on a TTY, a progress bar is drawn on stderr. Streamed
 rows are handed to that bar: it is suspended for each write and redrawn
@@ -112,11 +96,6 @@ gside scan A_R1.fq A_R2.fq B_R1.fq B_R2.fq -m marker     # two samples
 
 # Long-read isolate data (marker treats reads as sequences)
 gside scan ont_reads.fastq -m marker
-
-# Metagenomic community
-gside scan reads_R1.fq reads_R2.fq --meta                 # kraken2 + sylph
-gside scan contigs.fna --meta -m kraken2 -f md
-gside scan --meta --samples samples.tsv -j 4 -f csv -o profiles.csv
 ```
 
 ## gside db
@@ -161,13 +140,12 @@ gside db list -f tsv       # TIER	READY	SIZE	DESCRIPTION
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `-t`, `--tier` | `panel` | `mini|panel|mash|sourmash|meta|meta_sylph|all` |
+| `-t`, `--tier` | `panel` | `mini|panel|mash|sourmash|all` |
 | `-s`, `--source` | — | Copy an existing local database directory instead of downloading |
 | `-f`, `--format` | `text` | `text` / `json` (json routes progress to stderr) |
 
 - `mini` ships with the package (always ready).
 - `all` = **panel + mash**; `sourmash` is separate (~3.9GB).
-- `meta` (Kraken2 Standard-8 + Bracken, ~5.5GB) and `meta_sylph`
   (GTDB r226 `.syl2db`, ~14GB) download automatically with checksum
   verification.
 - CheckM2 and GTDB-Tk are **not** tiers; see
@@ -248,7 +226,7 @@ it still exits 0 when both tools ran. Configure the tools with `CHECKM2DB` and
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.2.2", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.3", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},
@@ -282,8 +260,6 @@ instead of crashing the server.
 
 ## gside species / gside meta (aliases)
 
-Hidden compatibility aliases: `gside species` = `gside scan` without `--meta`;
-`gside meta` = `gside scan --meta`. Mode choices stay context-scoped
 (isolate / meta). New scripts should use `scan`.
 
 ## Environment variables
@@ -311,18 +287,14 @@ Hidden compatibility aliases: `gside species` = `gside scan` without `--meta`;
 
 ## Upgrading from 0.1.4
 
-- `gside species` and `gside meta` still work as hidden aliases for
-  `gside scan` (without / with `--meta`).
+- `gside species` still works as a hidden alias for `scan`.
 - Species labels are now canonical `Genus_species` (`verdict.species`,
   `methods.<mode>.species`); the display form moved to
   `verdict.display_name`, strain detail to `verdict.strain`. The verdict also
   gained `supporting` and `agreement`.
-- Meta rows use the same canonical `name`, with `display_name`/`strain` and a
-  fraction (0-1) `abundance`.
 - `validate` no longer has `-m/--mode`; `-o/--output-dir` is required and its
   `validation.json` gained schema/genome/parameters/software/tools/status/
   errors/created_at.
-- `--meta -m all` requires FASTQ (sylph); use `-m kraken2` for contigs.
 
 ## gside --version
 
@@ -331,8 +303,8 @@ flag; `-J` adds a JSON envelope.
 
 ```bash
 gside -V
-# gside, version 0.2.2
+# gside, version 0.2.3
 
 gside --version --json     # or -V -J
-# {"tool": "gside", "version": "0.2.2"}
+# {"tool": "gside", "version": "0.2.3"}
 ```

@@ -10,7 +10,7 @@ Example with `-m marker` (marker results are flat; no `result` wrapper):
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": {
@@ -55,13 +55,26 @@ input each `detected_markers` row also reports `mean_depth`, `reads` and
 `notes` (see [Marker Rules Format](marker-rules.md#reads-mode-depth-gate-fastq-input)).
 Assembly input leaves the gate fields empty.
 
+When a method runs several selected databases (`-d`), its `database` field
+reports the joined provenance (`{"name": "food+lab2026", ...}`) and a
+`databases` array lists each contributing database:
+
+```json
+"databases": [
+  {"name": "food", "version": "9c1f2ab3", "path": "/data/db/marker/food"},
+  {"name": "lab2026", "version": "2026.1", "path": "/data/db/marker/lab2026"}
+]
+```
+
+A single-database selection (the default) omits `databases` entirely.
+
 ## Multi-Method Arbitration Output (-m all)
 
 ```json
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": {},
@@ -134,9 +147,8 @@ per sample instead of nested objects.
 | `methods.<mode>.confidence` | str | high / medium / low |
 | `methods.<mode>.error` | str | Method execution error (only on failure) |
 | `methods.<mode>.suggested_command` | str | Fix-up command when the error is a missing database |
-| `methods.<mode>.missing_tier` | str | Tier to provision (`panel`, `mash`, `sourmash`, `meta`, `meta_sylph`) |
+| `methods.<mode>.missing_tier` | str | Tier to provision (`panel`, `mash`, `sourmash`) |
 | `methods.<mode>.estimated_size` | str | Approximate download size for that tier |
-| `methods.<mode>.help_url` | str | Upstream landing page for downloadable tiers (`meta`, `meta_sylph`) |
 | `verdict.species` | str | Final arbitrated call (canonical `Genus_species`) |
 | `verdict.display_name` | str | Same call with spaces (`Escherichia coli`) |
 | `verdict.strain` | str \| null | Strain of the winning method, if any |
@@ -193,51 +205,6 @@ Species-group placeholders (`Campylobacter sp.`) and `Unknown` are emitted as
 Confidence follows the containment ANI (95/93 bands, same as panel). If the
 gather CSV has no ANI column, the hash-fraction fallback (0.90/0.70) applies.
 
-## Metagenomic Output (`gside scan --meta`)
-
-```json
-{
-  "analysis_type": "metagenomic_profiling",
-  "tool": "gside",
-  "version": "0.2.2",
-  "input": {"files": ["reads_R1.fq", "reads_R2.fq"], "type": "fastq_paired"},
-  "methods": {
-    "kraken2": {"method": "kraken2_bracken", "database": {"name": "D5_kraken2", "path": "..."},
-      "result": {"top_species": [{"name": "Escherichia coli", "taxid": 562, "reads": 850,
-        "fraction": 0.85, "confidence": "high"}], "total_reads": 10000,
-        "classified_reads": 9870, "n_species": 4}},
-    "sylph": {"method": "sylph_ani", "database": {"name": "D6_sylph", "path": "..."},
-      "result": {"species": [{"name": "Escherichia coli str. K-12", "ani": 99.9,
-        "abundance": 0.86, "coverage": 120.0, "confidence": "high"}], "n_species": 1}}
-  },
-  "verdict": {
-    "top_species": [{"name": "Escherichia_coli", "display_name": "Escherichia coli",
-      "strain": "str. K-12", "method": "sylph", "abundance": 0.86,
-      "confidence": "high", "ani": 99.9, "species_raw": "Escherichia coli str. K-12"}],
-    "richness": 1,
-    "basis": ["kraken2", "sylph"]
-  }
-}
-```
-
-| Field | Type | Description |
-|---|---|---|
-| `input.files` / `input.type` | list / str | Inputs and detected type (`fastq_paired`, `fastq_single`, `fasta`) |
-| `methods.<mode>.result` | dict | Per-method output (`top_species` for kraken2, `species` for sylph) |
-| `verdict.top_species[].name` | str | Canonical `Genus_species` (same contract as `scan`) |
-| `verdict.top_species[].display_name` | str | Spaced form |
-| `verdict.top_species[].strain` | str \| null | Strain detail from the winning method |
-| `verdict.top_species[].method` | str | `kraken2` or `sylph` (higher confidence wins; sylph wins ties) |
-| `verdict.top_species[].abundance` | float | Fraction 0-1 (sylph percentages are normalised) |
-| `verdict.top_species[].confidence` | str | high / medium / low |
-| `verdict.top_species[].ani` | float \| null | sylph ANI when available |
-| `verdict.top_species[].species_raw` | str | Original tool label, only when it differs |
-| `verdict.richness` | int | Number of merged species |
-| `verdict.basis` | list[str] | Methods that contributed |
-
-Batch (`--samples manifest.tsv`) emits a **JSON array**, each object with a
-`sample` key; `tsv`/`csv`/`md` rows gain a leading `sample` column.
-
 ## Genome Quality Output (`gside validate`)
 
 ```json
@@ -245,7 +212,7 @@ Batch (`--samples manifest.tsv`) emits a **JSON array**, each object with a
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.2.2", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.3", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},

@@ -59,16 +59,6 @@ class TestScanIsolate:
         result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "panel"])
         assert result.exit_code == 2
         assert "does not accept FASTQ" in result.output
-        assert "add --meta" not in result.output
-
-    def test_fastq_hint_mentions_meta(self):
-        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "panel"])
-        assert "supported: FASTA" in result.output
-
-    def test_meta_only_mode_requires_flag(self):
-        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "kraken2"])
-        assert result.exit_code == 2
-        assert "add --meta" in result.output
 
     def test_all_on_fastq_is_rejected(self):
         result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "all"])
@@ -85,109 +75,42 @@ class TestScanIsolate:
         assert result.exit_code == 2
         assert "missing input" in result.output
 
-    def test_samples_require_meta(self, tmp_path):
-        manifest = tmp_path / "s.tsv"
-        manifest.write_text("A\ta.fq\n")
-        result = CliRunner().invoke(main, ["scan", "g.fna", "--samples", str(manifest)])
-        assert result.exit_code == 2
-        assert "--samples is only available with --meta" in result.output
-
     def test_batch_jobs_forwarded(self, monkeypatch):
         calls = _capture(monkeypatch, "_run_species")
         assert CliRunner().invoke(main, ["scan", "a.fna", "b.fna", "-j", "4"]).exit_code == 0
         assert calls["args"][5] == 4
 
 
-class TestScanMeta:
-    def test_fasta_kraken2(self, monkeypatch):
-        calls = _capture(monkeypatch, "_run_meta")
-        assert CliRunner().invoke(main, ["scan", "g.fna", "--meta", "-m", "kraken2"]).exit_code == 0
-        assert calls["args"][0] == ["g.fna"]
-        assert calls["args"][1] == "kraken2"
+class TestMetaMovedToGmeta:
+    """The meta layer (kraken2/sylph community profiling) lives in gmeta now."""
 
-    def test_fastq_sylph(self, monkeypatch):
-        calls = _capture(monkeypatch, "_run_meta")
-        assert CliRunner().invoke(main, ["scan", "r.fq", "--meta", "-m", "sylph"]).exit_code == 0
-        assert calls["args"][1] == "sylph"
-
-    def test_fasta_sylph_rejected(self):
-        result = CliRunner().invoke(main, ["scan", "g.fna", "--meta", "-m", "sylph"])
+    def test_meta_flag_is_gone(self):
+        result = CliRunner().invoke(main, ["scan", "r.fq", "--meta"])
         assert result.exit_code == 2
-        assert "does not accept FASTA" in result.output
 
-    def test_isolate_mode_with_meta_rejected(self):
-        result = CliRunner().invoke(main, ["scan", "g.fna", "--meta", "-m", "marker"])
+    def test_kraken2_mode_is_unknown(self):
+        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "kraken2"])
         assert result.exit_code == 2
-        assert "not available with --meta" in result.output
-        assert "drop --meta" in result.output
+        assert "unknown mode" in result.output
 
-    def test_default_mode_is_all(self, monkeypatch):
-        calls = _capture(monkeypatch, "_run_meta")
-        assert CliRunner().invoke(main, ["scan", "r.fq", "--meta"]).exit_code == 0
-        assert calls["args"][1] == "all"
-
-    def test_fasta_all_rejected_because_sylph_needs_reads(self):
-        result = CliRunner().invoke(main, ["scan", "g.fna", "--meta", "-m", "all"])
+    def test_sylph_mode_is_unknown(self):
+        result = CliRunner().invoke(main, ["scan", "r.fq", "-m", "sylph"])
         assert result.exit_code == 2
-        assert "sylph" in result.output and "FASTQ" in result.output
-        assert "use -m kraken2" in result.output
+        assert "unknown mode" in result.output
 
-    def test_fasta_kraken2_explicit(self, monkeypatch):
-        calls = _capture(monkeypatch, "_run_meta")
-        assert CliRunner().invoke(main, ["scan", "g.fna", "--meta", "-m", "kraken2"]).exit_code == 0
-        assert calls["args"][1] == "kraken2"
-
-    def test_paired_fastq(self, monkeypatch):
-        calls = _capture(monkeypatch, "_run_meta")
-        assert CliRunner().invoke(main, ["scan", "a.fq", "b.fq", "--meta"]).exit_code == 0
-        assert calls["args"][0] == ["a.fq", "b.fq"]
-
-    def test_paired_mixed_input_rejected(self):
-        result = CliRunner().invoke(main, ["scan", "a.fq", "b.fna", "--meta"])
-        assert result.exit_code == 2
-        assert "paired input must be two FASTQ" in result.output
-
-    def test_three_unpaired_files_are_three_samples(self, monkeypatch):
-        calls = _capture(monkeypatch, "_run_meta_samples")
-        result = CliRunner().invoke(main, ["scan", "a.fq", "b.fq", "c.fq", "--meta"])
-        assert result.exit_code == 0
-        assert [s["id"] for s in calls["args"][0]] == ["a", "b", "c"]
-
-    def test_jobs_requires_samples(self):
-        result = CliRunner().invoke(main, ["scan", "r.fq", "--meta", "-j", "2"])
-        assert result.exit_code == 2
-        assert "--jobs requires multiple samples" in result.output
-
-    def test_manifest_dispatch(self, monkeypatch, tmp_path):
-        calls = _capture(monkeypatch, "_run_meta_samples")
-        manifest = tmp_path / "s.tsv"
-        manifest.write_text("A\ta.fq\nB\tb.fq\n")
-        result = CliRunner().invoke(main, ["scan", "--meta", "--samples", str(manifest)])
-        assert result.exit_code == 0
-        samples = calls["args"][0]
-        assert [s["id"] for s in samples] == ["A", "B"]
-        assert calls["args"][1] == "all"
-
-    def test_manifest_validates_each_sample(self, monkeypatch, tmp_path):
-        _capture(monkeypatch, "_run_meta_samples")
-        manifest = tmp_path / "s.tsv"
-        manifest.write_text("A\ta.fq\nB\tb.fna\n")
-        result = CliRunner().invoke(
-            main, ["scan", "--meta", "-m", "sylph", "--samples", str(manifest)]
-        )
-        assert result.exit_code == 2
-        assert "does not accept FASTA" in result.output
-
-    def test_files_and_samples_are_exclusive(self, tmp_path):
+    def test_samples_option_is_gone(self, tmp_path):
         manifest = tmp_path / "s.tsv"
         manifest.write_text("A\ta.fq\n")
-        result = CliRunner().invoke(main, ["scan", "r.fq", "--meta", "--samples", str(manifest)])
+        result = CliRunner().invoke(main, ["scan", "g.fna", "--samples", str(manifest)])
         assert result.exit_code == 2
-        assert "not both" in result.output
+
+    def test_meta_alias_is_gone(self):
+        result = CliRunner().invoke(main, ["meta", "r.fq"])
+        assert result.exit_code != 0
 
 
 class TestAliases:
-    def test_species_alias_forwards_without_meta(self, monkeypatch):
+    def test_species_alias_forwards(self, monkeypatch):
         calls = _capture(monkeypatch, "_run_species")
         assert CliRunner().invoke(main, ["species", "g.fna", "-m", "panel"]).exit_code == 0
         assert calls["args"][1] == "panel"
@@ -200,22 +123,7 @@ class TestAliases:
     def test_species_alias_rejects_meta_modes(self):
         result = CliRunner().invoke(main, ["species", "r.fq", "-m", "kraken2"])
         assert result.exit_code == 2
-        assert "not available without --meta" in result.output
-
-    def test_meta_alias_forces_meta(self, monkeypatch):
-        calls = _capture(monkeypatch, "_run_meta")
-        assert CliRunner().invoke(main, ["meta", "r.fq", "-m", "kraken2"]).exit_code == 0
-        assert calls["args"][1] == "kraken2"
-
-    def test_meta_alias_defaults_to_all(self, monkeypatch):
-        calls = _capture(monkeypatch, "_run_meta")
-        assert CliRunner().invoke(main, ["meta", "r.fq"]).exit_code == 0
-        assert calls["args"][1] == "all"
-
-    def test_meta_alias_rejects_isolate_modes(self):
-        result = CliRunner().invoke(main, ["meta", "g.fna", "-m", "panel"])
-        assert result.exit_code == 2
-        assert "not available with --meta" in result.output
+        assert "unknown mode" in result.output
 
     def test_scan_is_the_only_visible_command(self):
         result = CliRunner().invoke(main, ["--help"])
@@ -223,11 +131,6 @@ class TestAliases:
         assert "  scan" in commands
         assert "  species" not in commands
         assert "  meta" not in commands
-
-    def test_meta_alias_help_still_works(self):
-        result = CliRunner().invoke(main, ["meta", "-h"])
-        assert result.exit_code == 0
-        assert "-m, --mode" in result.output
 
 
 class TestReadsCapableGenomeTiers:
@@ -280,31 +183,108 @@ class TestCompositeModes:
         assert result.exit_code == 2
         assert "--mode is empty" in result.output
 
-    def test_meta_combination_is_forwarded(self, monkeypatch):
-        calls = _capture(monkeypatch, "_run_meta")
-        result = CliRunner().invoke(main, ["scan", "r.fq", "--meta", "-m", "kraken2+sylph"])
-        assert result.exit_code == 0
-        assert calls["args"][1] == "kraken2+sylph"
-
-    def test_meta_combination_rejects_fasta_component(self):
-        result = CliRunner().invoke(main, ["scan", "g.fna", "--meta", "-m", "kraken2+sylph"])
-        assert result.exit_code == 2
-        assert "mode 'sylph' does not accept FASTA" in result.output
-
 
 class TestExpandModes:
-    def test_all_expands_per_context(self):
-        assert cli._expand_modes("all", meta=False) == [
+    def test_all_expands_to_isolate_modes(self):
+        assert cli._expand_modes("all") == [
             "marker",
             "panel",
             "mash_refseq",
             "sourmash",
             "gtdbtk",
         ]
-        assert cli._expand_modes("all", meta=True) == ["kraken2", "sylph"]
 
     def test_duplicates_are_dropped_in_order(self):
-        assert cli._expand_modes("marker+panel+marker", meta=False) == ["marker", "panel"]
+        assert cli._expand_modes("marker+panel+marker") == ["marker", "panel"]
 
     def test_whitespace_is_tolerated(self):
-        assert cli._expand_modes("marker + sourmash", meta=False) == ["marker", "sourmash"]
+        assert cli._expand_modes("marker + sourmash") == ["marker", "sourmash"]
+
+
+def _marker_family_db(root, name="food"):
+    path = root / "marker" / name
+    path.mkdir(parents=True)
+    (path / "markers.fasta").write_text(">markers~~~g1~~~x marker\nACGTACGT\n")
+    (path / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
+    return path
+
+
+def _panel_family_db(root, name="lab2026"):
+    path = root / "panel" / name
+    (path / "panel.sketch").mkdir(parents=True)
+    (path / "panel.sketch" / "sketches.db").write_bytes(b"sketch")
+    (path / "metadata.tsv").write_text("genome\tspecies\n")
+    return path
+
+
+class TestDbSelection:
+    def test_named_selection_reaches_run_species(self, tmp_path, monkeypatch):
+        db = _marker_family_db(tmp_path)
+        captured: dict[str, Any] = {}
+        monkeypatch.setattr(cli, "_run_species", lambda *a, **k: captured.update(kwargs=k) or 0)
+        result = CliRunner().invoke(main, ["scan", "g.fna", "-D", str(tmp_path), "-d", "food"])
+        assert result.exit_code == 0
+        assert captured["kwargs"]["db_selections"] == {"marker": [db]}
+
+    def test_marker_db_alias_folds_into_selections(self, tmp_path):
+        db = _marker_family_db(tmp_path)
+        captured: dict[str, Any] = {}
+        orig = cli._run_species
+        cli._run_species = lambda *a, **k: captured.update(kwargs=k) or 0
+        try:
+            result = CliRunner().invoke(
+                main, ["scan", "g.fna", "-D", str(tmp_path), "--marker-db", str(db)]
+            )
+        finally:
+            cli._run_species = orig
+        assert result.exit_code == 0
+        assert captured["kwargs"]["db_selections"] == {"marker": [db]}
+
+    def test_mode_qualified_multi_mode(self, tmp_path):
+        marker = _marker_family_db(tmp_path)
+        panel = _panel_family_db(tmp_path)
+        captured: dict[str, Any] = {}
+        orig = cli._run_species
+        cli._run_species = lambda *a, **k: captured.update(kwargs=k) or 0
+        try:
+            result = CliRunner().invoke(
+                main,
+                [
+                    "scan",
+                    "g.fna",
+                    "-m",
+                    "marker+panel",
+                    "-D",
+                    str(tmp_path),
+                    "-d",
+                    "marker:food",
+                    "-d",
+                    "panel:lab2026",
+                ],
+            )
+        finally:
+            cli._run_species = orig
+        assert result.exit_code == 0
+        assert captured["kwargs"]["db_selections"] == {"marker": [marker], "panel": [panel]}
+
+    def test_unknown_mode_prefix_is_usage_error(self, tmp_path):
+        _marker_family_db(tmp_path)
+        result = CliRunner().invoke(
+            main, ["scan", "g.fna", "-D", str(tmp_path), "-d", "panel:lab2026"]
+        )
+        assert result.exit_code == 2
+        assert "not part of this invocation" in result.output
+
+    def test_bare_name_with_multiple_modes_is_usage_error(self, tmp_path):
+        _marker_family_db(tmp_path)
+        result = CliRunner().invoke(
+            main,
+            ["scan", "g.fna", "-m", "marker+panel", "-D", str(tmp_path), "-d", "food"],
+        )
+        assert result.exit_code == 2
+        assert "qualify the database" in result.output
+
+    def test_mode_without_family_is_usage_error(self, tmp_path):
+        result = CliRunner().invoke(main, ["scan", "g.fna", "-m", "gtdbtk", "-d", "whatever"])
+        assert result.exit_code == 2
+        assert "no mode in this invocation supports named databases" in result.output

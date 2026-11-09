@@ -16,15 +16,14 @@ from typing import Any, TextIO
 import click
 
 from gside import __version__
-from gside.analysis.species_name import UNKNOWN, display_name, parse_species_name
+from gside.analysis.species_name import display_name
 
 HELP_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 _ISOLATE_MODES = ["marker", "panel", "mash_refseq", "sourmash", "gtdbtk"]
-_META_METHODS = ["kraken2", "sylph"]
 MODES = [*_ISOLATE_MODES, "all"]
-META_MODES = [*_META_METHODS, "all"]
-TIERS = ["mini", "panel", "mash", "sourmash", "meta", "meta_sylph", "all"]
+SCAN_MODES = MODES
+TIERS = ["mini", "panel", "mash", "sourmash", "all"]
 
 
 def _db_dir_option(func: Any) -> Any:
@@ -128,8 +127,8 @@ def main(ctx: click.Context, version: bool, version_json: bool, verbose: bool, q
 _FASTA_SUFFIXES = (".fna", ".fa", ".fasta", ".faa", ".ffn", ".frn")
 _FASTQ_SUFFIXES = (".fq", ".fastq")
 
-# Which input kinds each mode can consume. `all` in isolate context means
-# every species tier, so it needs FASTA; in meta context it is kraken2+sylph.
+# Which input kinds each mode can consume. `all` means every species tier,
+# so it needs FASTA.
 _MODE_INPUTS: dict[str, frozenset[str]] = {
     "marker": frozenset({"fasta", "fastq"}),
     "panel": frozenset({"fasta"}),
@@ -137,12 +136,6 @@ _MODE_INPUTS: dict[str, frozenset[str]] = {
     "sourmash": frozenset({"fasta", "fastq"}),
     "gtdbtk": frozenset({"fasta"}),
 }
-_META_MODE_INPUTS: dict[str, frozenset[str]] = {
-    "kraken2": frozenset({"fasta", "fastq"}),
-    "sylph": frozenset({"fastq"}),
-    "all": frozenset({"fasta", "fastq"}),
-}
-SCAN_MODES = [*_ISOLATE_MODES, *_META_METHODS, "all"]
 
 
 def _input_kind(path: str) -> str:
@@ -208,37 +201,8 @@ def _group_read_samples(files: list[str]) -> list[list[str]]:
     return samples
 
 
-def _group_meta_samples(paths: list[str]) -> list[list[str]]:
-    """Group positional ``--meta`` inputs.
-
-    Exactly two files are one sample (the historic positional pairing
-    contract, so ``a.fq b.fq`` stays paired). More than two files are grouped
-    by mate marker, so ``A_R1 A_R2 B_R1 B_R2`` becomes two samples while
-    loose single-end files stay separate.
-    """
-    if len(paths) == 2:
-        return [paths]
-    return _group_read_samples(paths)
-
-
-def _sample_id(files: list[str]) -> str:
-    """Stable sample id for positional `--meta` batches (`A_R1.fq` → `A`)."""
-    first = Path(files[0]).name
-    key = _mate_key(files[0])
-    if key:
-        return key[0]
-    for suffix in (".gz", ".bz2"):
-        if first.lower().endswith(suffix):
-            first = first[: -len(suffix)]
-    for suffix in (".fastq", ".fq", ".fna", ".fa", ".fasta"):
-        if first.lower().endswith(suffix):
-            first = first[: -len(suffix)]
-            break
-    return first
-
-
-def _supported_inputs(mode: str, meta: bool) -> frozenset[str]:
-    return _META_MODE_INPUTS[mode] if meta else _MODE_INPUTS[mode]
+def _supported_inputs(mode: str) -> frozenset[str]:
+    return _MODE_INPUTS[mode]
 
 
 def _split_modes(raw: str) -> list[str]:
@@ -246,33 +210,30 @@ def _split_modes(raw: str) -> list[str]:
     return list(dict.fromkeys(part.strip() for part in raw.split("+") if part.strip()))
 
 
-def _expand_modes(raw: str, meta: bool) -> list[str]:
+def _expand_modes(raw: str) -> list[str]:
     parts = _split_modes(raw)
     if parts == ["all"]:
-        return list(_META_METHODS if meta else _ISOLATE_MODES)
+        return list(_ISOLATE_MODES)
     return parts
 
 
-def _resolve_modes(raw: str, meta: bool) -> list[str]:
+def _resolve_modes(raw: str) -> list[str]:
     """Validated expansion used before any tool runs."""
     parts = _split_modes(raw)
     if not parts:
         raise click.UsageError("--mode is empty")
     if "all" in parts and len(parts) > 1:
         raise click.UsageError("'all' cannot be combined with other modes")
-    return _expand_modes(raw, meta)
+    return _expand_modes(raw)
 
 
-def _validate_scan(files: list[str], raw_mode: str, meta: bool) -> None:
-    """Reject mode/flag and mode/input mismatches before any tool runs."""
-    modes = _resolve_modes(raw_mode, meta)
-    allowed_modes = _META_METHODS if meta else _ISOLATE_MODES
+def _validate_scan(files: list[str], raw_mode: str) -> None:
+    """Reject mode/input mismatches before any tool runs."""
+    modes = _resolve_modes(raw_mode)
     for mode in modes:
-        if mode not in allowed_modes:
-            hint = "drop --meta" if mode in _ISOLATE_MODES else "add --meta"
+        if mode not in _ISOLATE_MODES and mode != "all":
             raise click.UsageError(
-                f"mode {mode!r} is not available {'with' if meta else 'without'} --meta"
-                f" ({hint}); allowed: {', '.join(allowed_modes)}"
+                f"unknown mode {mode!r}; allowed: {', '.join([*_ISOLATE_MODES, 'all'])}"
             )
 
     kinds = {_input_kind(f) for f in files}
@@ -282,11 +243,9 @@ def _validate_scan(files: list[str], raw_mode: str, meta: bool) -> None:
             f"cannot infer input type from {bad!r}; "
             "expected FASTA (.fna/.fa/.fasta) or FASTQ (.fq/.fastq)"
         )
-    if meta and len(files) == 2 and kinds != {"fastq"}:
-        raise click.UsageError("paired input must be two FASTQ files")
 
     for mode in modes:
-        allowed = _supported_inputs(mode, meta)
+        allowed = _supported_inputs(mode)
         unsupported = kinds - allowed
         if not unsupported:
             continue
@@ -295,11 +254,9 @@ def _validate_scan(files: list[str], raw_mode: str, meta: bool) -> None:
             hint = (
                 "; all includes panel/gtdbtk, which need FASTA;"
                 " for reads use e.g. -m marker+sourmash"
-                if not meta
-                else "; all includes sylph, which needs FASTQ; for contigs use -m kraken2"
             )
         else:
-            hint = "; for reads use --meta -m kraken2" if not meta and kind == "fastq" else ""
+            hint = ""
         raise click.UsageError(
             f"mode {mode!r} does not accept {kind.upper()} input"
             f" (supported: {', '.join(sorted(k.upper() for k in allowed))}){hint}"
@@ -309,128 +266,71 @@ def _validate_scan(files: list[str], raw_mode: str, meta: bool) -> None:
 def _scan_dispatch(
     files: tuple[str, ...],
     mode: str | None,
-    meta: bool,
     db_dir: str | None,
     marker_db: str | None,
+    db_selection: tuple[str, ...],
     output_format: str,
     output: str | None,
     jobs: int,
     threads: int,
     no_header: bool,
     auto_setup: bool,
-    samples: str | None = None,
 ) -> None:
     paths = list(files)
-    resolved = mode or ("all" if meta else "marker")
+    resolved = mode or "marker"
 
-    if not meta:
-        if samples:
-            raise click.UsageError("--samples is only available with --meta")
-        if not paths:
-            raise click.UsageError("missing input: pass one or more FASTA/FASTQ files")
-        grouped = _group_read_samples(paths)
-        for sample in grouped:
-            _validate_scan(sample, resolved, meta=False)
-        if marker_db is None:
-            sys.exit(
-                _run_species(
-                    grouped,
-                    resolved,
-                    db_dir,
-                    output_format,
-                    output,
-                    jobs,
-                    threads,
-                    no_header,
-                    auto_setup,
-                )
-            )
-        sys.exit(
-            _run_species(
-                grouped,
-                resolved,
-                db_dir,
-                output_format,
-                output,
-                jobs,
-                threads,
-                no_header,
-                auto_setup,
-                marker_db=marker_db,
-            )
-        )
-
-    if samples and paths:
-        raise click.UsageError("pass either FILES or --samples, not both")
-    if not samples and not paths:
-        raise click.UsageError("missing input: pass reads, contigs, or --samples")
-    if samples:
-        try:
-            manifest = _read_samples(samples)
-        except ValueError as exc:
-            raise click.UsageError(str(exc)) from exc
-        for sample in manifest:
-            _validate_scan(sample["files"], resolved, meta=True)
-        sys.exit(
-            _run_meta_samples(
-                manifest,
-                resolved,
-                db_dir,
-                output_format=output_format,
-                output=output,
-                threads=threads,
-                jobs=jobs,
-                no_header=no_header,
-                auto_setup=auto_setup,
-            )
-        )
-
-    grouped = _group_meta_samples(paths)
+    if not paths:
+        raise click.UsageError("missing input: pass one or more FASTA/FASTQ files")
+    grouped = _group_read_samples(paths)
     for sample in grouped:
-        _validate_scan(sample, resolved, meta=True)
-    if len(grouped) == 1:
-        if jobs != 1:
-            raise click.UsageError("--jobs requires multiple samples in --meta mode")
-        sys.exit(
-            _run_meta(
-                grouped[0],
-                resolved,
-                db_dir,
-                output_format=output_format,
-                output=output,
-                threads=threads,
-                no_header=no_header,
-                auto_setup=auto_setup,
-            )
-        )
-
-    manifest: list[dict[str, Any]] = []
-    used: set[str] = set()
-    for sample in grouped:
-        base = _sample_id(sample)
-        sample_id, n = base, 2
-        while sample_id in used:
-            sample_id = f"{base}_{n}"
-            n += 1
-        used.add(sample_id)
-        manifest.append({"id": sample_id, "files": sample})
+        _validate_scan(sample, resolved)
+    db_selections = _resolve_db_selections(db_selection, marker_db, resolved, db_dir)
     sys.exit(
-        _run_meta_samples(
-            manifest,
+        _run_species(
+            grouped,
             resolved,
             db_dir,
-            output_format=output_format,
-            output=output,
-            threads=threads,
-            jobs=jobs,
-            no_header=no_header,
-            auto_setup=auto_setup,
+            output_format,
+            output,
+            jobs,
+            threads,
+            no_header,
+            auto_setup,
+            marker_db=marker_db,
+            db_selections=db_selections,
         )
     )
 
 
-def _scan_options(*, meta_preset: bool | None, with_samples: bool, modes: list[str]) -> Any:
-    """Shared option set for ``scan`` and its compatibility aliases."""
+def _resolve_db_selections(
+    db_selection: tuple[str, ...],
+    marker_db: str | None,
+    resolved_mode: str,
+    db_dir: str | None,
+) -> dict[str, list[Path]]:
+    """Fold ``-d/--db`` values (and the ``--marker-db`` alias) per mode.
+
+    Returns ``{mode: [database paths]}`` for the modes with explicit
+    selections; modes without one keep their default tier. Resolution and
+    validation errors surface as CLI usage errors.
+    """
+    from gside.db_registry import resolve_selections
+
+    values = list(db_selection)
+    if marker_db is not None:
+        values.append(f"marker:{marker_db}")
+    if not values:
+        return {}
+    modes = _expand_modes(resolved_mode)
+    try:
+        selections = resolve_selections(values, modes, root=db_dir)
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
+    return {mode: [choice.path for choice in choices] for mode, choices in selections.items()}
+
+
+def _scan_options(*, modes: list[str]) -> Any:
+    """Shared option set for ``scan`` and its compatibility alias."""
 
     def decorate(func: Any) -> Any:
         decorators: list[Any] = [
@@ -440,29 +340,23 @@ def _scan_options(*, meta_preset: bool | None, with_samples: bool, modes: list[s
                 "--mode",
                 default=None,
                 metavar="MODE[+MODE...]",
-                help=(
-                    f"Method or '+'-joined combination ({', '.join(modes)}); "
-                    f"default: {'all' if meta_preset else 'marker'}"
-                    + (" (all with --meta)" if meta_preset is None else "")
-                    + "."
-                ),
+                help=(f"Method or '+'-joined combination ({', '.join(modes)}); default: marker."),
             ),
-        ]
-        if meta_preset is None:
-            decorators.append(
-                click.option(
-                    "--meta",
-                    is_flag=True,
-                    default=False,
-                    help=(
-                        "Input is a metagenomic community: only kraken2/sylph/all are"
-                        " allowed (FASTA via kraken2, FASTQ via both)."
-                    ),
-                )
-            )
-        decorators += [
             _db_dir_option,
             _marker_db_option,
+            click.option(
+                "-d",
+                "--db",
+                "db_selection",
+                multiple=True,
+                metavar="[MODE:]NAME",
+                help=(
+                    "Database(s) to run per mode: a name under data/db/<family>/,"
+                    " an existing directory path, or MODE:NAME when several"
+                    " database-capable modes run together. Repeatable; the"
+                    " selected databases run and their results are merged."
+                ),
+            ),
             _format_option(["json", "tsv", "md", "csv"], "Output format (rows for tsv/md/csv)."),
             click.option(
                 "-o",
@@ -480,7 +374,7 @@ def _scan_options(*, meta_preset: bool | None, with_samples: bool, modes: list[s
                 type=click.IntRange(min=1),
                 default=1,
                 show_default=True,
-                help="Concurrent inputs (isolate batches) or samples (--meta --samples).",
+                help="Concurrent inputs (isolate batches).",
             ),
             _threads_option("Threads per tool invocation."),
             click.option(
@@ -498,16 +392,6 @@ def _scan_options(*, meta_preset: bool | None, with_samples: bool, modes: list[s
                 help="Install a missing database tier, then retry that method once.",
             ),
         ]
-        if with_samples:
-            decorators.append(
-                click.option(
-                    "-s",
-                    "--samples",
-                    type=click.Path(dir_okay=False),
-                    default=None,
-                    help="Batch manifest: sample_id<TAB>reads [<TAB>reads2] per line.",
-                )
-            )
         for decorator in reversed(decorators):
             func = decorator(func)
         return func
@@ -516,50 +400,50 @@ def _scan_options(*, meta_preset: bool | None, with_samples: bool, modes: list[s
 
 
 @main.command("scan", context_settings=HELP_SETTINGS)
-@_scan_options(meta_preset=None, with_samples=True, modes=SCAN_MODES)
+@_scan_options(modes=SCAN_MODES)
 def scan_cmd(
     files: tuple[str, ...],
     mode: str | None,
-    meta: bool,
     db_dir: str | None,
     marker_db: str | None,
+    db_selection: tuple[str, ...],
     output_format: str,
     output: str | None,
     jobs: int,
     threads: int,
     no_header: bool,
     auto_setup: bool,
-    samples: str | None,
 ) -> None:
-    """Identify species in one genome, or profile a metagenomic community.
+    """Identify the species of one or more isolate genomes.
 
     The input type is inferred from the extension and must match the mode
-    (FASTA: marker/panel/mash_refseq/sourmash/gtdbtk/kraken2; FASTQ: marker/
-    kraken2/sylph). Add --meta for community/reads profiling.
+    (FASTA: marker/panel/mash_refseq/sourmash/gtdbtk/all; FASTQ:
+    marker/mash_refseq/sourmash). Metagenomic community profiling moved to
+    the gmeta tool (``gmeta run`` / ``gmeta report``).
     """
     _scan_dispatch(
         files,
         mode,
-        meta,
         db_dir,
         marker_db,
+        db_selection,
         output_format,
         output,
         jobs,
         threads,
         no_header,
         auto_setup,
-        samples,
     )
 
 
 @main.command("species", hidden=True, context_settings=HELP_SETTINGS)
-@_scan_options(meta_preset=False, with_samples=False, modes=MODES)
+@_scan_options(modes=MODES)
 def species_alias(
     files: tuple[str, ...],
     mode: str | None,
     db_dir: str | None,
     marker_db: str | None,
+    db_selection: tuple[str, ...],
     output_format: str,
     output: str | None,
     jobs: int,
@@ -567,51 +451,19 @@ def species_alias(
     no_header: bool,
     auto_setup: bool,
 ) -> None:
-    """Compatibility alias for ``gside scan`` without --meta (single organism)."""
+    """Compatibility alias for ``gside scan`` (single organism)."""
     _scan_dispatch(
         files,
         mode,
-        False,
         db_dir,
         marker_db,
+        db_selection,
         output_format,
         output,
         jobs,
         threads,
         no_header,
         auto_setup,
-    )
-
-
-@main.command("meta", hidden=True, context_settings=HELP_SETTINGS)
-@_scan_options(meta_preset=True, with_samples=True, modes=META_MODES)
-def meta_alias(
-    files: tuple[str, ...],
-    mode: str | None,
-    db_dir: str | None,
-    marker_db: str | None,
-    output_format: str,
-    output: str | None,
-    jobs: int,
-    threads: int,
-    no_header: bool,
-    auto_setup: bool,
-    samples: str | None,
-) -> None:
-    """Compatibility alias for ``gside scan --meta`` (metagenomic community)."""
-    _scan_dispatch(
-        files,
-        mode,
-        True,
-        db_dir,
-        marker_db,
-        output_format,
-        output,
-        jobs,
-        threads,
-        no_header,
-        auto_setup,
-        samples,
     )
 
 
@@ -772,7 +624,6 @@ def validate_cmd(contigs: str, output_dir: str, threads: int) -> None:
 # Register commands
 main.add_command(scan_cmd, name="scan")
 main.add_command(species_alias, name="species")
-main.add_command(meta_alias, name="meta")
 main.add_command(db_group, name="db")
 main.add_command(validate_cmd, name="validate")
 
@@ -840,6 +691,7 @@ def _run_species(
     auto_setup: bool = False,
     quiet: bool = False,
     marker_db: str | None = None,
+    db_selections: dict[str, list[Path]] | None = None,
 ) -> int:
     from gside.progress import species_progress
 
@@ -847,15 +699,9 @@ def _run_species(
 
     def identify(sample: list[str]) -> dict[str, Any]:
         target: str | list[str] = sample[0] if len(sample) == 1 else sample
-        if marker_db is None:
-            payload = _identify_one(target, mode, db_dir, threads)
-        else:
-            payload = _identify_one(target, mode, db_dir, threads, marker_db)
+        payload = _identify_one(target, mode, db_dir, threads, marker_db, db_selections)
         if auto_setup:
-            if marker_db is None:
-                payload = _auto_setup_retry(target, payload, mode, db_dir, threads)
-            else:
-                payload = _auto_setup_retry(target, payload, mode, db_dir, threads, marker_db)
+            payload = _auto_setup_retry(target, payload, mode, db_dir, threads, marker_db)
         return payload
 
     if jobs > 1:
@@ -1093,33 +939,6 @@ def _auto_setup_retry(
     return payload
 
 
-def _auto_setup_retry_meta(
-    files: list[str],
-    payload: dict[str, Any],
-    mode: str,
-    db_dir: str | None,
-    threads: int,
-) -> dict[str, Any]:
-    """--auto-setup for meta: install each missing tier once, retry that method once."""
-    if db_dir is not None:
-        # A custom database root is user-managed; never write outside it.
-        return payload
-    methods = payload.get("methods", {})
-    input_type = payload.get("input", {}).get("type", _detect_meta_input(files))
-    for m, entry in methods.items():
-        tier = entry.get("missing_tier") if isinstance(entry, dict) else None
-        if not tier:
-            continue
-        try:
-            _setup_missing_tier(tier)
-        except Exception as e:  # noqa: BLE001 — CLI boundary: setup failure keeps the error entry
-            logger.warning("auto-setup of tier %s failed: %s", tier, e)
-            continue
-        methods[m] = _run_meta_method(m, files, db_dir, threads, input_type)
-    payload["verdict"] = _meta_verdict(methods)
-    return payload
-
-
 def _species_of(payload: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
     """(species, confidence, result-dict) from a method payload."""
     res = payload.get("result", payload)
@@ -1162,44 +981,59 @@ def _identify_one(
     db_dir: str | None,
     threads: int = 4,
     marker_db: str | None = None,
+    db_selections: dict[str, list[Path]] | None = None,
 ) -> dict[str, Any]:
     files = list(contigs) if isinstance(contigs, (list, tuple)) else [contigs]
     primary = files[0]
     reads: str | list[str] = files if len(files) > 1 else primary
     results: dict[str, Any] = {}
+    selections = db_selections or {}
 
-    modes = _expand_modes(mode, meta=False)
+    modes = _expand_modes(mode)
     unknown = [m for m in modes if m not in _ISOLATE_MODES]
     if unknown:
         raise ValueError(f"unsupported isolate mode(s): {', '.join(unknown)}")
     for m in modes:
+        selected_paths = selections.get(m, [])
         try:
             if m == "marker":
                 from gside.analysis.multigene_identifier import identify_multigene
 
-                marker_path = marker_db
-                if marker_path is None and db_dir:
-                    candidate = Path(db_dir) / "D1_marker"
-                    if candidate.is_dir():
-                        marker_path = str(candidate)
-                if marker_path is None:
-                    results[m] = identify_multigene(reads, threads=threads).to_dict()
-                else:
+                marker_paths: list[str] = [str(p) for p in selected_paths]
+                if not marker_paths:
+                    marker_path = marker_db
+                    if marker_path is None and db_dir:
+                        candidate = Path(db_dir) / "D1_marker"
+                        if candidate.is_dir():
+                            marker_path = str(candidate)
+                    if marker_path is not None:
+                        marker_paths = [marker_path]
+                if marker_paths:
                     results[m] = identify_multigene(
-                        reads, threads=threads, marker_db=marker_path
+                        reads,
+                        threads=threads,
+                        marker_db=marker_paths[0] if len(marker_paths) == 1 else marker_paths,
                     ).to_dict()
+                else:
+                    results[m] = identify_multigene(reads, threads=threads).to_dict()
             elif m in ("panel", "mash_refseq"):
                 from gside.analysis.ani_identifier import identify_by_ani
 
                 results[m] = identify_by_ani(
-                    reads, mode=m, db_dir=db_dir, threads=threads
+                    reads,
+                    mode=m,
+                    db_dir=db_dir,
+                    threads=threads,
+                    dbs=selected_paths or None,
                 ).to_dict()
             elif m == "sourmash":
                 from gside.analysis.sourmash_identifier import (
                     identify_by_sourmash as identify_sourmash,
                 )
 
-                results[m] = identify_sourmash(reads, db_dir=db_dir).to_dict()
+                results[m] = identify_sourmash(
+                    reads, db_dir=db_dir, dbs=selected_paths or None
+                ).to_dict()
             elif m == "gtdbtk":
                 from gside.analysis.gtdbtk_identifier import identify_by_gtdbtk
 
@@ -1223,6 +1057,7 @@ def _identify_one(
 
 
 _LAYER = {"gtdbtk": 3, "panel": 2, "mash_refseq": 2, "sourmash": 2, "marker": 1}
+_CONF_RANK = {"high": 2, "medium": 1, "low": 0}
 
 
 def _arbitrate(results: dict[str, Any]) -> dict[str, Any]:
@@ -1255,290 +1090,6 @@ def _arbitrate(results: dict[str, Any]) -> dict[str, Any]:
     supporting = sorted(m for m, s in successful.items() if m != mode and s == species)
     agreement = f"{1 + len(supporting)}/{len(successful)}"
     return _verdict_payload(species, conf, res.get("strain"), [mode], supporting, agreement)
-
-
-_META_FASTA_SUFFIXES = (".fna", ".fa", ".fasta")
-_META_TSV_HEADER = "method\tname\tabundance\tconfidence\tani"
-_CONF_RANK = {"high": 2, "medium": 1, "low": 0}
-_METHOD_RANK = {"sylph": 1, "kraken2": 0}
-
-
-def _detect_meta_input(files: list[str]) -> str:
-    """2 files = paired FASTQ; 1 FASTA-suffixed file = contigs; else single FASTQ."""
-    if len(files) == 2:
-        return "fastq_paired"
-    if len(files) == 1 and Path(files[0]).suffix in _META_FASTA_SUFFIXES:
-        return "fasta"
-    return "fastq_single"
-
-
-def _run_meta_method(
-    mode: str,
-    files: list[str],
-    db_dir: str | None,
-    threads: int,
-    input_type: str,
-) -> dict[str, Any]:
-    from gside.analysis.sylph_identifier import FASTA_INPUT_ERROR
-
-    if mode == "sylph" and input_type == "fasta":
-        return {"method": "sylph", "error": FASTA_INPUT_ERROR}
-    try:
-        if mode == "kraken2":
-            from gside.analysis.kraken2_identifier import identify_by_kraken2
-
-            return identify_by_kraken2(files, db_dir=db_dir, threads=threads).to_dict()
-        from gside.analysis.sylph_identifier import identify_by_sylph
-
-        return identify_by_sylph(files, db_dir=db_dir, threads=threads).to_dict()
-    except Exception as e:  # noqa: BLE001 — CLI boundary: method failure recorded, others continue
-        entry = {"method": mode, "error": str(e)[:300]}
-        entry.update(_structured_missing_db_fields(entry["error"]))
-        return entry
-
-
-def _meta_verdict(methods: dict[str, Any]) -> dict[str, Any]:
-    """Merge species lists from successful methods into canonical rows.
-
-    Rows are keyed by the canonical ``Genus_species`` label (the same contract
-    as ``gside species``), so sylph's strain-level names and kraken2's
-    taxonomy names collapse to one entry; on duplicates the higher-confidence
-    method wins, with sylph (ANI) outranking kraken2 (fraction) at equal
-    confidence. Species-group placeholders (``Campylobacter sp.``) are dropped.
-    """
-    merged: dict[str, dict[str, Any]] = {}
-    basis: list[str] = []
-    for mode, payload in methods.items():
-        if "error" in payload:
-            continue
-        basis.append(mode)
-        res = payload.get("result", payload)
-        entries = res.get("top_species") or res.get("species") or []
-        for entry in entries:
-            raw_name = entry.get("name", "")
-            if not raw_name:
-                continue
-            parsed = parse_species_name(raw_name)
-            if parsed.label == UNKNOWN:
-                continue
-            conf = entry.get("confidence", "low")
-            row = {
-                "name": parsed.label,
-                "display_name": parsed.display,
-                "strain": parsed.strain or None,
-                "method": mode,
-                "abundance": entry.get("fraction", entry.get("abundance", 0.0)),
-                "confidence": conf,
-                "ani": entry.get("ani"),
-            }
-            if raw_name != parsed.label:
-                row["species_raw"] = raw_name
-
-            prev = merged.get(parsed.label)
-            wins = prev is None or _CONF_RANK[conf] > _CONF_RANK[prev["confidence"]]
-            if not wins and prev is not None and _CONF_RANK[conf] == _CONF_RANK[prev["confidence"]]:
-                wins = _METHOD_RANK.get(mode, 0) > _METHOD_RANK.get(prev["method"], 0)
-            if wins:
-                merged[parsed.label] = row
-    top = sorted(merged.values(), key=lambda r: r["abundance"], reverse=True)
-    return {"top_species": top, "richness": len(top), "basis": basis}
-
-
-_META_COLUMNS = ("method", "name", "abundance", "confidence", "ani")
-
-
-def _meta_row_cells(payload: dict[str, Any]) -> list[list[str]]:
-    """One row per merged species, values already stringified for tsv/csv."""
-    rows: list[list[str]] = []
-    for row in payload.get("verdict", {}).get("top_species", []):
-        ani = "" if row.get("ani") is None else str(row["ani"])
-        abundance = f"{row['abundance']:.6g}"
-        rows.append([row["method"], row["name"], abundance, row["confidence"], ani])
-    return rows
-
-
-def _render_meta_table(
-    payloads: list[dict[str, Any]], fmt: str, no_header: bool, with_sample: bool
-) -> str:
-    header = (["sample"] if with_sample else []) + list(_META_COLUMNS)
-    if fmt == "csv":
-        out = io.StringIO()
-        writer = csv.writer(out, lineterminator="\n")
-        if not no_header:
-            writer.writerow(header)
-        for payload in payloads:
-            prefix = [payload.get("sample", "")] if with_sample else []
-            for cells in _meta_row_cells(payload):
-                writer.writerow(prefix + cells)
-        return out.getvalue()
-
-    if fmt == "md":
-        lines: list[str] = []
-        if not no_header:
-            lines.append("| " + " | ".join(header) + " |")
-            lines.append("|" + "|".join(["---"] * len(header)) + "|")
-        for payload in payloads:
-            prefix = [payload.get("sample", "")] if with_sample else []
-            for cells in _meta_row_cells(payload):
-                clean = [
-                    str(c).replace("|", "/").replace("\n", " ").replace("\r", " ")
-                    for c in prefix + cells
-                ]
-                lines.append("| " + " | ".join(clean) + " |")
-        return "\n".join(lines) + "\n"
-
-    lines = [] if no_header else ["\t".join(header)]
-    for payload in payloads:
-        prefix = [payload.get("sample", "")] if with_sample else []
-        lines += ["\t".join(prefix + cells) for cells in _meta_row_cells(payload)]
-    return "\n".join(lines) + "\n"
-
-
-def _emit_meta(
-    payload: dict[str, Any],
-    output_format: str,
-    output: str | None,
-    no_header: bool = False,
-) -> int:
-    if output_format == "json":
-        return _write_json_document(payload, output)
-    text = _render_meta_table([payload], output_format, no_header, with_sample=False)
-    return _write_text_document(text, output)
-
-
-def _emit_meta_batch(
-    payload_source: Iterator[dict[str, Any]],
-    output_format: str,
-    output: str | None,
-    no_header: bool = False,
-    bar: Any = None,
-) -> int:
-    if output_format == "json":
-        return _emit_chunks(_json_stream(payload_source, False), output, bar)
-
-    def chunks() -> Iterator[str]:
-        if not no_header:
-            yield _render_meta_table([], output_format, False, with_sample=True)
-        for payload in payload_source:
-            yield _render_meta_table([payload], output_format, True, with_sample=True)
-
-    return _emit_chunks(chunks(), output, bar)
-
-
-def _meta_payload(
-    files: list[str],
-    mode: str,
-    db_dir: str | None,
-    threads: int = 4,
-) -> dict[str, Any]:
-    """Profile one sample into the JSON payload (shared by CLI, MCP, batch)."""
-    input_type = _detect_meta_input(files)
-    modes = _expand_modes(mode, meta=True)
-    unknown = [m for m in modes if m not in _META_METHODS]
-    if unknown:
-        raise ValueError(f"unsupported meta mode(s): {', '.join(unknown)}")
-    methods = {m: _run_meta_method(m, files, db_dir, threads, input_type) for m in modes}
-    return {
-        "analysis_type": "metagenomic_profiling",
-        "tool": "gside",
-        "version": __version__,
-        "input": {"files": files, "type": input_type},
-        "methods": methods,
-        "verdict": _meta_verdict(methods),
-    }
-
-
-def _run_meta(
-    files: list[str],
-    mode: str,
-    db_dir: str | None,
-    output_format: str = "json",
-    output: str | None = None,
-    threads: int = 4,
-    no_header: bool = False,
-    auto_setup: bool = False,
-) -> int:
-    payload = _meta_payload(files, mode, db_dir, threads)
-    if auto_setup:
-        payload = _auto_setup_retry_meta(files, payload, mode, db_dir, threads)
-    return _emit_meta(payload, output_format, output, no_header)
-
-
-def _read_samples(path: str) -> list[dict[str, Any]]:
-    """Parse a ``sample_id<TAB>r1[<TAB>r2]`` manifest (header optional)."""
-    manifest = Path(path)
-    if not manifest.is_file():
-        raise ValueError(f"samples manifest not found: {manifest}")
-    samples: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for lineno, line in enumerate(manifest.read_text().splitlines(), start=1):
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        cols = [c.strip() for c in line.split("\t")]
-        if lineno == 1 and cols[0].lower() in ("sample", "sample_id"):
-            continue
-        if len(cols) < 2 or not cols[0] or not cols[1]:
-            raise ValueError(f"{manifest}:{lineno}: expected sample_id<TAB>reads [<TAB>reads2]")
-        if len(cols) > 3:
-            raise ValueError(f"{manifest}:{lineno}: too many columns (max 3)")
-        sample_id = cols[0]
-        if sample_id in seen:
-            raise ValueError(f"{manifest}:{lineno}: duplicate sample id {sample_id!r}")
-        seen.add(sample_id)
-        samples.append({"id": sample_id, "files": [c for c in cols[1:] if c]})
-    if not samples:
-        raise ValueError(f"{manifest}: no samples found")
-    return samples
-
-
-def _run_meta_samples(
-    samples: list[dict[str, Any]],
-    mode: str,
-    db_dir: str | None,
-    output_format: str = "json",
-    output: str | None = None,
-    threads: int = 4,
-    jobs: int = 1,
-    no_header: bool = False,
-    auto_setup: bool = False,
-) -> int:
-    """Profile every manifest sample, preserving manifest order in the output."""
-
-    def identify(sample: dict[str, Any]) -> dict[str, Any]:
-        payload = _meta_payload(sample["files"], mode, db_dir, threads)
-        if auto_setup:
-            payload = _auto_setup_retry_meta(sample["files"], payload, mode, db_dir, threads)
-        return {"sample": sample["id"], **payload}
-
-    if auto_setup and samples:
-        # Install tiers once, serially, before the parallel fan-out.
-        first = identify(samples[0])
-        rest = samples[1:]
-        if jobs > 1 and rest:
-            from concurrent.futures import ThreadPoolExecutor
-
-            with ThreadPoolExecutor(max_workers=jobs) as pool:
-
-                def auto_source() -> Iterator[dict[str, Any]]:
-                    yield first
-                    yield from pool.map(identify, rest)
-
-                return _emit_meta_batch(auto_source(), output_format, output, no_header)
-        return _emit_meta_batch(
-            (payload for payload in (first, *(identify(sample) for sample in rest))),
-            output_format,
-            output,
-            no_header,
-        )
-
-    if jobs > 1:
-        from concurrent.futures import ThreadPoolExecutor
-
-        with ThreadPoolExecutor(max_workers=jobs) as pool:
-            return _emit_meta_batch(pool.map(identify, samples), output_format, output, no_header)
-    return _emit_meta_batch(
-        (identify(sample) for sample in samples), output_format, output, no_header
-    )
 
 
 if __name__ == "__main__":

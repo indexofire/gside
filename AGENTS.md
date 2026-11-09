@@ -7,7 +7,7 @@ Agent guidance for this repository. Read this before writing or editing any code
 ## Project Overview
 
 - **Language**: Python 3.12 (standalone species-identification CLI, no frontend)
-- **Package manager**: [pixi](https://pixi.sh) — conda tools (blast/minimap2/skani/mash/sourmash/kraken2/bracken/sylph) + PyPI editable install via `pixi.toml`
+- **Package manager**: [pixi](https://pixi.sh) — conda tools (blast/minimap2/skani/mash/sourmash) + PyPI editable install via `pixi.toml`
 - **Linter + Formatter**: [ruff](https://docs.astral.sh/ruff/) (config in `pyproject.toml`; `pixi run -e dev check`, or the pip-installed dev extras)
 - **Testing**: pytest — `tests/unit/` hermetic (no binaries), `tests/integration/` needs real binaries/databases (skipif-guarded)
 - **Docs**: MkDocs Material + static-i18n, English default + Chinese secondary (`docs/*.md` + `*.zh.md` pairs)
@@ -96,10 +96,10 @@ CI (`.github/workflows/test.yml`, pip channel): ruff check + format --check,
 `pyright src/gside/` (must stay zero), `pytest -q --cov=src/gside`.
 Binary-needing tests skip gracefully without conda tools; full runs happen
 in the pixi dev env locally.
-Baseline (2026-11-03): **864 tests** (unit + integration, DBs provisioned),
-total coverage **99.0%** — all modules 100% except: ani 92%, sylph 95%,
-sourmash 96%, kraken2/db/cli 99%. Local coverage must never drop below its
-last high-water mark (99.0 with `D2_ani`/`D3_mash` provisioned; ~97 without).
+Baseline (2026-11-09): **775 tests** (unit + integration, DBs provisioned),
+total coverage **99.8%** — all modules 100% except: ani 97% (`main()` text
+branch). Local coverage must never drop below its
+last high-water mark (99.8 with `D2_ani`/`D3_mash` provisioned; ~97 without).
 Enforced by `[tool.coverage.report] fail_under = 95` in `pyproject.toml` —
 the 95 floor exists because CI checkouts lack the gitignored databases and
 sit ~2pts below a provisioned local run; raise it every time the CI floor
@@ -182,14 +182,14 @@ TDD is mandatory for all behavior changes and bug fixes. No exceptions.
 
 ### CLI Patterns
 - Click group style (mirrors gmlst/gspec family): `HELP_SETTINGS` (`-h`/`--help`), bare invocation prints help and exits 2 (`no_args_is_help`), `-v`/`-q` mutually exclusive (UsageError), thin commands registered via `add_command`
-- One command, `scan`, for both workflows; `-m/--mode` picks the method, `--meta` selects the community workflow. Every option carries a short flag: `-m/--mode -f/--format -D/--db-dir -o/--output -j/--jobs -t/--threads -n/--no-header -a/--auto-setup` (+ `-s/--samples` with `--meta`); validate `-m/--mode -o/--output-dir`; db `-t/--tier -s/--source -f/--format`
+- One command, `scan`; `-m/--mode` picks the method (isolate identification only — metagenomic profiling lives in the gmeta tool). Every option carries a short flag: `-m/--mode -f/--format -D/--db-dir -d/--db -o/--output -j/--jobs -t/--threads -n/--no-header -a/--auto-setup`; validate `-m/--mode -o/--output-dir`; db `-t/--tier -s/--source -f/--format`
+- `-d/--db [MODE:]NAME` (repeatable) selects databases per mode: a name under `data/db/<family>/<name>/`, a directory path, or `default`; resolutions live in `db_registry.py`. Multiple selections run and merge (marker: pooled rules+hits; panel/mash/sourmash: pooled hits re-ranked, taxa first-wins); `databases` array appears in the method payload only for multi-runs; `--marker-db` is a `-d marker:PATH` alias. `gtdbtk` rejects `-d`
 - `-D/--db-dir`, `-f/--format` and `-t/--threads` are built by the shared factories `_db_dir_option` / `_format_option` / `_threads_option` in `cli.py` — add new commands through them so flags never drift
 - Agent-friendly outputs: `scan` defaults to JSON on stdout and supports `-f json|tsv|md|csv`; `-o` writes the payload to a file (row formats flushed per row as inputs complete — a mid-batch failure persists the prefix; json single document at the end; stdout stays empty, notice on stderr); `db status|list` accept `--format table|tsv|json`; `db setup` accepts `--format text|json` (json routes progress to stderr); `-V -J` prints version as JSON
 - Subcommands: `scan` / `db` group (`status|setup|list`) / `validate` / `mcp` (MCP stdio server) / `--version`; entry `gside.cli:main`
-- `species` and `meta` are **hidden compatibility aliases** (preset `meta=False/True`) for `scan`; bacmap still calls `gside species`, so keep them until that pin moves
-- `--meta` batch mode: `-s/--samples sample_id<TAB>r1[<TAB>r2]` + `-j/--jobs` (order preserved); JSON becomes an array with a `sample` key, tsv/csv/md gain a leading `sample` column. `--samples` and positional reads are mutually exclusive (UsageError); `-j` without `--samples` is rejected
-- Mode choices: isolate `marker|panel|mash_refseq|sourmash|gtdbtk|all`; meta `kraken2|sylph|all` — do not invent modes. `-m` also accepts `+` combinations (`marker+sourmash`): `_split_modes` dedupes in order, `all` cannot be combined, and `_validate_scan` checks **every** component against the context and input kind
-- Input kinds are inferred from the extension (`.fna/.fa/.fasta` vs `.fq/.fastq`, `.gz` stripped) and validated **before** any tool runs: `_MODE_INPUTS` / `_META_MODE_INPUTS` in `cli.py` define the matrix (marker/mash_refseq/sourmash accept both; panel/gtdbtk are FASTA-only — skani and GTDB-Tk need assemblies; kraken2 both; sylph FASTQ-only). `all` expands to the context's full list (`_ISOLATE_MODES` / `_META_METHODS`) and is validated component-by-component, so isolate `all` needs FASTA and meta `all` needs FASTQ. Update the matrix and docs together when adding a mode
+- `species` is a **hidden compatibility alias** for `scan`; bacmap still calls `gside species`, so keep it until that pin moves
+- Mode choices: `marker|panel|mash_refseq|sourmash|gtdbtk|all` — do not invent modes. `-m` also accepts `+` combinations (`marker+sourmash`): `_split_modes` dedupes in order, `all` cannot be combined, and `_validate_scan` checks **every** component against the input kind
+- Input kinds are inferred from the extension (`.fna/.fa/.fasta` vs `.fq/.fastq`, `.gz` stripped) and validated **before** any tool runs: `_MODE_INPUTS` in `cli.py` defines the matrix (marker/mash_refseq/sourmash accept both; panel/gtdbtk are FASTA-only — skani and GTDB-Tk need assemblies). `all` expands to the full isolate list and is validated component-by-component, so `all` needs FASTA. Update the matrix and docs together when adding a mode
 - `--db-dir` overrides the database root for one invocation
 - `validate` is assembly QC (CheckM2 + GTDB-Tk), not a scan mode and **not** marker-based: no `-m`; `-o/--output-dir` is required and takes a **directory** (file is always `validation.json`), unlike `scan -o` (a file); `-t/--threads` feeds both tools. Exit 0 only when both tools ran; `partial`/`error` exit 1. The report carries schema/genome/parameters/software/tools/quality/taxonomy/status/errors/created_at
 - `verdict` shape is shared by single-mode and `all`: `species` (canonical), `display_name`, `strain`, `confidence`, `basis` (winner only), `supporting`, `agreement`
@@ -201,8 +201,9 @@ src/gside/
 ├── cli.py                    # Entry point; all-mode runner + _arbitrate()
 ├── config.py                 # DATA_DIR / SPECIES_DB_DIR / pixi binary discovery
 ├── db.py                     # gside db status/setup/list + downloaders
+├── db_registry.py            # Named per-mode databases: -d resolution/enumeration
 ├── mcp.py                    # MCP stdio server: JSON-RPC protocol + serve loop (`gside mcp`)
-├── mcp_schemas.py            # MCP tools/list declarations (species/meta/db_status/db_list/db_setup)
+├── mcp_schemas.py            # MCP tools/list declarations (species/db_status/db_list/db_setup)
 ├── mcp_tools.py              # MCP tool handlers (call cli._identify_one + db callables)
 ├── engine/                   # Alignment backends actually used by analysis/
 │   ├── _env.py               #   require_bin / run_checked / pixi_path
@@ -217,8 +218,6 @@ src/gside/
     ├── ani_identifier.py         # L2 panel/mash (live)
     ├── sourmash_identifier.py    # L2 sourmash (needs external binary + GTDB db)
     ├── gtdbtk_identifier.py      # L3 GTDB-Tk placement (needs external gtdbtk + GTDBTK_DATA_PATH)
-    ├── kraken2_identifier.py     # meta: kraken2 + bracken
-    ├── sylph_identifier.py       # meta: sylph ANI profiling (FASTQ only)
     └── taxonomic_validator.py    # CheckM2 + GTDB-Tk assembly QC (`gside validate`)
 tests/
 ├── unit/                     # Hermetic, no binaries, seconds
@@ -233,8 +232,10 @@ data/
 │   │                         # except manifests/ (tracked build recipe)
 │   ├── D3_mash/              # mash tier (mash.msh), gitignored
 │   ├── D4_sourmash/          # GTDB reps k31 + lineages, via db setup (3.9GB)
-│   ├── D5_kraken2/           # meta tier (Kraken2 Standard-8), manual, gitignored
-│   └── D6_sylph/             # meta_sylph tier (.syldb), manual, gitignored
+│   # named per-mode databases (-d [MODE:]NAME), family dirs:
+│   #   marker/<name>/  panel/<name>/  mash_refseq/<name>/  sourmash/<name>/
+│   # layouts mirror the tiers (marker: fasta+rules; panel: panel.sketch/;
+│   # mash_refseq: mash.msh; sourmash: gtdb-reps-k31.zip + lineages.csv)
 docs/
 ├── index.md / index.zh.md    # + architecture|installation|usage|reference/, same pairing
 └── (nav in mkdocs.yml; en default, zh secondary; build with --strict)
@@ -277,17 +278,16 @@ testpaths = ["tests"]
 ## Known Gotchas (read before touching these areas)
 
 - **Binary discovery**: `GSIDE_PIXI_BIN` env → repo `.pixi/envs/default/bin` → `~/.pixi/envs/default/bin` → `PATH` (`config.py`). There is no machine-specific path in the package; point `GSIDE_PIXI_BIN` at a conda env when the tools live elsewhere.
-- **gseek is the default engine**: `GSIDE_ENGINE=gseek` uses `gseek.align` for marker BLAST + FASTQ screening and `gseek.distance(external_reference=True)` for mash/sourmash/skani/sylph; `legacy` keeps the subprocess backends and `shadow` runs both, logs differences, and returns legacy — both are debug-only. All gseek-backed modes (marker, mash, sourmash, panel, sylph) use gseek; gtdbtk/kraken2 have no gseek adapter. gseek>=0.10.4 is a runtime dependency (0.10.2 added the sylph backend; 0.10.4 pins the index-cache security hardening). See `docs/development/gseek-migration.md`.
+- **gseek is the default engine**: `GSIDE_ENGINE=gseek` uses `gseek.align` for marker BLAST + FASTQ screening and `gseek.distance(external_reference=True)` for mash/sourmash/skani; `legacy` keeps the subprocess backends and `shadow` runs both, logs differences, and returns legacy — both are debug-only. All gseek-backed modes (marker, mash, sourmash, panel) use gseek; gtdbtk has no gseek adapter. gseek>=0.10.4 is a runtime dependency (0.10.4 pins the index-cache security hardening). See `docs/development/gseek-migration.md`.
 - **`gside species` never fails loud**: check `methods.<mode>.error` in JSON, not the exit code.
 - **Marker on FASTQ**: `analysis/read_screening.py` maps reads to the marker FASTA with minimap2 (`-x sr` short / `-x map-ont` long, `--secondary=no -c`; `-c` is required — without base-level alignment PAF columns 10/11 are approximate). Per-gene breadth is the union of reference intervals across primary alignments, identity is the alignment-weighted `nmatch/alen`; alignments with MAPQ < `min_mapq` (default 20, from `metadata.yaml`) are dropped before aggregation. Reads mode then applies a depth gate (`min_depth=5x`, `min_relative_depth=10%` of a single-copy control gene, `sample_median` fallback) before the rule engine — assembly mode is unchanged. Measured on a 1.65Mb genome: 10x -> 98-99% breadth, 1x -> 60-79% (still high), 0.3x -> Unknown. No assembly step, no read->FASTA conversion. Minimap2 is a declared pixi dependency.
 - **Marker thresholds**: global `_MIN_IDENTITY=85.0` / `_MIN_COVERAGE=60.0` / `_HIGH_CONF=90.0` gate `detected_markers` and `exclude_genes`. Rule matching uses each rule's own `min_identity`/`min_coverage` (defaults 90/60) against every raw hit of the gene, so the two *Campylobacter* rules with `min_coverage: 50` really do accept 50-60% coverage. `priority_over` is used by the Shigella species rules (they suppress the genus/E. coli fallback).
 - **Panel thresholds**: ANI ≥ 95 + AF ≥ 0.65 → high; 93–95 → medium. Mash identity ≥ 0.97 → high, 0.90–0.97 → medium.
 - **Mash/sourmash on reads are species-level, not assembly-grade ANI**: mash sketches reads with `-m 2 -r` (Mash paper: species correct, best strain often wrong; distance inflates with coverage/error; 10x-100x recommended). sourmash `sketch` accepts FASTQ and `gather` is built for unassembled reads, but the result is a containment profile, not an assembly-vs-assembly ANI, and short reads are not individually classified.
 - **Arbitration is layer-first**: `(layer, confidence-rank)` tuple — gtdbtk=3 beats any L2 hit, any L2 hit beats any L1 hit, and within a layer `medium` now beats `low` (`cli.py:_arbitrate`). `verdict.basis` stays the single winning method (bacmap maps it to a validated `method`); `verdict.supporting` + `verdict.agreement` expose cross-method corroboration (exact label match; pathotype labels (DEC/EIEC) are no longer emitted — they belong to gspec).
-- **Missing-database errors are structured**: alongside `methods.<mode>.error`, the payload carries `suggested_command` / `missing_tier` / `estimated_size` and `help_url` (from `gside.db._TIERS`). Both `species --auto-setup` and `meta --auto-setup` install the tier once (progress on stderr) and retry that method; meta's batch mode installs on the first sample, then fans out. With an explicit `--db-dir`, auto-setup is skipped (user-managed root). GTDB-Tk's own database is external (`GTDBTK_DATA_PATH`/`GTDBDB`) — it is NOT a `db setup` tier.
+- **Missing-database errors are structured**: alongside `methods.<mode>.error`, the payload carries `suggested_command` / `missing_tier` / `estimated_size` and `help_url` (from `gside.db._TIERS`). `species --auto-setup` installs the tier once (progress on stderr) and retries that method. With an explicit `--db-dir`, auto-setup is skipped (user-managed root). GTDB-Tk's own database is external (`GTDBTK_DATA_PATH`/`GTDBDB`) — it is NOT a `db setup` tier.
 - **`sourmash` needs its GTDB db**: provisioned via pixi (`sourmash>=4.9`) + `gside db setup --tier sourmash` (~3.9GB rs226 reps, renamed in place); `gather` output is read from `-o` file, never `--csv -` (unsupported flag). Confidence comes from the gather containment ANI (`average_containment_ani`, 95/93 bands, shared with panel); the old `f_unique_weighted` 0.90/0.70 bands remain only as a fallback when that column is absent. `possible_mixture` requires >=2 **distinct species** at >=10% with ANI >=93 — multiple strains of one species do not trigger it.
-- **Metagenomic tiers auto-download**: `db setup --tier meta` pulls Ben Langmead's Standard-8 (5.5GB, includes Bracken 50-300mer) and verifies each extracted file against the published md5 list; readiness needs `database150mers.kmer_distrib`. `--tier meta_sylph` pulls the 14GB two-stage GTDB r226 `.syl2db` (MD5 pinned). sylph accepts both `.syldb` and `.syl2db`; `.syl2db` is preferred and needs sylph >= 1.0.
-- **DB download verification**: panel pins SHA256, mash MD5 (Zenodo only publishes MD5), sourmash lineages + signature SHA256, sylph DB MD5 (GCS `x-goog-hash`). Kraken2 is verified per extracted file against the published `.md5` manifest. The sourmash signature zip has no upstream digest; `SOURMASH_SIG_SHA256` was pinned after a locally verified download (complete size, zip integrity, 143,385 k=31 DNA signatures, CC0) and `GSIDE_SOURMASH_SIG_SHA256` overrides it at setup time. Tar extraction uses `filter="data"`. All pinned artifacts live in the GitHub release tag `db-v0.1` (panel) — re-pin `PANEL_SHA256` whenever the release asset is replaced.
+- **DB download verification**: panel pins SHA256, mash MD5 (Zenodo only publishes MD5), sourmash lineages + signature SHA256. The sourmash signature zip has no upstream digest; `SOURMASH_SIG_SHA256` was pinned after a locally verified download (complete size, zip integrity, 143,385 k=31 DNA signatures, CC0) and `GSIDE_SOURMASH_SIG_SHA256` overrides it at setup time. Tar extraction uses `filter="data"`. All pinned artifacts live in the GitHub release tag `db-v0.1` (panel) — re-pin `PANEL_SHA256` whenever the release asset is replaced.
 - **`engine/` holds only live backends**: marker → `BlastBackend`, panel → `SkaniBackend`, mash_refseq/sourmash → `MashBackend`/`SourmashBackend` (analysis resolves binaries via `require_bin` and injects them with `binary=`; backends pass their module-level `which` as `resolver=` so tests can monkeypatch discovery). Shared scaffolding is `engine/_env.py` (`require_bin`/`run_checked`).
 - **Species name contract is `Genus_species`**: every tier emits the underscored label via `analysis/species_name.py` (`apply_species_name`) and keeps the tool string in `species_raw`, the strain in `strain`. The normalizer strips GTDB `s__` ranks, a leading `GCF_/GCA_` accession (sourmash names look like `GCF_... Campylobacter jejuni`), and GTDB disambiguation suffixes (`Campylobacter_D jejuni` → `Campylobacter_jejuni`, `Vibrio_A cholerae` → `Vibrio_cholerae`); `sp.`/`sp036004205`/`unidentified`/`Unknown` collapse to `Unknown`. marker labels are already contract form (`Salmonella_enterica`, `Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`) and pass through untouched — never "reduce" them to two tokens. bacmap's `canonical_from_verdict` only accepts `[A-Za-z]+(?:_[A-Za-z0-9]+)+`, so a spaced or dotted label breaks it.
 - **FASTA header contract**: `>markers~~~<gene>~~~<desc> role=<primary|confirm|typing|virulence|control>`; parser takes `split("~~~")[1]` — the `markers` prefix itself is never validated. `role=control` entries are single-copy depth controls mapped in `metadata.yaml: control_genes`; they never appear in `detected_markers` and are not rule genes.

@@ -345,3 +345,50 @@ def test_gather_shadow_keeps_legacy_when_gseek_fails(tmp_path, monkeypatch, capl
         rows = sm._gather_and_tax("q.fna", db)
     assert rows[0]["species"] == "s__Vibrio parahaemolyticus"
     assert "gseek path failed" in caplog.text
+
+
+class TestConfidenceAndLegacy:
+    def test_medium_band(self, monkeypatch, tmp_path):
+        one = tmp_path / "one"
+        one.mkdir()
+        (one / "gtdb-reps-k31.zip").write_bytes(b"zip")
+        monkeypatch.setattr(
+            sm,
+            "_gather_and_tax",
+            lambda contigs, base: [
+                {"species": "Escherichia coli", "f_unique_weighted": 0.8, "ani": 0.0}
+            ],
+        )
+        r = sm.identify_by_sourmash("q.fna", db_dir=one).result
+        assert r["confidence"] == "medium"
+
+    def test_legacy_gather_missing_csv_is_empty(self, monkeypatch, tmp_path):
+        db_zip = tmp_path / "db.zip"
+        db_zip.write_bytes(b"zip")
+
+        def fake_run(cmd, **kwargs):
+            # "succeed" without writing any output file
+            return None
+
+        monkeypatch.setattr(sm, "_run", fake_run)
+        assert sm._gather_rows_legacy(["q.fna"], db_zip) == []
+
+    def test_shadow_compare_runs(self, monkeypatch, tmp_path):
+        one = tmp_path / "one"
+        one.mkdir()
+        (one / "gtdb-reps-k31.zip").write_bytes(b"zip")
+        (one / "lineages.csv").write_text("a,b\n")
+        monkeypatch.setenv("GSIDE_ENGINE", "shadow")
+        rows = [
+            {
+                "name": "GCF_1 Escherichia coli",
+                "f_unique_weighted": "0.5",
+                "average_containment_ani": "0.96",
+            }
+        ]
+        from gside.engine import gseek_bridge
+
+        monkeypatch.setattr(sm, "_gather_rows_legacy", lambda files, db_zip: list(rows))
+        monkeypatch.setattr(gseek_bridge, "sourmash_gather", lambda files, db_zip: list(rows))
+        r = sm.identify_by_sourmash("q.fna", db_dir=one).result
+        assert r["confidence"] in {"high", "medium", "low"}
