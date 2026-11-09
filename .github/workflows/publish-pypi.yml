@@ -54,9 +54,12 @@ jobs:
             meta = next(n for n in names if n.endswith('METADATA'))
             version = [l for l in z.read(meta).decode().splitlines() if l.startswith('Version:')][0].split(': ')[1]
             assert version == '${GITHUB_REF_NAME#v}', f'wheel version {version} != tag'
-            for asset in ('marker_rules.yaml', 'markers.fasta', 'markers_blastdb.nhr'):
-                assert any(n.endswith(f'gside/data/db/D1_marker/{asset}') for n in names), f'{asset} missing from wheel'
-        print('wheel OK: version', version, '+ bundled marker tier')
+            for sub in ('default', 'cpin'):
+                for asset in ('marker_rules.yaml', 'markers.fasta'):
+                    path = f'gside/data/db/D1_marker/{sub}/{asset}'
+                    assert any(n.endswith(path) for n in names), f'{path} missing from wheel'
+            assert any(n.endswith('gside/data/db/D1_marker/default/markers_blastdb.nhr') for n in names), 'default blastdb missing from wheel'
+        print('wheel OK: version', version, '+ bundled default/cpin marker databases')
         "
 
     - name: Publish to PyPI
