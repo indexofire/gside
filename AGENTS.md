@@ -52,6 +52,13 @@ gside --version
 Check `pixi.toml` for the canonical task definitions — only `docs` / `docs-build`
 exist as pixi tasks; everything else runs via `python -m` or the `gside` script.
 
+**Keep `pixi.lock` in sync and on schema v7.** The lock is generated with
+pixi >= 0.68 (v7), which no longer records an input hash for the editable
+`gside = { path = ".", editable = true }` dependency — that hash used to churn
+on every `pyproject.toml` edit. Manifest changes that alter the solve (version,
+dependencies, platforms, features) still require `pixi lock --no-install`, and
+CI enforces `pixi lock --check`.
+
 ---
 
 ## Lint / Format Commands
