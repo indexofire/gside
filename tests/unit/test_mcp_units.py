@@ -199,7 +199,9 @@ class TestToolHandlers:
         (marker / "marker_rules.yaml").write_text("rules:\n- species: X\n  genes: [g1]\n")
         monkeypatch.setattr(dbmod, "SPECIES_DB_DIR", root)
         payload = json.loads(TOOL_HANDLERS["db_status"]({}))
-        assert set(payload) == {"modes", "tiers"}
+        assert set(payload) == {"modes", "tiers", "root", "root_source"}
+        assert payload["root"] == str(root)
+        assert payload["root_source"] == "custom"
         assert payload["modes"]["marker"][0] == {
             "name": "default",
             "default": True,

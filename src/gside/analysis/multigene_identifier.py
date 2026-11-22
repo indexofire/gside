@@ -106,6 +106,21 @@ def _coerce_marker_dbs(
     return dbs
 
 
+def _ensure_default_marker_db() -> None:
+    """Materialize the wheel-bundled marker DB when the default D1 is absent.
+
+    The default-path constants below point at ``<root>/D1_marker/default``;
+    on a fresh install that root is the empty user data dir, so the wheel
+    seed is copied in before the rules/fasta are read.
+    """
+    if _MARKER_RULES.is_file():
+        return
+    from gside.db import ensure_marker_seed
+
+    # _MARKER_RULES = <root>/D1_marker/default/marker_rules.yaml -> root.
+    ensure_marker_seed(_MARKER_RULES.parents[2])
+
+
 def _db_version(marker_db: MarkerDatabase | None = None) -> str:
     if marker_db is not None:
         return marker_db.version
@@ -474,6 +489,8 @@ def identify_multigene(
     BLAST identity/coverage rules (depth is not available from BLAST hits).
     """
     dbs = _coerce_marker_dbs(marker_db)
+    if not dbs:
+        _ensure_default_marker_db()
     multi = len(dbs) > 1
     db = dbs[0] if len(dbs) == 1 else None
     files = [contigs_fasta] if isinstance(contigs_fasta, str) else list(contigs_fasta)

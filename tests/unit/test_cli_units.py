@@ -418,7 +418,7 @@ class TestDbOutputFormats:
         result = CliRunner().invoke(main, ["db", "status", "--format", "json"])
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert set(payload) == {"modes", "tiers"}
+        assert set(payload) == {"modes", "tiers", "root", "root_source"}
         assert [d["name"] for d in payload["modes"]["marker"]] == ["default", "food"]
         assert payload["modes"]["marker"][0]["ready"] is True
         assert payload["modes"]["ani"][0]["ready"] is False

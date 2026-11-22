@@ -41,13 +41,23 @@ gside db status
 ```
 
 ```
-gside database status
-──────────────────────────────────────────
-  ✅ D1_marker          tier=mini   path=data/db/D1_marker
-  ✅ D2_ani        tier=panel  path=data/db/D2_ani
-  ✅ D3_mash         tier=mash   path=data/db/D3_mash
-  ✅ D4_sourmash     tier=sourmash path=data/db/D4_sourmash
+Database root: ~/.local/share/gside/db (source: xdg)
+
+                gside databases                 
+┌──────────┬──────────┬──────────┬─────────────┬────────────────────────────────┐
+│ MODE     │ DATABASE │ READY    │ INPUTS      │ PATH                           │
+├──────────┼──────────┼──────────┼─────────────┼────────────────────────────────┤
+│ marker   │ default  │ ready    │ FASTA/FASTQ │ …/data/db/D1_marker/default    │
+│ marker   │ cpin     │ ready    │ FASTA/FASTQ │ …/data/db/D1_marker/cpin       │
+│ ani      │ default  │ missing  │ FASTA       │ …/data/db/D2_ani/default       │
+│ mash     │ default  │ missing  │ FASTA/FASTQ │ …/data/db/D3_mash/default      │
+│ sourmash │ default  │ missing  │ FASTA/FASTQ │ …/data/db/D4_sourmash/default  │
+└──────────┴──────────┴──────────┴─────────────┴────────────────────────────────┘
 ```
+
+`db status` 会在表格前给出实际生效的数据库根目录及其来源
+（`env`/`repo`/`xdg`）；`gside db list` 打印同样的表格但不带根目录行。
+`--format json` 会在载荷中额外携带 `root`/`root_source` 字段。
 
 ### 安装/更新
 
@@ -174,12 +184,33 @@ export GTDBTK_DATA_PATH=/path/to/D8_gtdbtk
 
 ## 数据库路径
 
-默认路径可通过环境变量覆盖：
+数据库根目录按以下顺序解析（先命中先用）：
+
+| 优先级 | 来源 | 路径 |
+|---|---|---|
+| 1 | `GSIDE_DB_DIR` | 该值本身 |
+| 2 | `GSIDE_DATA_DIR` | `$GSIDE_DATA_DIR/db` |
+| 3 | 源码检出 | `<repo>/data/db` |
+| 4 | XDG 数据目录 | `$XDG_DATA_HOME/gside/db`，否则 `~/.local/share/gside/db` |
+
+这与 gspec 的 datadir 约定一致：pip 安装的用户把数据库放在 XDG 数据目录
+（由 `gside db setup` 自动创建，权限 0o700），而源码检出继续使用仓库内的
+`data/db`，开发流和已下载的大型数据库不受影响。`$XDG_DATA_HOME` 为相对
+路径或空时按 XDG 规范忽略。
+
+wheel 内置了 marker 档（`D1_marker/default` 与 `D1_marker/cpin`）作为种子：
+全新安装会在首次使用时把它复制进数据库根目录，因此 `gside scan -m marker`
+在任何 `gside db setup` 之前即可工作。
+
+`gside db status` 会报告实际生效的根目录及其来源（`env`/`repo`/`xdg`/
+`custom`）——JSON 里是 `root`/`root_source` 字段，表格是 `Database root:`
+一行；`gside db list` 保持纯数据库视图不变。
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `GSIDE_DATA_DIR` | `<repo>/data` | 标记规则等小型参考数据 |
-| `GSIDE_DB_DIR` | `<data>/db` | 大型数据库（panel/mash） |
+| `GSIDE_DB_DIR` | （见上方顺序） | 数据库根目录覆盖（优先级最高） |
+| `GSIDE_DATA_DIR` | （见上方顺序） | 数据目录覆盖；根目录变为 `<值>/db` |
+| `XDG_DATA_HOME` | `~/.local/share` | 安装版数据库的 XDG 基目录 |
 | `GSIDE_PIXI_BIN` | 自动发现 | 生信二进制目录 |
 
 ## 自定义标记规则

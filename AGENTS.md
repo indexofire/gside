@@ -283,6 +283,7 @@ testpaths = ["tests"]
 
 ## Known Gotchas (read before touching these areas)
 
+- **Database root resolution** (`config.py`): `GSIDE_DB_DIR` > `GSIDE_DATA_DIR/db` > the source checkout's `<repo>/data/db` > `$XDG_DATA_HOME/gside/db` > `~/.local/share/gside/db` (gspec datadir convention). The wheel bundles `D1_marker` (`BUNDLED_DB_ROOT`) as a seed materialized into the root on first use (`db.ensure_marker_seed`), so fresh installs work before `db setup`; `db status` reports `root`/`root_source` (env/repo/xdg/custom), `db list` does not.
 - **Binary discovery**: `GSIDE_PIXI_BIN` env → repo `.pixi/envs/default/bin` → `~/.pixi/envs/default/bin` → `PATH` (`config.py`). There is no machine-specific path in the package; point `GSIDE_PIXI_BIN` at a conda env when the tools live elsewhere.
 - **gseek is the default engine**: `GSIDE_ENGINE=gseek` uses `gseek.align` for marker BLAST + FASTQ screening and `gseek.distance(external_reference=True)` for mash/sourmash/skani; `legacy` keeps the subprocess backends and `shadow` runs both, logs differences, and returns legacy — both are debug-only. All gseek-backed modes (marker, mash, sourmash, panel) use gseek; gtdbtk has no gseek adapter. gseek>=0.10.4 is a runtime dependency (0.10.4 pins the index-cache security hardening). See `docs/development/gseek-migration.md`.
 - **`gside species` never fails loud**: check `methods.<mode>.error` in JSON, not the exit code.

@@ -248,7 +248,15 @@ def default_marker_db(path: str | Path | None = None) -> MarkerDatabase:
         return resolved
     from gside.config import SPECIES_DB_DIR
 
-    db = MarkerDatabase.from_path(SPECIES_DB_DIR / "D1_marker" / "default")
+    d1_default = SPECIES_DB_DIR / "D1_marker" / "default"
+    if not d1_default.is_dir():
+        # Fresh install: the root is the (empty) user data dir, and the wheel
+        # carries D1_marker as a seed for exactly this root — materialize it
+        # so marker mode works before any `gside db setup`.
+        from gside.db import ensure_marker_seed
+
+        ensure_marker_seed(SPECIES_DB_DIR)
+    db = MarkerDatabase.from_path(d1_default)
     return MarkerDatabase(
         root=db.root,
         fasta=db.fasta,

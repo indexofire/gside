@@ -42,15 +42,23 @@ gside db status
 ```
 
 ```
-gside database status
-───────────────────────────────────────────────
-  ✅ D1_marker          tier=mini   path=data/db/D1_marker
-  ✅ D2_ani        tier=panel  path=data/db/D2_ani
-  ✅ D3_mash         tier=mash   path=data/db/D3_mash
-  ✅ D4_sourmash     tier=sourmash path=data/db/D4_sourmash
+Database root: ~/.local/share/gside/db (source: xdg)
 
-  Run 'gside db setup --tier <tier>' to provision
+                gside databases                 
+┌──────────┬──────────┬──────────┬─────────────┬────────────────────────────────┐
+│ MODE     │ DATABASE │ READY    │ INPUTS      │ PATH                           │
+├──────────┼──────────┼──────────┼─────────────┼────────────────────────────────┤
+│ marker   │ default  │ ready    │ FASTA/FASTQ │ …/data/db/D1_marker/default    │
+│ marker   │ cpin     │ ready    │ FASTA/FASTQ │ …/data/db/D1_marker/cpin       │
+│ ani      │ default  │ missing  │ FASTA       │ …/data/db/D2_ani/default       │
+│ mash     │ default  │ missing  │ FASTA/FASTQ │ …/data/db/D3_mash/default      │
+│ sourmash │ default  │ missing  │ FASTA/FASTQ │ …/data/db/D4_sourmash/default  │
+└──────────┴──────────┴──────────┴─────────────┴────────────────────────────────┘
 ```
+
+`db status` prepends the effective database root and its source
+(`env`/`repo`/`xdg`); `gside db list` prints the same table without the
+root line. `--format json` adds `root`/`root_source` keys to the payload.
 
 ### Install / update
 
@@ -184,12 +192,35 @@ the two environment variables above and records per-tool status in
 
 ## Database Paths
 
-Default paths can be overridden via environment variables:
+The database root resolves in this order (first hit wins):
+
+| Priority | Source | Path |
+|---|---|---|
+| 1 | `GSIDE_DB_DIR` | the value itself |
+| 2 | `GSIDE_DATA_DIR` | `$GSIDE_DATA_DIR/db` |
+| 3 | Source checkout | `<repo>/data/db` |
+| 4 | XDG data home | `$XDG_DATA_HOME/gside/db`, else `~/.local/share/gside/db` |
+
+This follows the gspec datadir convention: pip-installed users get databases
+under their XDG data home (created automatically by `gside db setup`,
+mode 0o700), while a source checkout keeps using the repo's `data/db` so
+development workflows and already-provisioned large databases keep working.
+A relative or empty `$XDG_DATA_HOME` is ignored per the XDG Base Directory
+specification.
+
+The wheel bundles the marker tier (`D1_marker/default` + `D1_marker/cpin`)
+as a seed: on a fresh install it is copied into the database root on first
+use, so `gside scan -m marker` works before any `gside db setup`.
+
+`gside db status` reports the effective root and where it came from
+(`env`/`repo`/`xdg`/`custom`) — JSON as `root`/`root_source`, table as a
+`Database root:` line; `gside db list` keeps the plain database view.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GSIDE_DATA_DIR` | `<repo>/data` | Small reference data (marker rules) |
-| `GSIDE_DB_DIR` | `<data>/db` | Large databases (panel/mash) |
+| `GSIDE_DB_DIR` | (see order above) | Database root override (wins over everything) |
+| `GSIDE_DATA_DIR` | (see order above) | Data dir override; root becomes `<value>/db` |
+| `XDG_DATA_HOME` | `~/.local/share` | XDG base dir for installed-package databases |
 | `GSIDE_PIXI_BIN` | Auto-detected | Bioinformatics binary directory |
 
 ## Custom Marker Rules

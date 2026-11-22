@@ -785,8 +785,14 @@ class TestFormatStatus:
 
     def test_json_is_database_view(self, root):
         payload = json.loads(db.format_status("json"))
-        assert set(payload) == {"modes", "tiers"}
+        assert set(payload) == {"modes", "tiers", "root", "root_source"}
         assert "marker" in payload["modes"]
+        assert payload["root"] == str(db.SPECIES_DB_DIR)
+
+    def test_table_prepends_database_root(self, root, capsys):
+        run_db_command(["status"])
+        out = capsys.readouterr().out
+        assert out.splitlines()[0].startswith("Database root:")
 
     def test_json_matches_cli_table_source(self, root, capsys):
         run_db_command(["status"])

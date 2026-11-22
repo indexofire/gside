@@ -33,7 +33,7 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from .config import SPECIES_DB_DIR, which
+from .config import BUNDLED_DB_ROOT, SPECIES_DB_DIR, db_root_source, which
 
 _MANIFEST_DIR = SPECIES_DB_DIR / "D2_ani" / "manifests"
 
@@ -138,10 +138,58 @@ _COMPONENTS: dict[str, tuple[str, str, list[list[tuple[str, Callable[[Path], boo
 }
 
 
+def ensure_db_root(root: Path | str | None = None) -> Path:
+    """Create the database root when absent (private: 0o700, gspec recipe).
+
+    Databases affect identification results, so a fresh root is owner-only
+    by default; sharing it across users is an explicit chmod/ACL decision.
+    """
+    target = SPECIES_DB_DIR if root is None else Path(root)
+    target.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return target
+
+
+def ensure_marker_seed(root: Path | str | None = None) -> list[str]:
+    """Copy the wheel-bundled ``D1_marker`` databases into *root* when missing.
+
+    Fresh installs resolve the root to the user's XDG data dir, which starts
+    empty; the wheel ships the marker tier as a seed so marker mode (and the
+    lazy BLAST index build, which needs a writable DB directory) works before
+    any ``gside db setup``. Returns the database names it copied. Best-effort:
+    copy failures are swallowed — a read-only root only loses seeding, the
+    command itself keeps reporting whatever is actually on disk.
+    """
+    target_root = (SPECIES_DB_DIR if root is None else Path(root)).expanduser()
+    bundled = BUNDLED_DB_ROOT / "D1_marker"
+    if not bundled.is_dir():
+        return []
+    materialized: list[str] = []
+    for bundled_db in sorted(bundled.iterdir()):
+        if not bundled_db.is_dir():
+            continue
+        target = target_root / "D1_marker" / bundled_db.name
+        if target.exists():
+            continue
+        try:
+            ensure_db_root(target_root)
+            shutil.copytree(bundled_db, target)
+        except OSError:
+            continue
+        materialized.append(bundled_db.name)
+    return materialized
+
+
 def _component_ready(component: str) -> bool:
     _, dir_name, groups = _COMPONENTS[component]
-    base = SPECIES_DB_DIR / dir_name
-    return any(all(pred(base / rel) for rel, pred in group) for group in groups)
+
+    def any_group(base: Path) -> bool:
+        return any(all(pred(base / rel) for rel, pred in group) for group in groups)
+
+    if any_group(SPECIES_DB_DIR / dir_name):
+        return True
+    # The marker tier also ships inside the wheel: a fresh install whose root
+    # has not been seeded yet can still serve it from the bundled copy.
+    return component == "D1_marker" and any_group(BUNDLED_DB_ROOT / dir_name)
 
 
 def _check_panel() -> bool:
@@ -175,6 +223,10 @@ def db_setup(tier: str = "panel", source: str = "") -> dict[str, str]:
     # Installers are resolved by name at call time on purpose: tests monkeypatch
     # the module-level downloaders, so they must not be captured in a table.
     results: dict[str, str] = {}
+    if tier == "mini":
+        seeded = ensure_marker_seed()
+        if seeded:
+            results["D1_marker"] = f"materialized from bundled wheel data: {', '.join(seeded)}"
     if tier in ("panel", "all"):
         results["D2_ani"] = _setup_component("D2_ani", _install_panel, source)
     if tier in ("mash", "all"):
@@ -195,6 +247,7 @@ def _setup_component(component: str, install: Callable[[Path], str], source: str
         return _copy_from_source(source, dir_name)
 
     dst = SPECIES_DB_DIR / dir_name
+    ensure_db_root()
     dst.mkdir(parents=True, exist_ok=True)
     return install(dst)
 
@@ -543,26 +596,15 @@ def format_databases(fmt: str) -> str:
     Every row is a database ``-d [MODE:]NAME`` can select: the default tier
     database plus the named databases under ``data/db/<family>/``. The JSON
     view additionally carries the installable ``tiers`` (``db setup``) so
-    machine consumers keep sizes and descriptions.
+    machine consumers keep sizes and descriptions. Rendering also
+    materializes the wheel-bundled marker seed so readiness is truthful on a
+    fresh install.
     """
-    from gside.db_registry import DEFAULT_NAME, enumerate_databases
-
     _check_format(fmt)
-    rows = _database_rows()
+    ensure_marker_seed()
     if fmt == "json":
-        modes: dict[str, list[dict[str, Any]]] = {}
-        for mode, choices in enumerate_databases(root=SPECIES_DB_DIR).items():
-            modes[mode] = [
-                {
-                    "name": c.name,
-                    "default": c.name == DEFAULT_NAME,
-                    "ready": c.ready,
-                    "path": str(c.path),
-                }
-                for c in choices
-            ]
-        tiers = {name: {**info, "inputs": _TIER_INPUTS[name]} for name, info in _TIERS.items()}
-        return json.dumps({"modes": modes, "tiers": tiers}, indent=2, ensure_ascii=False)
+        return json.dumps(_databases_payload(), indent=2, ensure_ascii=False)
+    rows = _database_rows()
     if fmt == "tsv":
         lines = ["MODE\tDATABASE\tREADY\tINPUTS\tPATH"]
         lines += ["\t".join(row) for row in rows]
@@ -584,9 +626,45 @@ def format_databases(fmt: str) -> str:
     )
 
 
+def _databases_payload() -> dict[str, Any]:
+    """The JSON document behind ``db list``/``db status`` (modes + tiers)."""
+    from gside.db_registry import DEFAULT_NAME, enumerate_databases
+
+    modes: dict[str, list[dict[str, Any]]] = {}
+    for mode, choices in enumerate_databases(root=SPECIES_DB_DIR).items():
+        modes[mode] = [
+            {
+                "name": c.name,
+                "default": c.name == DEFAULT_NAME,
+                "ready": c.ready,
+                "path": str(c.path),
+            }
+            for c in choices
+        ]
+    tiers = {name: {**info, "inputs": _TIER_INPUTS[name]} for name, info in _TIERS.items()}
+    return {"modes": modes, "tiers": tiers}
+
+
 def format_status(fmt: str) -> str:
-    """``db status`` renders the same view as ``db list`` (hidden alias)."""
-    return format_databases(fmt)
+    """``db status``: the same database view plus the effective root.
+
+    JSON adds ``root``/``root_source`` (env/repo/xdg/custom); the table
+    prepends a ``Database root:`` line; tsv/csv keep the machine schema
+    unchanged (read the root from JSON when needed). ``db list`` renders the
+    plain view without root reporting.
+    """
+    _check_format(fmt)
+    if fmt == "json":
+        ensure_marker_seed()
+        payload: dict[str, Any] = _databases_payload()
+        payload["root"] = str(SPECIES_DB_DIR)
+        payload["root_source"] = db_root_source(SPECIES_DB_DIR)
+        return json.dumps(payload, indent=2, ensure_ascii=False)
+    if fmt in ("tsv", "csv"):
+        return format_databases(fmt)
+    table = format_databases("table")
+    source = db_root_source(SPECIES_DB_DIR)
+    return f"Database root: {SPECIES_DB_DIR} (source: {source})\n\n{table}"
 
 
 def _render_table(

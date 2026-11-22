@@ -45,7 +45,8 @@ TOOLS: list[dict[str, object]] = [
     ),
     _tool_entry(
         "db_status",
-        "Check database readiness status. Returns JSON with per-tier ready/path/tier info.",
+        "Check database readiness status. Returns JSON with per-tier ready/path/tier"
+        " info plus the effective database root and its source (env/repo/xdg).",
         dict(format=_FORMAT),
     ),
     _tool_entry(
