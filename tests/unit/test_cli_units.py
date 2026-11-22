@@ -510,6 +510,9 @@ class TestRemainingBranches:
             "basis": ["a", "b"],
             "supporting": [],
             "agreement": "0/0",
+            "scope": "unknown",
+            "alternatives": [],
+            "ambiguity_reason": None,
         }
 
     def test_setup_with_source(self, tmp_path, monkeypatch):
@@ -1342,3 +1345,92 @@ class TestDbSetupTargetResolution:
         result = CliRunner().invoke(main, ["db", "setup", "-d", "wat"])
         assert result.exit_code == 2
         assert "unknown database" in result.output
+
+
+class TestVerdictSemantics:
+    def test_genus_label_reports_genus_scope(self):
+        from gside.cli import _verdict_for
+
+        verdict = _verdict_for({"marker": {"species": "Shigella", "confidence": "high"}})
+        assert verdict["species"] == "Shigella"
+        assert verdict["scope"] == "genus"
+        assert verdict["alternatives"] == []
+        assert verdict["ambiguity_reason"] is None
+
+    def test_species_call_has_species_scope_and_no_alternatives(self):
+        from gside.cli import _verdict_for
+
+        verdict = _verdict_for(
+            {"ani": {"result": {"species": "Vibrio_cholerae", "confidence": "high"}}}
+        )
+        assert verdict["scope"] == "species"
+        assert verdict["alternatives"] == []
+        assert verdict["ambiguity_reason"] is None
+
+    def test_unknown_call_reports_unknown_scope(self):
+        from gside.cli import _verdict_for
+
+        verdict = _verdict_for({"marker": {"species": "Unknown", "confidence": "low"}})
+        assert verdict["scope"] == "unknown"
+        assert verdict["alternatives"] == []
+        assert verdict["ambiguity_reason"] is None
+
+    def test_close_species_disagreement_becomes_complex_with_alternative(self):
+        from gside.cli import _arbitrate
+
+        verdict = _arbitrate(
+            {
+                "ani": {
+                    "result": {
+                        "species": "Escherichia_coli",
+                        "confidence": "high",
+                        "ani": 99.5,
+                        "aligned_fraction": 0.91,
+                    }
+                },
+                "mash": {
+                    "result": {
+                        "species": "Shigella",
+                        "confidence": "high",
+                        "identity": 0.981,
+                    }
+                },
+            }
+        )
+        assert verdict["species"] == "Escherichia_coli"
+        assert verdict["scope"] == "complex"
+        assert verdict["ambiguity_reason"] == "same_genomic_species_complex"
+        assert verdict["alternatives"] == [
+            {
+                "species": "Shigella",
+                "methods": ["mash"],
+                "confidence": "high",
+                "evidence": {"mash": {"identity": 0.981}},
+            }
+        ]
+
+    def test_botulinum_group_disagreement_is_reported_as_complex(self):
+        from gside.cli import _arbitrate
+
+        verdict = _arbitrate(
+            {
+                "ani": {"result": {"species": "Clostridium_botulinum", "confidence": "high"}},
+                "mash": {"result": {"species": "Clostridium_haemolyticum", "confidence": "high"}},
+            }
+        )
+        assert verdict["scope"] == "complex"
+        assert verdict["ambiguity_reason"] == "clostridium_botulinum_complex"
+        assert [a["species"] for a in verdict["alternatives"]] == ["Clostridium_haemolyticum"]
+
+    def test_exact_agreement_is_not_marked_ambiguous(self):
+        from gside.cli import _arbitrate
+
+        verdict = _arbitrate(
+            {
+                "ani": {"result": {"species": "Listeria_monocytogenes", "confidence": "high"}},
+                "mash": {"result": {"species": "Listeria_monocytogenes", "confidence": "high"}},
+            }
+        )
+        assert verdict["scope"] == "species"
+        assert verdict["alternatives"] == []
+        assert verdict["ambiguity_reason"] is None

@@ -1013,6 +1013,142 @@ def _species_of(payload: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
     return res.get("species", "Unknown"), res.get("confidence", "low"), res
 
 
+# Deliberate genus-level labels: the evidence below species rank belongs to the
+# typing tool (gspec), so the verdict says what it actually knows.
+_GENUS_SCOPE_LABELS = frozenset({"Salmonella", "Shigella"})
+
+# Benchmark-informed close-relative groups. When successful methods disagree
+# inside one group, the winner stays in ``species`` for backward compatibility,
+# but the verdict gains ``scope: complex``, the competing labels in
+# ``alternatives``, and a machine-readable ``ambiguity_reason``.
+_TAXONOMIC_COMPLEXES: tuple[tuple[frozenset[str], str], ...] = (
+    (
+        frozenset(
+            {
+                "Escherichia_coli",
+                "Shigella",
+                "Shigella_flexneri",
+                "Shigella_sonnei",
+                "Shigella_boydii",
+                "Shigella_dysenteriae",
+            }
+        ),
+        "same_genomic_species_complex",
+    ),
+    (
+        frozenset(
+            {
+                "Clostridium_botulinum",
+                "Clostridium_haemolyticum",
+                "Clostridium_combesii",
+                "Clostridium_caccae",
+                "Clostridium_novyi",
+                "Clostridium_sporogenes",
+            }
+        ),
+        "clostridium_botulinum_complex",
+    ),
+    (frozenset({"Enterococcus_faecium", "Enterococcus_lactis"}), "close_species_complex"),
+    (
+        frozenset({"Burkholderia_pseudomallei", "Burkholderia_mallei"}),
+        "close_species_complex",
+    ),
+    (
+        frozenset({"Vibrio_cholerae", "Vibrio_paracholerae"}),
+        "close_species_complex",
+    ),
+    (
+        frozenset({"Aeromonas_hydrophila", "Aeromonas_oralensis"}),
+        "close_species_complex",
+    ),
+    (
+        frozenset({"Legionella_pneumophila", "Legionella_fraseri", "Legionella_pascullei"}),
+        "close_species_complex",
+    ),
+    (
+        frozenset(
+            {"Haemophilus_influenzae", "Haemophilus_parainfluenzae", "Haemophilus_aegyptius"}
+        ),
+        "close_species_complex",
+    ),
+)
+
+_VERDICT_EVIDENCE_KEYS = (
+    "ani",
+    "identity",
+    "aligned_fraction",
+    "f_unique_weighted",
+)
+
+
+def _scope_for_species(species: str) -> str:
+    """Evidence granularity of a verdict label."""
+    if species == "Unknown":
+        return "unknown"
+    if species in _GENUS_SCOPE_LABELS:
+        return "genus"
+    return "species"
+
+
+def _complex_reason(labels: set[str]) -> str | None:
+    """Ambiguity reason when every label belongs to one close-relative group."""
+    for members, reason in _TAXONOMIC_COMPLEXES:
+        if labels <= members:
+            return reason
+    return None
+
+
+def _method_evidence(result: dict[str, Any]) -> dict[str, Any]:
+    evidence = {key: result[key] for key in _VERDICT_EVIDENCE_KEYS if result.get(key) is not None}
+    return evidence
+
+
+def _verdict_semantics(
+    species: str,
+    successful: dict[str, str],
+    results: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """``scope``/``alternatives``/``ambiguity_reason`` for an arbitrated call.
+
+    Exact agreement keeps ``scope`` at species/genus level. A disagreement inside
+    a known close-relative group upgrades scope to ``complex`` and records the
+    competing labels with their methods and numeric evidence.
+    """
+    labels = {species, *(value for value in successful.values() if value != "Unknown")}
+    reason = _complex_reason(labels) if len(labels) > 1 else None
+    if reason is None:
+        return {
+            "scope": _scope_for_species(species),
+            "alternatives": [],
+            "ambiguity_reason": None,
+        }
+
+    grouped = sorted(label for label in labels if label != species)
+    alternatives: list[dict[str, Any]] = []
+    for alternative in grouped:
+        modes = sorted(mode for mode, label in successful.items() if label == alternative)
+        best_confidence = "low"
+        evidence: dict[str, Any] = {}
+        for mode in modes:
+            _, confidence, result = _species_of(results[mode])
+            if _CONF_RANK.get(confidence, 0) > _CONF_RANK.get(best_confidence, 0):
+                best_confidence = confidence
+            evidence[mode] = _method_evidence(result)
+        alternatives.append(
+            {
+                "species": alternative,
+                "methods": modes,
+                "confidence": best_confidence,
+                "evidence": evidence,
+            }
+        )
+    return {
+        "scope": "complex",
+        "alternatives": alternatives,
+        "ambiguity_reason": reason,
+    }
+
+
 def _verdict_payload(
     species: str,
     confidence: str,
@@ -1030,6 +1166,9 @@ def _verdict_payload(
         "basis": basis,
         "supporting": supporting,
         "agreement": agreement,
+        "scope": _scope_for_species(species),
+        "alternatives": [],
+        "ambiguity_reason": None,
     }
 
 
@@ -1161,7 +1300,9 @@ def _arbitrate(results: dict[str, Any]) -> dict[str, Any]:
     mode, species, conf, res = winner
     supporting = sorted(m for m, s in successful.items() if m != mode and s == species)
     agreement = f"{1 + len(supporting)}/{len(successful)}"
-    return _verdict_payload(species, conf, res.get("strain"), [mode], supporting, agreement)
+    verdict = _verdict_payload(species, conf, res.get("strain"), [mode], supporting, agreement)
+    verdict.update(_verdict_semantics(species, successful, results))
+    return verdict
 
 
 if __name__ == "__main__":

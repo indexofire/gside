@@ -45,7 +45,10 @@ applies.
   "confidence": "high",
   "basis": ["panel"],
   "supporting": ["marker", "sourmash"],
-  "agreement": "3/3"
+  "agreement": "3/3",
+  "scope": "species",
+  "alternatives": [],
+  "ambiguity_reason": null
 }
 ```
 
@@ -57,9 +60,15 @@ applies.
 | `basis` | The single method that produced the call (winners only) |
 | `supporting` | Other successful methods that agree on `species` |
 | `agreement` | `agreeing/successful` — `2/3` means one tier disagreed or failed |
+| `scope` | Evidence granularity: `species` / `genus` / `complex` / `unknown` |
+| `alternatives` | Competing labels when methods disagree in a close-relative group |
+| `ambiguity_reason` | Stable machine reason for a complex call; `null` when methods agree |
 
 `methods.<mode>.error` explains a failed method; `species`/`display_name` stay
-`Unknown` when nothing was called. Field-by-field details:
+`Unknown` when nothing was called. `Salmonella` and `Shigella` are deliberate
+genus-level calls (typing belongs to gspec); close-relative disagreements keep
+the arbitrated winner in `species` and expose the competing labels in
+`alternatives`. Field-by-field details:
 [JSON Output Contract](../reference/json-contract.md).
 
 ### Arguments

@@ -40,7 +40,10 @@ Example with `-m marker` (marker results are flat; no `result` wrapper):
     "confidence": "high",
     "basis": ["marker"],
     "supporting": [],
-    "agreement": "1/1"
+    "agreement": "1/1",
+    "scope": "species",
+    "alternatives": [],
+    "ambiguity_reason": null
   }
 }
 ```
@@ -110,10 +113,53 @@ A single-database selection (the default) omits `databases` entirely.
     "confidence": "high",
     "basis": ["panel"],
     "supporting": ["mash_refseq"],
-    "agreement": "2/2"
+    "agreement": "2/2",
+    "scope": "species",
+    "alternatives": [],
+    "ambiguity_reason": null
   }
 }
 ```
+
+## Verdict scope, alternatives, and ambiguity
+
+`verdict` states the **evidence granularity**, not only a label:
+
+| `scope` | Meaning |
+|---|---|
+| `species` | The winning evidence supports a binomial call |
+| `genus` | gside deliberately stops at genus (`Salmonella`, `Shigella`); serovar/pathotype typing belongs to gspec |
+| `complex` | Successful methods disagree inside a known close-relative group; the winner stays in `species`, competing labels move to `alternatives` |
+| `unknown` | No method produced a call |
+
+When methods disagree inside a close-relative group, the label selected by the
+layer arbitration remains backward-compatible in `species`, while the competing
+labels are reported explicitly:
+
+```json
+"verdict": {
+  "species": "Escherichia_coli",
+  "scope": "complex",
+  "confidence": "high",
+  "basis": ["ani"],
+  "supporting": [],
+  "agreement": "1/2",
+  "alternatives": [
+    {
+      "species": "Shigella",
+      "methods": ["mash"],
+      "confidence": "high",
+      "evidence": {"mash": {"identity": 0.981}}
+    }
+  ],
+  "ambiguity_reason": "same_genomic_species_complex"
+}
+```
+
+`ambiguity_reason` is a stable machine value (`same_genomic_species_complex`,
+`clostridium_botulinum_complex`, `close_species_complex`) and is `null` when
+the successful methods agree. `alternatives` is empty unless `scope` is
+`complex`.
 
 ## Multiple Inputs (Samples)
 
@@ -156,12 +202,19 @@ per sample instead of nested objects.
 | `verdict.basis` | list[str] | The single method that produced the verdict |
 | `verdict.supporting` | list[str] | Other successful methods that agree on `verdict.species` |
 | `verdict.agreement` | str | `agreeing/successful`, e.g. `2/3` (exact label match) |
+| `verdict.scope` | str | Evidence granularity: `species` / `genus` / `complex` / `unknown` |
+| `verdict.alternatives` | list[dict] | Competing labels when methods disagree in a close-relative group |
+| `verdict.alternatives[].species` | str | Canonical competing label |
+| `verdict.alternatives[].methods` | list[str] | Modes that produced the alternative |
+| `verdict.alternatives[].confidence` | str | Highest confidence among those modes |
+| `verdict.alternatives[].evidence` | dict | Numeric method evidence (`ani`, `identity`, `aligned_fraction`, `f_unique_weighted`) |
+| `verdict.ambiguity_reason` | str \| null | Stable machine reason; `null` when methods agree |
 
 `agreement` compares canonical labels exactly. Marker rules now emit
-species-level labels (genus-level `Shigella` only as the fallback when no
-species marker is detected), so marker and the ANI/sketch tiers agree on the
-same string. Pathotype/serotype typing (DEC, EIEC, Shigella serotypes) is
-gspec's job, not gside's.
+species-level labels, except the deliberate genus labels `Salmonella` and
+`Shigella`. Serovar/pathotype typing belongs to gspec; `verdict.scope` says
+explicitly whether the evidence supports a species, a genus, or a close-relative
+complex.
 
 ## Species name contract
 

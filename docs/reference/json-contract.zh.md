@@ -47,9 +47,9 @@ marker 结果额外携带 reads 模式深度门控字段（`control_gene`、`con
           "coverage": 100.0
         }
       ],
-      "all_hits": [...],
+      "matched_rule": "hipo+cadf+mapa (3/2 required)",
       "notes": [],
-      "rule_evidence": "hipo+cadf+mapa (3/2 required)"
+      "interpretation": "Identified as Campylobacter jejuni (confidence: high)."
     }
   },
   "verdict": {
@@ -59,7 +59,10 @@ marker 结果额外携带 reads 模式深度门控字段（`control_gene`、`con
     "confidence": "high",
     "basis": ["marker"],
     "supporting": [],
-    "agreement": "1/1"
+    "agreement": "1/1",
+    "scope": "species",
+    "alternatives": [],
+    "ambiguity_reason": null
   }
 }
 ```
@@ -107,10 +110,51 @@ marker 结果额外携带 reads 模式深度门控字段（`control_gene`、`con
     "confidence": "high",
     "basis": ["panel"],
     "supporting": ["mash_refseq"],
-    "agreement": "2/2"
+    "agreement": "2/2",
+    "scope": "species",
+    "alternatives": [],
+    "ambiguity_reason": null
   }
 }
 ```
+
+## verdict 的范围、候选与歧义
+
+`verdict` 不仅给出标签，还声明**证据粒度**：
+
+| `scope` | 含义 |
+|---|---|
+| `species` | 证据支持二名法种级判定 |
+| `genus` | gside 有意只判到属（`Salmonella`、`Shigella`）；血清型/致病型分型属于 gspec |
+| `complex` | 多个成功方法在已知近缘群内不一致；胜者仍写入 `species`，其余标签进入 `alternatives` |
+| `unknown` | 没有任何方法给出判定 |
+
+当方法在近缘群内不一致时，为了兼容既有消费者，`species` 仍保留分层仲裁
+选出的标签，同时显式列出竞争标签：
+
+```json
+"verdict": {
+  "species": "Escherichia_coli",
+  "scope": "complex",
+  "confidence": "high",
+  "basis": ["ani"],
+  "supporting": [],
+  "agreement": "1/2",
+  "alternatives": [
+    {
+      "species": "Shigella",
+      "methods": ["mash"],
+      "confidence": "high",
+      "evidence": {"mash": {"identity": 0.981}}
+    }
+  ],
+  "ambiguity_reason": "same_genomic_species_complex"
+}
+```
+
+`ambiguity_reason` 是稳定的机器值（`same_genomic_species_complex`、
+`clostridium_botulinum_complex`、`close_species_complex`）；方法一致时为
+`null`。只有 `scope == "complex"` 时 `alternatives` 非空。
 
 ## 多输入（样本）
 
@@ -148,6 +192,13 @@ tsv`/`md`/`csv` 每个样本渲染一行，而非嵌套对象。
 | `verdict.basis` | list[str] | 产生该判定的方法（单个） |
 | `verdict.supporting` | list[str] | 其他成功且与 `verdict.species` 一致的方法 |
 | `verdict.agreement` | str | `一致数/成功数`，如 `2/3`（按标签精确匹配） |
+| `verdict.scope` | str | 证据粒度：`species` / `genus` / `complex` / `unknown` |
+| `verdict.alternatives` | list[dict] | 近缘群内方法不一致时的竞争标签 |
+| `verdict.alternatives[].species` | str | 规范竞争标签 |
+| `verdict.alternatives[].methods` | list[str] | 给出该候选的方法 |
+| `verdict.alternatives[].confidence` | str | 这些方法中的最高置信度 |
+| `verdict.alternatives[].evidence` | dict | 数值证据（`ani`、`identity`、`aligned_fraction`、`f_unique_weighted`） |
+| `verdict.ambiguity_reason` | str \| null | 稳定机器原因；方法一致时为 `null` |
 
 `agreement` 按规范标签精确比对。marker 规则现在输出种级标签（仅在无种特异
 标记时回退到属级 `Shigella`），因此 marker 与 ANI/sketch 层使用同一字符串。
@@ -167,8 +218,9 @@ DEC/EIEC、志贺菌血清型等致病型/血清型分型属于 gspec，不在 g
 | gtdbtk | `Vibrio cholerae` | `Vibrio_cholerae` |
 
 marker 注册标签本身即契约形式：`Salmonella`、
-`Vibrio_parahaemolyticus`、`Escherichia_coli`、`Shigella`。志贺菌有意只到
-属级——种/血清型分型属于 gspec，并在 `methods.marker.notes` 中注明。菌株/登录号
+`Vibrio_parahaemolyticus`、`Escherichia_coli`、`Shigella`。`Salmonella` 与
+`Shigella` 是有意的属级标签——血清型/致病型分型属于 gspec；
+`verdict.scope` 明确说明证据支持种、属还是近缘 complex。菌株/登录号
 文本绝不拼进 `species`（点号会破坏下游匹配），统一放入 `strain`。
 种组占位（`Campylobacter sp.`）与 `Unknown` 一律输出 `Unknown`。
 

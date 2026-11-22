@@ -42,7 +42,10 @@ gside scan <files...> [选项]
   "confidence": "high",
   "basis": ["panel"],
   "supporting": ["marker", "sourmash"],
-  "agreement": "3/3"
+  "agreement": "3/3",
+  "scope": "species",
+  "alternatives": [],
+  "ambiguity_reason": null
 }
 ```
 
@@ -54,9 +57,14 @@ gside scan <files...> [选项]
 | `basis` | 产生判定的单个方法（仅胜出者） |
 | `supporting` | 其他成功且与 `species` 一致的方法 |
 | `agreement` | `一致数/成功数`——`2/3` 表示有一层不一致或失败 |
+| `scope` | 证据粒度：`species` / `genus` / `complex` / `unknown` |
+| `alternatives` | 近缘群内方法不一致时的竞争标签 |
+| `ambiguity_reason` | complex 判定的稳定机器原因；方法一致时为 `null` |
 
 `methods.<mode>.error` 说明失败的方法；没有任何判定时 `species` 为
-`Unknown`。逐字段说明见 [JSON 输出契约](../reference/json-contract.md)。
+`Unknown`。`Salmonella` 与 `Shigella` 是有意的属级判定（分型交给 gspec）；
+近缘方法不一致时，仲裁胜者仍保留在 `species`，竞争标签写入
+`alternatives`。逐字段说明见 [JSON 输出契约](../reference/json-contract.md)。
 
 ### 参数
 
