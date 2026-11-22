@@ -18,8 +18,10 @@ import json
 import logging
 import shutil
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +34,31 @@ SCHEMA = "gside.validate/1"
 _CHECKM2_TIMEOUT = 600
 _GTDBTK_TIMEOUT = 3600
 _VERSION_TIMEOUT = 30
+
+
+class ToolStatus(StrEnum):
+    """Per-tool execution state for assembly validation."""
+
+    MISSING = "missing"
+    FAILED = "failed"
+    OK = "ok"
+
+
+class ValidationStatus(StrEnum):
+    """Aggregate report state derived from per-tool statuses."""
+
+    OK = "ok"
+    PARTIAL = "partial"
+    ERROR = "error"
+
+
+class QualityVerdict(StrEnum):
+    """CheckM2 completeness/contamination quality tier."""
+
+    PASS = "PASS"
+    CHECK = "CHECK"
+    WARNING = "WARNING"
+    UNKNOWN = "UNKNOWN"
 
 
 @dataclass
@@ -103,7 +130,7 @@ def _as_float(value: str | None) -> float | None:
 def _run_checkm2(contigs_path: str, output_dir: Path, threads: int = 4) -> dict[str, Any]:
     """Run CheckM2; returns status/completeness/contamination/version/error."""
     result: dict[str, Any] = {
-        "status": "missing",
+        "status": ToolStatus.MISSING,
         "completeness": None,
         "contamination": None,
         "version": "",
@@ -141,14 +168,16 @@ def _run_checkm2(contigs_path: str, output_dir: Path, threads: int = 4) -> dict[
             env={**__import__("os").environ, "PATH": pixi_path()},
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        result.update(status="failed", error=f"CheckM2 failed: {exc}")
+        result.update(status=ToolStatus.FAILED, error=f"CheckM2 failed: {exc}")
         return result
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "").strip()[:300]
-        result.update(status="failed", error=f"CheckM2 failed (exit {proc.returncode}): {detail}")
+        result.update(
+            status=ToolStatus.FAILED, error=f"CheckM2 failed (exit {proc.returncode}): {detail}"
+        )
         return result
     if not tsv_path.is_file():
-        result.update(status="failed", error="CheckM2 produced no checkm2_results.tsv")
+        result.update(status=ToolStatus.FAILED, error="CheckM2 produced no checkm2_results.tsv")
         return result
 
     row = _parse_tsv_row(tsv_path)
@@ -156,18 +185,18 @@ def _run_checkm2(contigs_path: str, output_dir: Path, threads: int = 4) -> dict[
     result["contamination"] = _as_float(row.get("Contamination"))
     if result["completeness"] is None or result["contamination"] is None:
         result.update(
-            status="failed",
+            status=ToolStatus.FAILED,
             error="CheckM2 report has no numeric Completeness/Contamination",
         )
         return result
-    result["status"] = "ok"
+    result["status"] = ToolStatus.OK
     return result
 
 
 def _run_gtdbtk(contigs_path: str, output_dir: Path, threads: int = 4) -> dict[str, Any]:
     """Run GTDB-Tk classify_wf; returns status/classification/version/note."""
     result: dict[str, Any] = {
-        "status": "missing",
+        "status": ToolStatus.MISSING,
         "classification": "",
         "version": "",
         "note": "",
@@ -207,36 +236,48 @@ def _run_gtdbtk(contigs_path: str, output_dir: Path, threads: int = 4) -> dict[s
             env={**__import__("os").environ, "PATH": pixi_path()},
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        result.update(status="failed", note=f"GTDB-Tk failed: {exc}")
+        result.update(status=ToolStatus.FAILED, note=f"GTDB-Tk failed: {exc}")
         return result
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "").strip()[:300]
-        result.update(status="failed", note=f"GTDB-Tk failed (exit {proc.returncode}): {detail}")
+        result.update(
+            status=ToolStatus.FAILED, note=f"GTDB-Tk failed (exit {proc.returncode}): {detail}"
+        )
         return result
 
     summary = out_dir / "gtdbtk.bac120.summary.tsv"
     if not summary.is_file():
         summary = out_dir / "gtdbtk.ar122.summary.tsv"
     if not summary.is_file():
-        result.update(status="failed", note="GTDB-Tk produced no bac120/ar122 summary")
+        result.update(status=ToolStatus.FAILED, note="GTDB-Tk produced no bac120/ar122 summary")
         return result
     row = _parse_tsv_row(summary)
     classification = row.get("classification", "").strip()
     if not classification:
-        result.update(status="failed", note="GTDB-Tk summary has no classification")
+        result.update(status=ToolStatus.FAILED, note="GTDB-Tk summary has no classification")
         return result
-    result.update(status="ok", classification=classification)
+    result.update(status=ToolStatus.OK, classification=classification)
     return result
 
 
-def _quality_verdict(completeness: float | None, contamination: float | None) -> str:
+def _quality_verdict(completeness: float | None, contamination: float | None) -> QualityVerdict:
     if completeness is None or contamination is None:
-        return "UNKNOWN"
+        return QualityVerdict.UNKNOWN
     if completeness >= 90 and contamination <= 5:
-        return "PASS"
+        return QualityVerdict.PASS
     if completeness < 50 or contamination > 10:
-        return "WARNING"
-    return "CHECK"
+        return QualityVerdict.WARNING
+    return QualityVerdict.CHECK
+
+
+def _aggregate_status(statuses: Sequence[ToolStatus | str]) -> ValidationStatus:
+    """Fold per-tool statuses into the report-level ValidationStatus."""
+    ok_tools = sum(1 for status in statuses if status == ToolStatus.OK)
+    if ok_tools == len(statuses):
+        return ValidationStatus.OK
+    if ok_tools > 0:
+        return ValidationStatus.PARTIAL
+    return ValidationStatus.ERROR
 
 
 def _build_interpretation(result: ValidateResult) -> str:
@@ -281,8 +322,7 @@ def validate_genome(
         "verdict": _quality_verdict(checkm2["completeness"], checkm2["contamination"]),
     }
     errors = [msg for msg in (checkm2["error"], gtdbtk["note"]) if msg]
-    ok_tools = sum(1 for tool in (checkm2, gtdbtk) if tool["status"] == "ok")
-    status = "ok" if ok_tools == 2 else ("partial" if ok_tools == 1 else "error")
+    status = _aggregate_status((checkm2["status"], gtdbtk["status"]))
 
     result = ValidateResult(
         genome={"name": contigs.stem, "path": str(contigs)},

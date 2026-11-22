@@ -32,9 +32,9 @@ def _tool_entry(
 TOOLS: list[dict[str, object]] = [
     _tool_entry(
         "species",
-        "Identify species from assemblies or FASTQ reads (R1/R2 are paired into one"
-        " methods (marker/ani/mash/sourmash/gtdbtk), arbitration, and"
-        " confidence.",
+        "Identify species from FASTA assemblies or FASTQ reads (paired R1/R2"
+        " mates auto-group into one sample) with multi-layer methods"
+        " (marker/ani/mash/sourmash/gtdbtk), arbitration, and confidence.",
         dict(
             contigs=_FILES,
             mode={"type": "string", "enum": list(MODES), "default": "marker"},

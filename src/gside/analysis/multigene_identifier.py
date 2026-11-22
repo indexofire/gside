@@ -11,6 +11,7 @@ import json
 import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -150,19 +151,36 @@ def _control_config(
     return controls, dict(defaults or {})
 
 
+class ControlSource(StrEnum):
+    """How the single-copy depth control was resolved in reads mode."""
+
+    NONE = ""
+    DEDICATED = "dedicated"
+    FALLBACK = "fallback"
+
+
+class DepthGateMode(StrEnum):
+    """Explicit depth-gating regime applied to marker hits."""
+
+    DISABLED = "disabled"
+    ABSOLUTE_ONLY = "absolute_only"
+    RELATIVE = "relative"
+
+
 @dataclass
 class _DepthGate:
     hits: list[dict[str, Any]]
     control_depth: float | None = None
     control_gene: str = ""
-    control_source: str = ""
+    control_source: ControlSource = ControlSource.NONE
+    mode: DepthGateMode = DepthGateMode.DISABLED
     filtered: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _control_depth(
     hits: list[dict[str, Any]],
     control_genes: list[str],
-) -> tuple[float | None, str, str]:
+) -> tuple[float | None, str, ControlSource]:
     """Control mean depth, label, and source (dedicated/fallback).
 
     A dedicated control is the median mean depth of the configured
@@ -197,7 +215,7 @@ def _control_depth(
     if dedicated:
         depths = [depth for _, depth in dedicated]
         label = "+".join(gene for gene, _ in dedicated)
-        return statistics.median(depths), label, "dedicated"
+        return statistics.median(depths), label, ControlSource.DEDICATED
 
     fallback = [
         float(hit["mean_depth"])
@@ -207,8 +225,8 @@ def _control_depth(
         and hit["coverage"] >= _MIN_COVERAGE
     ]
     if fallback:
-        return statistics.median(fallback), "sample_median", "fallback"
-    return None, "", ""
+        return statistics.median(fallback), "sample_median", ControlSource.FALLBACK
+    return None, "", ControlSource.NONE
 
 
 def _apply_depth_gate(
@@ -222,6 +240,7 @@ def _apply_depth_gate(
     if not any("mean_depth" in hit for hit in hits):
         # Assembly (BLAST) hits have no depth; preserve legacy behaviour.
         gate.hits = list(hits)
+        gate.mode = DepthGateMode.DISABLED
         return gate
 
     control_depth, label, source = _control_depth(hits, control_genes)
@@ -230,6 +249,7 @@ def _apply_depth_gate(
     gate.control_source = source
     if control_depth is None or control_depth <= 0:
         # No relative control: still enforce the absolute depth floor.
+        gate.mode = DepthGateMode.ABSOLUTE_ONLY
         for raw_hit in hits:
             hit = dict(raw_hit)
             depth = hit.get("mean_depth")
@@ -239,6 +259,7 @@ def _apply_depth_gate(
                 gate.filtered.append(hit)
         return gate
 
+    gate.mode = DepthGateMode.RELATIVE
     for raw_hit in hits:
         hit = dict(raw_hit)
         depth = hit.get("mean_depth")

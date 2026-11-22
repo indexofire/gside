@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from gside.analysis._envelope import MethodEnvelope
-from gside.analysis._thresholds import ANI_HIGH, ANI_MEDIUM
+from gside.analysis._thresholds import Confidence, ani_confidence
 from gside.analysis.read_screening import is_fastq
 from gside.analysis.species_name import apply_species_name
 from gside.engine.backends.skani import AniHit
@@ -212,6 +212,28 @@ def _mash_rows(
     return _mash_dist(files[0], msh, threads)
 
 
+def _mash_confidence(identity: float) -> Confidence:
+    """Single source for Mash MinHash identity confidence bands."""
+    if identity >= _MASH_IDENTITY_HIGH:
+        return Confidence.HIGH
+    if identity >= _MASH_IDENTITY_MEDIUM:
+        return Confidence.MEDIUM
+    return Confidence.LOW
+
+
+def _mash_result_from_rows(rows: list[tuple[str, float]], taxa: dict[str, str]) -> dict[str, Any]:
+    """Derive the mash verdict from (possibly multi-database) distance rows."""
+    mash_top = sorted(rows, key=lambda r: (-r[1], r[0]))[:_TOP_N]
+    best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)
+    raw_species = taxa.get(best_ref, _mash_species(best_ref)) if best_ref else "Unknown"
+    result = {
+        "confidence": _mash_confidence(best_identity),
+        "identity": best_identity,
+        "top_hits": [{"genome": r, "identity": i} for r, i in mash_top],
+    }
+    return apply_species_name(result, raw_species or "Unknown")
+
+
 def _mash_result(
     base: Path,
     contigs: str | Path | Sequence[str | Path],
@@ -219,19 +241,7 @@ def _mash_result(
     threads: int,
 ) -> dict[str, Any]:
     """mash_refseq: nearest RefSeq sketch by MinHash identity."""
-    mash_top = sorted(_mash_rows(base, contigs, threads), key=lambda r: (-r[1], r[0]))[:_TOP_N]
-    best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)
-    raw_species = taxa.get(best_ref, _mash_species(best_ref)) if best_ref else "Unknown"
-
-    confidence = "high" if best_identity >= _MASH_IDENTITY_HIGH else "low"
-    if _MASH_IDENTITY_MEDIUM <= best_identity < _MASH_IDENTITY_HIGH:
-        confidence = "medium"
-    result = {
-        "confidence": confidence,
-        "identity": best_identity,
-        "top_hits": [{"genome": r, "identity": i} for r, i in mash_top],
-    }
-    return apply_species_name(result, raw_species or "Unknown")
+    return _mash_result_from_rows(_mash_rows(base, contigs, threads), taxa)
 
 
 def _taxa_lookup(taxa: dict[str, str], ref: str) -> str:
@@ -275,13 +285,11 @@ def _panel_result_from_hits(hits: list[AniHit], taxa: dict[str, str]) -> dict[st
     top = skani_hits[:_TOP_N]
     best = top[0] if top else None
 
-    species, confidence = "Unknown", "low"
+    species, confidence = "Unknown", Confidence.LOW
     if best is not None and best.aligned_fraction >= _AF_MIN:
-        matched = _taxa_lookup(taxa, best.ref)
-        if best.ani >= ANI_HIGH:
-            species, confidence = (matched or "Unknown"), "high"
-        elif best.ani >= ANI_MEDIUM:
-            species, confidence = (matched or "Unknown"), "medium"
+        band = ani_confidence(best.ani)
+        if band is not Confidence.LOW:
+            species, confidence = (_taxa_lookup(taxa, best.ref) or "Unknown"), band
 
     result = {
         "confidence": confidence,
@@ -372,18 +380,7 @@ def _identify_multi(
         rows: list[tuple[str, float]] = []
         for base in bases:
             rows.extend(_mash_rows(base, contigs, threads))
-        mash_top = sorted(rows, key=lambda r: (-r[1], r[0]))[:_TOP_N]
-        best_ref, best_identity = mash_top[0] if mash_top else ("", 0.0)
-        raw_species = taxa.get(best_ref, _mash_species(best_ref)) if best_ref else "Unknown"
-        confidence = "high" if best_identity >= _MASH_IDENTITY_HIGH else "low"
-        if _MASH_IDENTITY_MEDIUM <= best_identity < _MASH_IDENTITY_HIGH:
-            confidence = "medium"
-        result = {
-            "confidence": confidence,
-            "identity": best_identity,
-            "top_hits": [{"genome": r, "identity": i} for r, i in mash_top],
-        }
-        result = apply_species_name(result, raw_species or "Unknown")
+        result = _mash_result_from_rows(rows, taxa)
     else:
         hits: list[AniHit] = []
         for base in bases:

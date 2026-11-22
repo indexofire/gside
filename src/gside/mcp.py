@@ -25,6 +25,7 @@ rendered as text; stdout is protocol-only.
 import json
 import sys
 from collections.abc import Iterable
+from enum import StrEnum
 from typing import Any, TextIO, TypeGuard
 
 import click
@@ -38,6 +39,15 @@ from gside import __version__
 JsonRpcId = str | int | float | None
 
 PROTOCOL_VERSION = "2025-06-18"
+
+
+class McpState(StrEnum):
+    """Explicit MCP stdio session lifecycle: UNINITIALIZED -> INITIALIZED -> READY -> CLOSED."""
+
+    UNINITIALIZED = "uninitialized"
+    INITIALIZED = "initialized"
+    READY = "ready"
+    CLOSED = "closed"
 
 
 class _Frame(BaseModel, frozen=True):
@@ -119,42 +129,68 @@ def _reject(value: Any) -> dict[str, object] | None:
     return _error(id_value, -32602, "invalid request: params must be an object")
 
 
-def _handle(frame: _Frame) -> dict[str, object] | None:
-    """One parsed frame -> one response object; None = no response."""
-    if "id" not in frame.model_fields_set:
-        return None  # notifications never get responses
-    if frame.method is None:
-        return _error(frame.id, -32600, "invalid request: method is required")
-    id_value = frame.id
-    if frame.method == "initialize":
-        return _result(id_value, _initialize(frame.params))
-    if frame.method == "tools/list":
-        from gside.mcp_schemas import TOOLS
+class McpSession:
+    """Explicit MCP JSON-RPC 2.0 session state machine.
 
-        return _result(id_value, {"tools": list(TOOLS)})
-    if frame.method == "tools/call":
-        return _tools_call(id_value, frame.params)
-    return _error(id_value, -32601, f"method not found: {frame.method}")
+    Tracks ``UNINITIALIZED -> INITIALIZED -> READY -> CLOSED`` and supports
+    the MCP ``ping`` heartbeat and ``notifications/initialized`` transition
+    while keeping stateless ``tools/list`` and ``tools/call`` callers working.
+    """
+
+    def __init__(self) -> None:
+        self.state = McpState.UNINITIALIZED
+        self.protocol_version = PROTOCOL_VERSION
+
+    def close(self) -> None:
+        self.state = McpState.CLOSED
+
+    def handle(self, frame: _Frame) -> dict[str, object] | None:
+        """One parsed frame -> one response object; None = no response."""
+        if "id" not in frame.model_fields_set:
+            if frame.method == "notifications/initialized":
+                self.state = McpState.READY
+            return None  # notifications never get responses
+        if frame.method is None:
+            return _error(frame.id, -32600, "invalid request: method is required")
+        id_value = frame.id
+        if frame.method == "initialize":
+            result = _initialize(frame.params)
+            self.protocol_version = str(result["protocolVersion"])
+            self.state = McpState.INITIALIZED
+            return _result(id_value, result)
+        if frame.method == "ping":
+            return _result(id_value, {})
+        if frame.method == "tools/list":
+            from gside.mcp_schemas import TOOLS
+
+            return _result(id_value, {"tools": list(TOOLS)})
+        if frame.method == "tools/call":
+            return _tools_call(id_value, frame.params)
+        return _error(id_value, -32601, f"method not found: {frame.method}")
 
 
 def serve(stdin: Iterable[str], stdout: TextIO) -> None:
     """Serve newline-delimited JSON-RPC 2.0 until EOF; non-JSON lines and
     id-less invalid messages are ignored, requests that fail frame
     validation get a -32600/-32602 error instead of silence."""
-    for line in stdin:
-        try:
-            value: object = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        try:
-            frame = _Frame.model_validate(value)
-        except ValidationError:
-            response = _reject(value)
-        else:
-            response = _handle(frame)
-        if response is not None:
-            stdout.write(json.dumps(response, separators=(",", ":")) + "\n")
-            stdout.flush()
+    session = McpSession()
+    try:
+        for line in stdin:
+            try:
+                value: object = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            try:
+                frame = _Frame.model_validate(value)
+            except ValidationError:
+                response = _reject(value)
+            else:
+                response = session.handle(frame)
+            if response is not None:
+                stdout.write(json.dumps(response, separators=(",", ":")) + "\n")
+                stdout.flush()
+    finally:
+        session.close()
 
 
 def register_mcp_command(app: click.Group) -> None:

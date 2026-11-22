@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from gside.analysis._envelope import MethodEnvelope
-from gside.analysis._thresholds import ANI_HIGH, ANI_MEDIUM
+from gside.analysis._thresholds import ANI_MEDIUM, Confidence, ani_confidence
 from gside.analysis.species_name import UNKNOWN, apply_species_name, canonical_species
 
 # Fallback bands for gather CSVs without the containment-ANI column
@@ -37,19 +37,15 @@ def _float(row: dict[str, str], key: str) -> float:
         return 0.0
 
 
-def _confidence(ani: float, fuw: float) -> str:
+def _confidence(ani: float, fuw: float) -> Confidence:
     """Containment ANI when available, hash-fraction bands otherwise."""
     if ani > 0:
-        if ani >= ANI_HIGH:
-            return "high"
-        if ani >= ANI_MEDIUM:
-            return "medium"
-        return "low"
+        return ani_confidence(ani)
     if fuw >= _FUW_HIGH:
-        return "high"
+        return Confidence.HIGH
     if fuw >= _FUW_MEDIUM:
-        return "medium"
-    return "low"
+        return Confidence.MEDIUM
+    return Confidence.LOW
 
 
 def _run(cmd: list[str]) -> str:
@@ -196,9 +192,13 @@ def identify_by_sourmash(
     flags = ["possible_mixture"] if len(strong_species) >= 2 else []
 
     confidence = _confidence(best_ani, best_fuw)
-    if flags and confidence == "high":
-        confidence = "medium"
-    species = best["species"] if best is not None and confidence != "low" else "Mixed/Unknown"
+    if flags and confidence is Confidence.HIGH:
+        confidence = Confidence.MEDIUM
+    species = (
+        best["species"]
+        if best is not None and confidence is not Confidence.LOW
+        else "Mixed/Unknown"
+    )
 
     result = {
         "confidence": confidence,

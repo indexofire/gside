@@ -9,7 +9,9 @@ import json
 import logging
 import re
 import sys
+import threading
 from collections.abc import Iterator
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -130,28 +132,37 @@ def main(ctx: click.Context, version: bool, version_json: bool, verbose: bool, q
 _FASTA_SUFFIXES = (".fna", ".fa", ".fasta", ".faa", ".ffn", ".frn")
 _FASTQ_SUFFIXES = (".fq", ".fastq")
 
+
+class InputKind(StrEnum):
+    """Sequence input format inferred from a file extension."""
+
+    FASTA = "fasta"
+    FASTQ = "fastq"
+    UNKNOWN = "unknown"
+
+
 # Which input kinds each mode can consume. `all` means every species tier,
 # so it needs FASTA.
-_MODE_INPUTS: dict[str, frozenset[str]] = {
-    "marker": frozenset({"fasta", "fastq"}),
-    "ani": frozenset({"fasta"}),
-    "mash": frozenset({"fasta", "fastq"}),
-    "sourmash": frozenset({"fasta", "fastq"}),
-    "gtdbtk": frozenset({"fasta"}),
+_MODE_INPUTS: dict[str, frozenset[InputKind]] = {
+    "marker": frozenset({InputKind.FASTA, InputKind.FASTQ}),
+    "ani": frozenset({InputKind.FASTA}),
+    "mash": frozenset({InputKind.FASTA, InputKind.FASTQ}),
+    "sourmash": frozenset({InputKind.FASTA, InputKind.FASTQ}),
+    "gtdbtk": frozenset({InputKind.FASTA}),
 }
 
 
-def _input_kind(path: str) -> str:
+def _input_kind(path: str) -> InputKind:
     """'fasta' / 'fastq' / 'unknown' from the extension (``.gz`` aware)."""
     name = path.lower()
     for suffix in (".gz", ".bz2"):
         if name.endswith(suffix):
             name = name[: -len(suffix)]
     if name.endswith(_FASTA_SUFFIXES):
-        return "fasta"
+        return InputKind.FASTA
     if name.endswith(_FASTQ_SUFFIXES):
-        return "fastq"
-    return "unknown"
+        return InputKind.FASTQ
+    return InputKind.UNKNOWN
 
 
 _MATE_RE = re.compile(r"^(.*?)[._-](?:R)?([12])(?:_001)?$", re.IGNORECASE)
@@ -204,7 +215,7 @@ def _group_read_samples(files: list[str]) -> list[list[str]]:
     return samples
 
 
-def _supported_inputs(mode: str) -> frozenset[str]:
+def _supported_inputs(mode: str) -> frozenset[InputKind]:
     return _MODE_INPUTS[mode]
 
 
@@ -553,7 +564,7 @@ def db_setup_cmd(
     output_format: str,
 ) -> None:
     """Install or update the default database of a mode (its tier)."""
-    from .db import db_setup, run_db_command
+    from .db import _is_setup_error, db_setup, run_db_command
 
     resolved = _resolve_setup_target(tier, db_selection)
     if isinstance(resolved, click.UsageError):
@@ -562,7 +573,7 @@ def db_setup_cmd(
         with contextlib.redirect_stdout(sys.stderr):
             results = db_setup(resolved, source)
         print(json.dumps(results, indent=2, ensure_ascii=False))
-        sys.exit(1 if any("ERROR" in str(msg) for msg in results.values()) else 0)
+        sys.exit(1 if any(_is_setup_error(str(msg)) for msg in results.values()) else 0)
 
     args = ["setup", "--tier", resolved]
     if source:
@@ -703,6 +714,14 @@ from gside.mcp import register_mcp_command  # noqa: E402
 register_mcp_command(main)
 
 
+class _WriterState(StrEnum):
+    """Explicit file-sink lifecycle: IDLE -> OPEN -> CLOSED."""
+
+    IDLE = "idle"
+    OPEN = "open"
+    CLOSED = "closed"
+
+
 class _OutputFileWriter:
     """Chunk sink behind ``species --output`` (gspec OutputFileWriter semantics):
     opens truncating on the first chunk, and every chunk is flushed, so an
@@ -711,16 +730,32 @@ class _OutputFileWriter:
     def __init__(self, path: Path) -> None:
         self._path = path
         self._handle: TextIO | None = None
+        self._state = _WriterState.IDLE
+
+    @property
+    def state(self) -> _WriterState:
+        return self._state
+
+    def __enter__(self) -> _OutputFileWriter:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
 
     def __call__(self, chunk: str) -> None:
-        handle = self._handle or self._path.open("w", encoding="utf-8", newline="\n")
-        self._handle = handle
-        handle.write(chunk)
-        handle.flush()
+        if self._state is _WriterState.CLOSED:
+            raise RuntimeError(f"cannot write to closed output file: {self._path}")
+        if self._handle is None:
+            self._handle = self._path.open("w", encoding="utf-8", newline="\n")
+            self._state = _WriterState.OPEN
+        self._handle.write(chunk)
+        self._handle.flush()
 
     def close(self) -> None:
         if self._handle is not None:
             self._handle.close()
+            self._handle = None
+        self._state = _WriterState.CLOSED
 
 
 def _write_text_document(text: str, output: str | None, bar: Any = None) -> int:
@@ -731,11 +766,8 @@ def _write_text_document(text: str, output: str | None, bar: Any = None) -> int:
         else:
             print(text, end="")
         return 0
-    writer = _OutputFileWriter(Path(output))
-    try:
+    with _OutputFileWriter(Path(output)) as writer:
         writer(text)
-    finally:
-        writer.close()
     notice = f"Results written to {output}"
     bar.notice(notice) if bar is not None else print(notice, file=sys.stderr)
     return 0
@@ -764,13 +796,27 @@ def _run_species(
     from gside.progress import species_progress
 
     samples = [list(item) if isinstance(item, (list, tuple)) else [item] for item in contigs_list]
+    coordinator = _AutoSetupCoordinator() if auto_setup else None
 
-    def identify(sample: list[str]) -> dict[str, Any]:
-        target: str | list[str] = sample[0] if len(sample) == 1 else sample
-        payload = _identify_one(target, mode, db_dir, threads, marker_db, db_selections)
-        if auto_setup:
-            payload = _auto_setup_retry(target, payload, mode, db_dir, threads, marker_db)
-        return payload
+    def make_identifier(bar: Any) -> Any:
+        def identify(sample: list[str]) -> dict[str, Any]:
+            target: str | list[str] = sample[0] if len(sample) == 1 else sample
+            payload = _identify_one(target, mode, db_dir, threads, marker_db, db_selections)
+            if coordinator is not None:
+                payload = _auto_setup_retry(
+                    target,
+                    payload,
+                    mode,
+                    db_dir,
+                    threads,
+                    marker_db,
+                    coordinator=coordinator,
+                    bar=bar,
+                    db_selections=db_selections,
+                )
+            return payload
+
+        return identify
 
     if jobs > 1:
         from concurrent.futures import ThreadPoolExecutor
@@ -783,7 +829,7 @@ def _run_species(
             ),
         ):
             return _emit_species(
-                _tracked(pool.map(identify, samples), bar),
+                _tracked(pool.map(make_identifier(bar), samples), bar),
                 len(samples),
                 output_format,
                 output,
@@ -792,7 +838,7 @@ def _run_species(
             )
     with species_progress(samples, quiet=quiet) as (bar, _tid):
         return _emit_species(
-            _tracked(map(identify, samples), bar),
+            _tracked(map(make_identifier(bar), samples), bar),
             len(samples),
             output_format,
             output,
@@ -819,12 +865,9 @@ def _emit_chunks(chunks: Iterator[str], output: str | None, bar: Any = None) -> 
         for chunk in chunks:
             write(chunk)
         return 0
-    writer = _OutputFileWriter(Path(output))
-    try:
+    with _OutputFileWriter(Path(output)) as writer:
         for chunk in chunks:
             writer(chunk)
-    finally:
-        writer.close()
     notice = f"Results written to {output}"
     bar.notice(notice) if bar is not None else print(notice, file=sys.stderr)
     return 0
@@ -843,7 +886,9 @@ def _json_stream(payload_source: Iterator[dict[str, Any]], single: bool) -> Iter
     each object emitted as soon as it completes, so ``-o`` can be streamed too.
     """
     if single:
-        yield json.dumps(next(payload_source), ensure_ascii=False, indent=2) + "\n"
+        first = next(payload_source, None)
+        if first is not None:
+            yield json.dumps(first, ensure_ascii=False, indent=2) + "\n"
         return
     yield "[\n"
     for index, payload in enumerate(payload_source):
@@ -970,12 +1015,74 @@ def _structured_missing_db_fields(error: str) -> dict[str, str]:
     return fields
 
 
-def _setup_missing_tier(tier: str) -> None:
+class _TierProvisionState(StrEnum):
+    """Per-tier auto-setup lifecycle within a batch run."""
+
+    PENDING = "pending"
+    INSTALLING = "installing"
+    INSTALLED = "installed"
+    FAILED = "failed"
+
+
+class _AutoSetupCoordinator:
+    """Thread-safe batch state machine for ``--auto-setup``.
+
+    Guarantees each missing tier is installed at most once per batch even
+    under ``-j > 1``: concurrent workers wait while the first worker installs,
+    a failed tier is never retried across remaining samples, and any live
+    progress bar is suspended while setup progress streams to stderr.
+    """
+
+    def __init__(self) -> None:
+        self._cond = threading.Condition()
+        self._states: dict[str, _TierProvisionState] = {}
+
+    def state_of(self, tier: str) -> _TierProvisionState:
+        with self._cond:
+            return self._states.get(tier, _TierProvisionState.PENDING)
+
+    def provision(self, tier: str, bar: Any = None) -> bool:
+        """Ensure *tier* was installed; returns True when retry should run."""
+        with self._cond:
+            while True:
+                state = self._states.get(tier, _TierProvisionState.PENDING)
+                if state is _TierProvisionState.INSTALLED:
+                    return True
+                if state is _TierProvisionState.FAILED:
+                    return False
+                if state is _TierProvisionState.INSTALLING:
+                    self._cond.wait()
+                    continue
+                self._states[tier] = _TierProvisionState.INSTALLING
+                break
+
+        ok = False
+        try:
+            suspend = bar.suspend() if bar is not None else contextlib.nullcontext()
+            with suspend:
+                setup_result = _setup_missing_tier(tier)
+            if isinstance(setup_result, dict):
+                from gside.db import _is_setup_error
+
+                ok = not any(_is_setup_error(str(msg)) for msg in setup_result.values())
+            else:
+                ok = True
+        except Exception as e:  # noqa: BLE001 — CLI boundary: setup failure keeps the error entry
+            logger.warning("auto-setup of tier %s failed: %s", tier, e)
+            ok = False
+
+        with self._cond:
+            self._states[tier] = _TierProvisionState.INSTALLED if ok else _TierProvisionState.FAILED
+            self._cond.notify_all()
+        return ok
+
+
+def _setup_missing_tier(tier: str) -> dict[str, str] | None:
     """Install one database tier with progress routed to stderr."""
     from gside.db import db_setup
 
     with contextlib.redirect_stdout(sys.stderr):
-        db_setup(tier)
+        return db_setup(tier)
 
 
 def _auto_setup_retry(
@@ -985,23 +1092,28 @@ def _auto_setup_retry(
     db_dir: str | None,
     threads: int,
     marker_db: str | None = None,
+    *,
+    coordinator: _AutoSetupCoordinator | None = None,
+    bar: Any = None,
+    db_selections: dict[str, list[Path]] | None = None,
 ) -> dict[str, Any]:
     """--auto-setup: install each missing tier once, retry that method once."""
+    coord = coordinator if coordinator is not None else _AutoSetupCoordinator()
     methods = payload.get("methods", {})
     for m, method_payload in methods.items():
         tier = method_payload.get("missing_tier") if isinstance(method_payload, dict) else None
         if not tier:
             continue
-        try:
-            _setup_missing_tier(tier)
-        except Exception as e:  # noqa: BLE001 — CLI boundary: setup failure keeps the error entry
-            logger.warning("auto-setup of tier %s failed: %s", tier, e)
+        if not coord.provision(tier, bar=bar):
             continue
-        retry = (
-            _identify_one(contigs, m, db_dir, threads)
-            if marker_db is None
-            else _identify_one(contigs, m, db_dir, threads, marker_db)
-        )
+        if db_selections:
+            retry = _identify_one(
+                contigs, m, db_dir, threads, marker_db, db_selections=db_selections
+            )
+        elif marker_db is not None:
+            retry = _identify_one(contigs, m, db_dir, threads, marker_db)
+        else:
+            retry = _identify_one(contigs, m, db_dir, threads)
         methods[m] = retry["methods"].get(m, method_payload)
     payload["verdict"] = _verdict_for(methods)
     return payload
@@ -1081,13 +1193,22 @@ _VERDICT_EVIDENCE_KEYS = (
 )
 
 
-def _scope_for_species(species: str) -> str:
+class VerdictScope(StrEnum):
+    """Evidence granularity of an arbitrated species verdict."""
+
+    SPECIES = "species"
+    GENUS = "genus"
+    COMPLEX = "complex"
+    UNKNOWN = "unknown"
+
+
+def _scope_for_species(species: str) -> VerdictScope:
     """Evidence granularity of a verdict label."""
     if species == "Unknown":
-        return "unknown"
+        return VerdictScope.UNKNOWN
     if species in _GENUS_SCOPE_LABELS:
-        return "genus"
-    return "species"
+        return VerdictScope.GENUS
+    return VerdictScope.SPECIES
 
 
 def _complex_reason(labels: set[str]) -> str | None:
@@ -1143,7 +1264,7 @@ def _verdict_semantics(
             }
         )
     return {
-        "scope": "complex",
+        "scope": VerdictScope.COMPLEX,
         "alternatives": alternatives,
         "ambiguity_reason": reason,
     }

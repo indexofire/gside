@@ -19,8 +19,10 @@ cursor is still directly below it). The same applies to stderr notices.
 from __future__ import annotations
 
 import sys
+import threading
 from collections.abc import Generator, Sequence
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
+from enum import StrEnum
 from typing import Final, Protocol
 
 from rich.console import Console
@@ -38,14 +40,30 @@ from rich.progress import (
 STATUS_CONSOLE: Final = Console(stderr=True)
 
 
+class ProgressState(StrEnum):
+    """Explicit lifecycle states for batch progress reporting."""
+
+    IDLE = "idle"
+    RUNNING = "running"
+    SUSPENDED = "suspended"
+    CLOSED = "closed"
+
+
 class BatchProgress(Protocol):
+    @property
+    def state(self) -> ProgressState: ...
     def describe(self, text: str) -> None: ...
     def advance(self) -> None: ...
     def write(self, text: str) -> None: ...
     def notice(self, text: str) -> None: ...
+    def suspend(self) -> AbstractContextManager[None]: ...
 
 
 class IdleBatch:
+    @property
+    def state(self) -> ProgressState:
+        return ProgressState.IDLE
+
     def describe(self, text: str) -> None:
         return None
 
@@ -58,34 +76,70 @@ class IdleBatch:
     def notice(self, text: str) -> None:
         print(text, file=sys.stderr)
 
+    def suspend(self) -> AbstractContextManager[None]:
+        return nullcontext()
+
 
 class _LiveBatch:
+    """Thread-safe Live progress lifecycle: RUNNING <-> SUSPENDED -> CLOSED."""
+
     def __init__(self, progress: Progress, task_id: TaskID) -> None:
         self._progress = progress
         self._task_id = task_id
+        self._lock = threading.RLock()
+        self._state = ProgressState.RUNNING
+        self._suspend_depth = 0
+
+    @property
+    def state(self) -> ProgressState:
+        with self._lock:
+            return self._state
+
+    def close(self) -> None:
+        """Mark the live display closed so late calls never restart it."""
+        with self._lock:
+            self._state = ProgressState.CLOSED
+            self._suspend_depth = 0
+
+    @contextmanager
+    def suspend(self) -> Generator[None, None, None]:
+        """Re-entrantly suspend the live bar around stdout/stderr I/O."""
+        with self._lock:
+            if self._state is ProgressState.CLOSED:
+                yield
+                return
+            if self._suspend_depth == 0:
+                self._progress.stop()
+                self._state = ProgressState.SUSPENDED
+            self._suspend_depth += 1
+            try:
+                yield
+            finally:
+                self._suspend_depth -= 1
+                if self._suspend_depth == 0 and self._state is ProgressState.SUSPENDED:
+                    self._progress.start()
+                    self._state = ProgressState.RUNNING
 
     def describe(self, text: str) -> None:
-        self._progress.update(self._task_id, description=text)
+        with self._lock:
+            if self._state is not ProgressState.CLOSED:
+                self._progress.update(self._task_id, description=text)
 
     def advance(self) -> None:
-        self._progress.advance(self._task_id)
+        with self._lock:
+            if self._state is not ProgressState.CLOSED:
+                self._progress.advance(self._task_id)
 
     def write(self, text: str) -> None:
         """Print a report row, suspending the live bar around the write."""
-        self._progress.stop()
-        try:
+        with self.suspend():
             sys.stdout.write(text)
             sys.stdout.flush()
-        finally:
-            self._progress.start()
 
     def notice(self, text: str) -> None:
         """Print a stderr notice without corrupting the live bar."""
-        self._progress.stop()
-        try:
+        with self.suspend():
             print(text, file=sys.stderr)
-        finally:
-            self._progress.start()
 
 
 _IDLE: Final = IdleBatch()
@@ -121,6 +175,10 @@ def species_progress(
     if progress is not None and progress.console.is_terminal:
         with progress:
             task_id = progress.add_task(description, total=len(inputs))
-            yield _LiveBatch(progress, task_id), task_id
+            live = _LiveBatch(progress, task_id)
+            try:
+                yield live, task_id
+            finally:
+                live.close()
         return
     yield _IDLE, None

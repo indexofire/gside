@@ -92,7 +92,7 @@ def _layout_requirements(mode: str) -> tuple[tuple[str, ...], ...]:
     if mode == "ani":
         return (("panel.sketch/sketches.db",), ("panel.sketch",))
     if mode == "mash":
-        return (("mash.msh",),)
+        return (("mash.msh",), ("payload.bin",))
     if mode == "sourmash":
         return (("gtdb-reps-k31.zip", "lineages.csv"),)
     raise ValueError(f"{mode} does not support named databases")

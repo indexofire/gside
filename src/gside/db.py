@@ -25,6 +25,7 @@ import subprocess
 import tarfile
 import urllib.request
 from collections.abc import Callable
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -100,6 +101,18 @@ _TIER_INPUTS: dict[str, str] = {
 
 _DOWNLOAD_TIMEOUT = 3600
 _CHUNK = 1024 * 1024
+
+
+class DbReadiness(StrEnum):
+    """Explicit readiness label rendered in database tables."""
+
+    READY = "ready"
+    MISSING = "missing"
+
+
+def _is_setup_error(message: str) -> bool:
+    """Single predicate distinguishing setup error messages from success."""
+    return "ERROR" in message
 
 
 _COMPONENTS: dict[str, tuple[str, str, list[list[tuple[str, Callable[[Path], bool]]]]]] = {
@@ -190,7 +203,7 @@ def _install_panel(dst: Path) -> str:
     """Panel install chain: pre-built GitHub Release sketch, else manifest build."""
     result = _try_download_panel_release(dst)
     if result:
-        if not result.startswith("ERROR"):
+        if not _is_setup_error(result):
             _publish_taxa_map(dst)
         return result
     return _build_panel_from_manifest(dst)
@@ -251,7 +264,8 @@ def _download_sourmash_farm(dst: Path) -> str:
         (lineages_csv, SOURMASH_LINEAGES_SHA256),
     ):
         if not _verify_sha256(artifact, expected):
-            artifact.unlink(missing_ok=True)
+            sig_zip.unlink(missing_ok=True)
+            lineages_csv.unlink(missing_ok=True)
             return f"ERROR: SHA256 mismatch for {artifact.name}"
     try:
         sig_zip.rename(default_dir / "gtdb-reps-k31.zip")
@@ -452,21 +466,32 @@ def _build_panel_from_manifest(dst: Path) -> str:
 
 
 def _download_file(url: str, dst: Path) -> None:
+    """Stream *url* to a ``.part`` staging file and atomically replace *dst*.
+
+    Any network or write error removes the partial file so interrupted setups
+    never leave corrupt artifacts at the target path.
+    """
     req = urllib.request.Request(url, headers={"User-Agent": "gside-setup"})
-    with urllib.request.urlopen(req, timeout=_DOWNLOAD_TIMEOUT) as resp:
-        total = int(resp.headers.get("Content-Length", 0))
-        downloaded = 0
-        with open(dst, "wb") as f:
-            while True:
-                chunk = resp.read(_CHUNK)
-                if not chunk:
-                    break
-                f.write(chunk)
-                downloaded += len(chunk)
-                if total > 0:
-                    pct = downloaded * 100 // total
-                    print(f"\r  {pct:3d}% ({downloaded // _CHUNK}MB)", end="", flush=True)
-        print()
+    part = dst.with_name(f"{dst.name}.part")
+    try:
+        with urllib.request.urlopen(req, timeout=_DOWNLOAD_TIMEOUT) as resp:
+            total = int(resp.headers.get("Content-Length", 0))
+            downloaded = 0
+            with open(part, "wb") as f:
+                while True:
+                    chunk = resp.read(_CHUNK)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total > 0:
+                        pct = downloaded * 100 // total
+                        print(f"\r  {pct:3d}% ({downloaded // _CHUNK}MB)", end="", flush=True)
+            print()
+        part.replace(dst)
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
 
 
 def _verify_sha256(path: Path, expected: str) -> bool:
@@ -504,7 +529,7 @@ def _database_rows() -> list[tuple[str, str, str, str, str]]:
                 (
                     mode,
                     choice.name,
-                    "ready" if choice.ready else "missing",
+                    DbReadiness.READY if choice.ready else DbReadiness.MISSING,
                     inputs,
                     str(choice.path),
                 )
@@ -616,7 +641,7 @@ def run_db_command(args: list[str]) -> int:
         has_error = False
         for name, msg in results.items():
             print(f"  {name}: {msg}")
-            if "ERROR" in msg:
+            if _is_setup_error(msg):
                 has_error = True
         return 1 if has_error else 0
     elif sub == "list":
