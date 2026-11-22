@@ -57,7 +57,7 @@ class TestPanelTaxaMap:
 
 
 _MASH_GOLDENS = {
-    "GCF_000006945.2_ASM694v2_genomic.fna": ("Salmonella", 1.0),
+    "GCF_000006945.2_ASM694v2_genomic.fna": ("Salmonella_enterica", 1.0),
     "GCF_000009085.1_ASM908v1_genomic.fna": ("Campylobacter_jejuni", 1.0),
     "GCF_000465235.1_ASM46523v1_genomic.fna": ("Campylobacter_coli", 0.99),
     "GCF_000005845.2_ASM584v2_genomic.fna": ("Escherichia_coli", 1.0),

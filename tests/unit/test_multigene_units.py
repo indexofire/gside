@@ -578,11 +578,18 @@ def test_main_text_output_prints_markers_and_notes(monkeypatch, capsys, tmp_path
     assert "NOTE:" in out
 
 
-def _pick(*genes: str) -> str:
-    """Species chosen by the real rules for a synthetic set of detected genes."""
+def _pick(*genes: str | tuple[str, float]) -> str:
+    """Species chosen by the real rules for a synthetic set of detected genes.
+
+    A bare ``str`` gene is detected at 99% identity; a ``(gene, identity)``
+    tuple pins a specific identity so threshold bands can be exercised.
+    """
     rules = _load_rules()
-    by_gene = {gene: [{"gene": gene, "identity": 99.0, "coverage": 100.0}] for gene in genes}
-    significant = {gene: by_gene[gene][0] for gene in genes}
+    by_gene: dict[str, list[dict[str, object]]] = {}
+    for item in genes:
+        gene, identity = item if isinstance(item, tuple) else (item, 99.0)
+        by_gene[gene] = [{"gene": gene, "identity": identity, "coverage": 100.0}]
+    significant = {gene: hits[0] for gene, hits in by_gene.items()}
     species, _confidence, _rule = mg._pick_rule(
         rules, by_gene, significant, mg._priority_species(rules)
     )
@@ -597,6 +604,11 @@ class TestRuleDesign:
         assert _pick("uida", "ipah", "rfc") == "Shigella_flexneri"
         assert _pick("uida", "ipah", "wbgz", "sonnei_psuk") == "Shigella_sonnei"
         assert _pick("uida", "ipah", "sb1_wzx") == "Shigella_boydii"
+        # require 语义：O-抗原特异基因在场而属锚（uidA+ipaH）缺席时，
+        # 种级规则永不触发（与沙门菌 require:[inva] 同型防线）。
+        assert _pick("rfc", "rfbe", "rfbi") == "Unknown"
+        assert _pick("sb1_wzx", "sb1_wzy", "sd1_wzx") == "Unknown"
+        assert _pick("uida", "rfc", "rfbe") == "Unknown"
         # lacY-positive keeps the call E. coli: every Shigella rule is
         # lacY-negative (exclude_genes) so EIEC never fires Shigella.
         assert _pick("uida", "ipah", "lacy") == "Escherichia_coli"
@@ -641,7 +653,23 @@ class TestRuleDesign:
 
     def test_renamed_labels(self):
         assert _pick("tlh") == "Vibrio_parahaemolyticus"
+        # inva 单独命中 → 属级回退（种级需要属锚 + 特异标记）
         assert _pick("inva") == "Salmonella"
+
+    def test_salmonella_species_rules(self):
+        # inva + SPI-2 标记 → enterica（divergent 带不敏感化）
+        assert _pick(("inva", 99.0), ("ssav", 99.0)) == "Salmonella_enterica"
+        assert _pick(("inva", 94.5), ("ssec", 99.0)) == "Salmonella_enterica"
+        assert _pick(("inva", 91.8), ("asst", 99.0)) == "Salmonella_bongori"
+        assert _pick(("inva", 91.8), ("zadh", 99.0)) == "Salmonella_bongori"
+        # require 语义：inva 缺席时种级规则不触发（即使两个特异标记都在场）
+        assert _pick(("ssav", 99.0), ("ssec", 99.0)) == "Unknown"
+        assert _pick(("asst", 99.0), ("zadh", 99.0)) == "Unknown"
+        # inva 单独命中（邦戈尔 draft 缺标记 / SPI-2 阴性 enterica）→ 属级回退
+        assert _pick(("inva", 99.0)) == "Salmonella"
+        assert _pick(("inva", 91.8)) == "Salmonella"
+        # 标记在全局检出阈（85-90 带）→ 两个种级规则都被压制 → 属级回退
+        assert _pick(("inva", 91.8), ("asst", 87.0)) == "Salmonella"
 
 
 def _bundled_marker_genes() -> set[str]:

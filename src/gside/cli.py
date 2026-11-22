@@ -1127,6 +1127,9 @@ def _species_of(payload: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
 
 # Deliberate genus-level labels: the evidence below species rank belongs to the
 # typing tool (gspec), so the verdict says what it actually knows.
+# Salmonella is NOT here anymore: the two species have their own marker rules
+# (Salmonella_enterica / Salmonella_bongori); the bare label remains only as
+# the genus-fallback rule output.
 _GENUS_SCOPE_LABELS = frozenset({"Salmonella", "Shigella"})
 
 # Benchmark-informed close-relative groups. When successful methods disagree

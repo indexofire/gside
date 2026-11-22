@@ -26,14 +26,38 @@ def _gene_seq(prefix: str) -> str:
 
 @pytest.mark.skipif(not _HAS_BLASTN, reason="blastn not available")
 class TestSpeciesMarker:
-    def test_inva_single_gene_calls_salmonella(self, tmp_path):
-        """inva alone satisfies its single-gene rule → Salmonella_enterica."""
+    def test_inva_alone_falls_back_to_genus(self, tmp_path):
+        """inva alone fires only the genus fallback (species needs the anchor + marker)."""
         from gside.analysis.multigene_identifier import identify_multigene
 
         q = tmp_path / "inva.fna"
         q.write_text(f">inva_q\n{_gene_seq('gside|db=species_markers_v2|gene=inva|acc=')}\n")
         r = identify_multigene(str(q)).to_dict()
         assert r["species"] == "Salmonella"
+
+    def test_inva_plus_spi2_calls_enterica(self, tmp_path):
+        """inva (required anchor) + ssav (SPI-2 marker) → Salmonella_enterica."""
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        q = tmp_path / "inva_ssav.fna"
+        q.write_text(
+            f">inva_q\n{_gene_seq('gside|db=species_markers_v2|gene=inva|acc=')}\n"
+            f">ssav_q\n{_gene_seq('gside|db=species_markers_v2|gene=ssav|acc=')}\n"
+        )
+        r = identify_multigene(str(q)).to_dict()
+        assert r["species"] == "Salmonella_enterica"
+
+    def test_spi2_without_inva_calls_nothing(self, tmp_path):
+        """SPI-2 markers without the inva anchor never fire the species rule."""
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        q = tmp_path / "spi2.fna"
+        q.write_text(
+            f">ssav_q\n{_gene_seq('gside|db=species_markers_v2|gene=ssav|acc=')}\n"
+            f">ssec_q\n{_gene_seq('gside|db=species_markers_v2|gene=ssec|acc=')}\n"
+        )
+        r = identify_multigene(str(q)).to_dict()
+        assert r["species"] == "Unknown"
 
     def test_excluded_gene_suppresses_coli_call(self, tmp_path):
         """ceuE + mapa suppress the coli call; jejuni then misses min_hits=2 → Unknown."""

@@ -128,7 +128,7 @@ A single-database selection (the default) omits `databases` entirely.
 | `scope` | Meaning |
 |---|---|
 | `species` | The winning evidence supports a binomial call |
-| `genus` | gside deliberately stops at genus (`Salmonella`, `Shigella`); serovar/pathotype typing belongs to gspec |
+| `genus` | gside deliberately stops at genus (`Salmonella` fallback, `Shigella`); serovar/pathotype typing belongs to gspec |
 | `complex` | Successful methods disagree inside a known close-relative group; the winner stays in `species`, competing labels move to `alternatives` |
 | `unknown` | No method produced a call |
 
@@ -211,10 +211,13 @@ per sample instead of nested objects.
 | `verdict.ambiguity_reason` | str \| null | Stable machine reason; `null` when methods agree |
 
 `agreement` compares canonical labels exactly. Marker rules now emit
-species-level labels, except the deliberate genus labels `Salmonella` and
-`Shigella`. Serovar/pathotype typing belongs to gspec; `verdict.scope` says
-explicitly whether the evidence supports a species, a genus, or a close-relative
-complex.
+species-level labels — `Salmonella_enterica` and `Salmonella_bongori` have
+their own rules, and the bare `Salmonella` survives only as the genus-level
+fallback for edge cases (bongori markers in the 85–90 detection band).
+`Shigella`
+stays a deliberate genus label. Serovar/pathotype typing belongs to gspec;
+`verdict.scope` says explicitly whether the evidence supports a species, a
+genus, or a close-relative complex.
 
 ## Species name contract
 
@@ -229,8 +232,9 @@ complex.
 | sourmash | `...;s__Vibrio parahaemolyticus` | `Vibrio_parahaemolyticus` |
 | gtdbtk | `Vibrio cholerae` | `Vibrio_cholerae` |
 
-Marker registry labels are already in contract form: `Salmonella`,
-`Vibrio_parahaemolyticus`, `Escherichia_coli`, `Shigella`. Shigella is
+Marker registry labels are already in contract form: `Salmonella_enterica`,
+`Salmonella_bongori`, `Salmonella` (genus fallback), `Vibrio_parahaemolyticus`,
+`Escherichia_coli`, `Shigella`. Shigella is
 deliberately genus-level only — species/serotype discrimination belongs to
 gspec and is called out in `methods.marker.notes`. Strain/accession text is
 never glued into `species` (a dot would break the downstream matcher); it goes

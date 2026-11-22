@@ -55,7 +55,7 @@ _EXPECTED: dict[str, str] = {
     # pre-existing coverage regression (bundled panel genomes)
     "GCF_000005845.2": "Escherichia_coli",
     "GCF_000006745.1": "Vibrio_cholerae",
-    "GCF_000006945.2": "Salmonella",
+    "GCF_000006945.2": "Salmonella_enterica",
     "GCF_000009005.1": "Staphylococcus_aureus",
     "GCF_000009085.1": "Campylobacter_jejuni",
     "GCF_000465235.1": "Campylobacter_coli",
@@ -91,6 +91,7 @@ def test_reference_genome_calls_expected_species(accession: str, expected: str):
         "Escherichia_coli",
         "Vibrio_cholerae",
         "Salmonella",
+        "Salmonella_enterica",
         "Staphylococcus_aureus",
         "Campylobacter_jejuni",
         "Campylobacter_coli",

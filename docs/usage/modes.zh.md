@@ -74,7 +74,8 @@ breadth = 所有 primary 比对的参考区间并集 / 基因长度（与 gspec 
 
 - 快速初筛（分钟级）
 - 无需大数据库（mini tier 内置）
-- 近缘种丰富的属（沙门菌/大肠/弯曲菌等）需配合 L2 确认
+- 近缘种丰富的属（沙门菌/大肠/弯曲菌等）需配合 L2 确认（marker 已将沙门菌
+  判到种级：`Salmonella_enterica` 与 `Salmonella_bongori`）
 
 ## L2: panel（ANI 精选面板）
 

@@ -168,6 +168,17 @@ class MarkerDatabase:
                             errors.append(f"{prefix}.genes contains an invalid name")
                         elif gene.lower() not in genes:
                             errors.append(f"{prefix} references unknown gene: {gene}")
+                    require = rule.get("require", [])
+                    if not isinstance(require, list):
+                        errors.append(f"{prefix}.require must be a list")
+                    else:
+                        for gene in require:
+                            if not isinstance(gene, str) or not gene:
+                                errors.append(f"{prefix}.require contains an invalid name")
+                            elif gene.lower() not in {str(g).lower() for g in rule_genes}:
+                                errors.append(
+                                    f"{prefix}.require references gene not in genes: {gene}"
+                                )
 
         if not errors and not genes:
             errors.append("markers.fasta contains no marker sequences")

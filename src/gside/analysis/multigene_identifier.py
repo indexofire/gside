@@ -440,7 +440,11 @@ def _pick_rule(
     for rule in rules:
         min_hits = rule.get("min_hits", 1)
         matched, excluded_present, identities = _rule_match(rule, by_gene, significant)
-        if len(matched) < min_hits or excluded_present:
+        # ``require`` genes must be among the matched hits (hard AND on top of
+        # the min_hits quorum), so a species rule can demand its genus signal
+        # before any specific marker counts.
+        required = {str(g).lower() for g in rule.get("require", [])}
+        if len(matched) < min_hits or excluded_present or not required <= set(matched):
             continue
         score = len(matched)
         avg_id = sum(identities) / len(identities)

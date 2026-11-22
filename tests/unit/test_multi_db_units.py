@@ -39,7 +39,7 @@ class TestPanelMultiDatabase:
         monkeypatch.setattr(ani, "_skani_search", lambda q, d, threads=4: hits_by_db[str(d)])
         identified = identify_by_ani("q.fna", mode="ani", dbs=[taxadb, salmdb])
         r = identified.result
-        assert (r["species"], r["confidence"]) == ("Salmonella", "high")
+        assert (r["species"], str(r["confidence"])) == ("Salmonella_enterica", "high")
         assert r["top_hits"][0]["genome"] == "GCF_B"
         assert identified.database["name"] == f"{taxadb.name}+{salmdb.name}"
         assert [d["name"] for d in identified.to_dict()["databases"]] == [

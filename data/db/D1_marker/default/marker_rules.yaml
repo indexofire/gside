@@ -1,12 +1,54 @@
 rules:
+- species: Salmonella_bongori
+  genes:
+  - inva
+  - asst
+  - zadh
+  require:
+  - inva
+  min_hits: 2
+  min_identity: 90
+  priority_over:
+  - Salmonella
+  - Salmonella_enterica
+  note: Bongori species call = genus signal (inva, required) plus at least one
+    bongori-specific marker (asst = aryl-sulfate sulfotransferase, zadh =
+    zinc-dependent alcohol dehydrogenase; both from S. bongori NCTC 12419,
+    absent from all S. enterica subspecies and outgroups; screened against 26
+    Salmonella + 5 outgroup genomes, Fookes 2011 PLoS Pathog e1002191).
+    A bongori draft missing both markers falls back to the genus rule
+    (SPI-2 markers are never present in bongori).
+- species: Salmonella_enterica
+  genes:
+  - inva
+  - ssav
+  - ssec
+  require:
+  - inva
+  min_hits: 2
+  min_identity: 90
+  exclude_genes:
+  - asst
+  - zadh
+  priority_over:
+  - Salmonella
+  note: Species call = genus signal (inva, required) plus at least one SPI-2
+    marker (ssav/ssec apparatus genes; SPI-2 is absent from every S. bongori
+    strain and outgroup screened, core in all 11 S. enterica panel genomes
+    covering 6 subspecies). Divergent enterica lineages stay species-called
+    (genus-level identity threshold); bongori markers detected at the global
+    floor (85/60) also suppress this rule. SPI-2-negative enterica (rare,
+    historic subsp. arizonae isolates) falls back to the genus rule.
+    Serovar/subspecies typing belongs to gspec.
 - species: Salmonella
   genes:
   - inva
   min_hits: 1
   min_identity: 90
-  note: Genus-level call by design (CPIN) - typhoidal and non-typhoidal
-    Salmonella, including S. bongori and every S. enterica serovar, report as
-    Salmonella; serovar/serotype discrimination belongs to gspec.
+  note: Genus-level fallback for invA-positive genomes where both species
+    rules are suppressed (bongori markers detected below the species-rule
+    identity floor, 85-90 band); typhoidal/non-typhoidal serovars all
+    resolve to Salmonella_enterica above.
 - species: Vibrio_parahaemolyticus
   genes:
   - tlh
@@ -203,6 +245,9 @@ rules:
   - rfc
   - rfbe
   - rfbi
+  require:
+  - uida
+  - ipah
   min_hits: 3
   min_identity: 95
   exclude_genes:
@@ -218,6 +263,9 @@ rules:
   - ipah
   - wbgz
   - sonnei_psuk
+  require:
+  - uida
+  - ipah
   min_hits: 3
   min_identity: 95
   exclude_genes:
@@ -261,6 +309,9 @@ rules:
   - sdprove_wzy
   - sdprov_wzx
   - sdprov_wzy
+  require:
+  - uida
+  - ipah
   min_hits: 3
   min_identity: 85
   min_coverage: 50
@@ -309,6 +360,9 @@ rules:
   - sb9_wzy
   - sbprov_wzx
   - sbprov_wzy
+  require:
+  - uida
+  - ipah
   min_hits: 3
   min_identity: 85
   min_coverage: 50

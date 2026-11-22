@@ -82,6 +82,8 @@ genes are not assembled first, so a read set is never turned into contigs.
 - Rapid initial screening (minutes)
 - No large database needed (mini tier bundled)
 - Species-rich genera (Salmonella/E.coli/Campylobacter) should confirm with L2
+  (marker already resolves *Salmonella* to the species level:
+  `Salmonella_enterica` vs `Salmonella_bongori`)
 
 ## L2: panel (ANI Curated Panel)
 

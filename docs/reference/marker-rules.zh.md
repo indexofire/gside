@@ -95,9 +95,10 @@ rules:
 
 `priority_over` 引擎支持（命中的 priority 物种会压制非 priority 物种）。四条志贺菌
 种级规则（`Shigella_flexneri`、`Shigella_sonnei`、`Shigella_dysenteriae`、
-`Shigella_boydii`）使用 `priority_over: [Shigella, Escherichia_coli]`：
-种级决定因子（如 `rfc`、`wbgZ`、`sb1_wzx`）会升级属级判定，而单纯的
-`uidA+ipaH` 仍停留在 `Shigella` 属级；所有志贺菌规则均为 lacY 阴性
+`Shigella_boydii`）使用 `priority_over: [Shigella, Escherichia_coli]` 与
+`require: [uida, ipah]`：种级决定因子（如 `rfc`、`wbgZ`、`sb1_wzx`）会升级属级
+判定——且 O-抗原决定因子单独在场、缺少 uidA+ipaH 属锚时永不触发种级判定——
+而单纯的 `uidA+ipaH` 仍停留在 `Shigella` 属级；所有志贺菌规则均为 lacY 阴性
 （`exclude_genes: [lacy]`），EIEC 不会触发志贺菌判定。
 
 ## CPIN 覆盖块
@@ -146,6 +147,24 @@ mean depth 中位数。每个基因取最深的等位基因，避免少量污染
 `detected_markers` 中。没有专用对照的物种回退到已检出标记的样本中位深度
 （`control_source: "fallback"`）；完全无对照时关闭相对门控，仅保留绝对下限。
 组装（BLAST）输入没有深度信息，保持旧行为。
+
+## 沙门菌种级规则
+
+内置库用三层规则区分沙门菌的两个种（实证基础：26 株沙门菌面板——
+*S. enterica* 全部 6 个亚种 + 13 株 *S. bongori*——及 5 株外群；背景文献
+Fookes 2011, PLoS Pathog e1002191）：
+
+| 规则 | 基因 | 阈值 | 含义 |
+|---|---|---|---|
+| `Salmonella_enterica` | `inva`（必命中）+（`ssav` \| `ssec`），排除 `asst`/`zadh` | 3 选 2，≥ 90 | 属锚 AND SPI-2 标记（T3SS-2 装置 `ssav`/转位孔 `ssec`，11 株 *S. enterica* 面板[覆盖 6 亚种]核心、所有邦戈尔与外群缺失）；属级阈值保证 divergent enterica 谱系不漏检 |
+| `Salmonella_bongori` | `inva`（必命中）+（`asst` \| `zadh`） | 3 选 2，≥ 90 | 属锚 AND 邦戈尔特异标记（`asst` = 芳基硫酸磺基转移酶、`zadh` = 锌依赖乙醇脱氢酶） |
+| `Salmonella` | `inva` | 一致性 ≥ 90 | 属级回退——inva 阳性但种级规则未触发（邦戈尔 draft 缺双标记、SPI-2 阴性 enterica、标记落在 85–90 检出带） |
+
+两个种级规则均 `require: inva`（属信号必须在命中集合内），
+`Salmonella_bongori` 另有 `priority_over: [Salmonella, Salmonella_enterica]`：
+特异标记单独在场永不触发种级判定，携带标记的邦戈尔基因组必然判对。
+已知权衡（有意）：缺失 SPI-2 的 *S. enterica*（罕见，历史 subsp. arizonae
+菌株）回退属级标签。血清型/亚种分型仍归 gspec。
 
 ## 新增物种示例
 

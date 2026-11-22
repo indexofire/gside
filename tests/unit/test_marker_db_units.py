@@ -90,6 +90,39 @@ def test_validate_bad_fasta_header_and_unknown_rule_gene(tmp_path: Path) -> None
     assert any("unknown gene" in err for err in errors)
 
 
+def test_validate_require_must_reference_rule_genes(tmp_path: Path) -> None:
+    root = _db(
+        tmp_path / "db",
+        fasta=">markers~~~geneA~~~refA\nACGT\n",
+        rules=[{"species": "X", "genes": ["genea"], "require": ["genea"], "min_hits": 1}],
+    )
+    assert MarkerDatabase.from_path(root).validate() == []
+
+    bad = _db(
+        tmp_path / "db2",
+        fasta=">markers~~~geneA~~~refA\nACGT\n",
+        rules=[{"species": "X", "genes": ["genea"], "require": ["genez"], "min_hits": 1}],
+    )
+    errors = MarkerDatabase.from_path(bad).validate()
+    assert any("require references gene not in genes: genez" in err for err in errors)
+
+    not_list = _db(
+        tmp_path / "db3",
+        fasta=">markers~~~geneA~~~refA\nACGT\n",
+        rules=[{"species": "X", "genes": ["genea"], "require": "genea", "min_hits": 1}],
+    )
+    errors = MarkerDatabase.from_path(not_list).validate()
+    assert any("require must be a list" in err for err in errors)
+
+    invalid_entry = _db(
+        tmp_path / "db4",
+        fasta=">markers~~~geneA~~~refA\nACGT\n",
+        rules=[{"species": "X", "genes": ["genea"], "require": [""], "min_hits": 1}],
+    )
+    errors = MarkerDatabase.from_path(invalid_entry).validate()
+    assert any("require contains an invalid name" in err for err in errors)
+
+
 def test_validate_duplicate_fasta_id(tmp_path: Path) -> None:
     root = _db(
         tmp_path / "db",

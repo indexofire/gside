@@ -177,32 +177,50 @@ class TestGtdbDisambiguationSuffix:
         assert parse_species_name("Escherichia coli K12").strain == "K12"
 
 
-class TestGenusCollapse:
-    """Deliberate genus-level labels (CPIN): every Salmonella entry point -
-    marker registry, panel metadata, GTDB lineages - reports as Salmonella."""
+class TestSalmonellaSpeciesLevel:
+    """The two Salmonella species keep their binomials (each has its own
+    marker rules); only the bare genus label passes through unchanged."""
 
     @pytest.mark.parametrize(
         ("raw", "label", "display"),
         [
-            ("Salmonella enterica", "Salmonella", "Salmonella"),
-            ("Salmonella bongori", "Salmonella", "Salmonella"),
-            ("Salmonella enterica subsp. enterica", "Salmonella", "Salmonella"),
-            ("Salmonella enterica subsp. enterica serovar Typhi", "Salmonella", "Salmonella"),
-            ("Salmonella", "Salmonella", "Salmonella"),
-            ("s__Salmonella enterica", "Salmonella", "Salmonella"),
+            ("Salmonella enterica", "Salmonella_enterica", "Salmonella enterica"),
+            ("Salmonella bongori", "Salmonella_bongori", "Salmonella bongori"),
+            ("s__Salmonella enterica", "Salmonella_enterica", "Salmonella enterica"),
         ],
     )
-    def test_salmonella_collapses_to_genus(self, raw, label, display):
+    def test_salmonella_binomials_are_kept(self, raw, label, display):
         parsed = parse_species_name(raw)
         assert parsed.label == label
         assert parsed.display == display
 
+    def test_bare_genus_label_passes_through(self):
+        parsed = parse_species_name("Salmonella")
+        assert (parsed.label, parsed.display) == ("Salmonella", "Salmonella")
+
     def test_serovar_detail_lands_in_strain(self):
         parsed = parse_species_name("Salmonella enterica subsp. enterica serovar Typhi")
-        assert parsed.label == "Salmonella"
+        assert parsed.label == "Salmonella_enterica"
         assert "enterica" in parsed.strain
         assert "Typhi" in parsed.strain
 
+
+class TestGenusCollapse:
+    """No genus collapses today; binomials stay idempotent and bare genus
+    labels pass through untouched (Salmonella genus behavior now lives in the
+    marker rules, Shigella likewise)."""
+
+    @pytest.mark.parametrize(
+        ("raw", "label"),
+        [
+            ("Shigella flexneri", "Shigella_flexneri"),
+            ("Shigella", "Shigella"),
+            ("Salmonella", "Salmonella"),
+        ],
+    )
+    def test_binomials_stay_binomials(self, raw, label):
+        assert parse_species_name(raw).label == label
+
     def test_other_genera_unchanged(self):
         assert parse_species_name("Vibrio cholerae").label == "Vibrio_cholerae"
-        assert parse_species_name("Shigella flexneri").label == "Shigella_flexneri"
+        assert parse_species_name("Salmonella enterica").label == "Salmonella_enterica"

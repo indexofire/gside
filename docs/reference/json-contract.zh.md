@@ -125,7 +125,7 @@ marker 结果额外携带 reads 模式深度门控字段（`control_gene`、`con
 | `scope` | 含义 |
 |---|---|
 | `species` | 证据支持二名法种级判定 |
-| `genus` | gside 有意只判到属（`Salmonella`、`Shigella`）；血清型/致病型分型属于 gspec |
+| `genus` | gside 有意只判到属（`Salmonella` 属级回退、`Shigella`）；血清型/致病型分型属于 gspec |
 | `complex` | 多个成功方法在已知近缘群内不一致；胜者仍写入 `species`，其余标签进入 `alternatives` |
 | `unknown` | 没有任何方法给出判定 |
 
@@ -217,9 +217,12 @@ DEC/EIEC、志贺菌血清型等致病型/血清型分型属于 gspec，不在 g
 | sourmash | `...;s__Vibrio parahaemolyticus` | `Vibrio_parahaemolyticus` |
 | gtdbtk | `Vibrio cholerae` | `Vibrio_cholerae` |
 
-marker 注册标签本身即契约形式：`Salmonella`、
-`Vibrio_parahaemolyticus`、`Escherichia_coli`、`Shigella`。`Salmonella` 与
-`Shigella` 是有意的属级标签——血清型/致病型分型属于 gspec；
+marker 注册标签本身即契约形式：`Salmonella_enterica`、
+`Salmonella_bongori`、`Salmonella`（属级回退）、
+`Vibrio_parahaemolyticus`、`Escherichia_coli`、`Shigella`。沙门菌两个种
+各有专属规则（见 marker-rules），裸 `Salmonella` 只作为边缘情形的属级回退
+（bongori 标记落在 85–90 检出带时两个种级规则都被压制）。`Shigella`
+是有意的属级标签——血清型/致病型分型属于 gspec；
 `verdict.scope` 明确说明证据支持种、属还是近缘 complex。菌株/登录号
 文本绝不拼进 `species`（点号会破坏下游匹配），统一放入 `strain`。
 种组占位（`Campylobacter sp.`）与 `Unknown` 一律输出 `Unknown`。

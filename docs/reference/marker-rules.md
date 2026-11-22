@@ -48,6 +48,15 @@ called.
 Multi-gene combinations significantly reduce cross-reactions (e.g.,
 C.jejuni's 2-of-3 design).
 
+### require
+
+Genes that MUST be among the matched hits, in addition to the `min_hits`
+quorum (default: none). Use it when a rule mixes a genus signal with
+species-specific markers — e.g. `Salmonella_enterica` = `require: [inva]`
+plus at least one SPI-2 marker — so the specific markers alone can never
+fire the species call without the genus anchor. Every `require` entry must
+also appear in `genes` (validated by `gside db validate`).
+
 ### min_identity
 
 Minimum identity percentage per gene (blastn pident). Default 90.
@@ -107,11 +116,13 @@ rules that omit them use 90 / 60. The global `_MIN_IDENTITY` (85) and
 `priority_over` is supported by the engine (a matching priority species
 suppresses non-priority ones). The four Shigella species rules
 (`Shigella_flexneri`, `Shigella_sonnei`, `Shigella_dysenteriae`,
-`Shigella_boydii`) use it with `priority_over: [Shigella, Escherichia_coli]`:
-a species determinant (e.g. `rfc`, `wbgZ`, `sb1_wzx`) upgrades the genus
-signature, while the plain `uidA+ipaH` signature stays at the `Shigella` genus
-and every Shigella rule is lacY-negative (`exclude_genes: [lacy]`) so EIEC
-never fires a Shigella call.
+`Shigella_boydii`) use it with `priority_over: [Shigella, Escherichia_coli]`
+and `require: [uida, ipah]`: a species determinant (e.g. `rfc`, `wbgZ`,
+`sb1_wzx`) upgrades the genus signature — and the O-antigen determinants
+alone can never fire the species call without the uidA+ipaH anchors — while
+the plain `uidA+ipaH` signature stays at the `Shigella` genus and every
+Shigella rule is lacY-negative (`exclude_genes: [lacy]`) so EIEC never fires
+a Shigella call.
 
 ## CPIN coverage block
 
@@ -169,6 +180,27 @@ sample median depth of detected markers (`control_source: "fallback"`);
 if no control is available at all, the relative gate is disabled and only the
 absolute floor applies. Assembly (BLAST) input has no depth and keeps the
 legacy behaviour.
+
+## Species-level Salmonella rules
+
+The bundled database distinguishes the two *Salmonella* species with three
+layered rules (empirical basis: 26 *Salmonella* genomes across all six
+*S. enterica* subspecies plus 13 *S. bongori* strains, and five outgroup
+genomes; background in Fookes 2011, PLoS Pathog e1002191):
+
+| Rule | Genes | Threshold | Meaning |
+|---|---|---|---|
+| `Salmonella_enterica` | `inva` (required) + (`ssav` \| `ssec`), exclude `asst`/`zadh` | 2 of 3 genes, ≥ 90 | genus anchor AND a SPI-2 marker (T3SS-2 apparatus `ssav`/translocon `ssec`, core in all 11 *S. enterica* panel genomes across 6 subspecies, absent from every *S. bongori* strain and outgroup); genus-level threshold keeps divergent enterica lineages species-called |
+| `Salmonella_bongori` | `inva` (required) + (`asst` \| `zadh`) | 2 of 3 genes, ≥ 90 | genus anchor AND a bongori-specific marker (`asst` = aryl-sulfate sulfotransferase, `zadh` = zinc-dependent alcohol dehydrogenase) |
+| `Salmonella` | `inva` | identity ≥ 90 | genus fallback — invA-positive genomes where no species rule fires (bongori drafts missing both markers; SPI-2-negative enterica; markers in the 85–90 detection band) |
+
+Both species rules `require: inva` (the genus signal must be among the
+matched hits) and `Salmonella_bongori` carries
+`priority_over: [Salmonella, Salmonella_enterica]`, so specific markers
+alone never fire a species call, and a marker-carrying bongori genome always
+resolves correctly. Known trade-off (deliberate): *S. enterica* isolates
+lacking SPI-2 (rare, historic subsp. arizonae) fall back to the genus label.
+Serovar/subspecies typing stays with gspec.
 
 ## Adding a New Species
 

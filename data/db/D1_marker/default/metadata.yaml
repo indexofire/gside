@@ -7,6 +7,10 @@ description: Bundled species marker database. Control genes are conserved single
 control_genes:
   Salmonella:
   - rpoD
+  Salmonella_enterica:
+  - rpoD
+  Salmonella_bongori:
+  - rpoD
   Listeria_monocytogenes:
   - prs
   Staphylococcus_aureus:
