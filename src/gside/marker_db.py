@@ -55,6 +55,11 @@ class MarkerDatabase:
         configured = self.metadata.get("blast_db")
         return self.root / str(configured) if configured else self.root / "markers_blastdb"
 
+    @property
+    def extends(self) -> str:
+        """Sibling database name this one pools in at runtime (``metadata.yaml``)."""
+        return str(self.metadata.get("extends", "")).strip()
+
     @classmethod
     def from_path(cls, path: str | Path) -> MarkerDatabase:
         """Load a marker DB from *path*.

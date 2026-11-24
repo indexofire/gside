@@ -243,8 +243,10 @@ class TestDbCommands:
         import gside.db as dbmod
 
         self._db(tmp_path, monkeypatch)
-        (tmp_path / "db" / "D2_ani" / "panel.sketch").mkdir(parents=True)
-        (tmp_path / "db" / "D2_ani" / "panel.sketch" / "sketches.db").write_bytes(b"x")
+        # 当前布局：<root>/D2_ani/default/panel.sketch/（旧版无 default/ 层级，
+        # 会让就绪探测失败并走进真实网络下载路径——测试必须无网络）
+        (tmp_path / "db" / "D2_ani" / "default" / "panel.sketch").mkdir(parents=True)
+        (tmp_path / "db" / "D2_ani" / "default" / "panel.sketch" / "sketches.db").write_bytes(b"x")
         assert CliRunner().invoke(main, ["db", "setup", "--tier", "panel"]).exit_code == 0
         monkeypatch.setattr(dbmod, "db_setup", lambda tier, source: {"x": "ERROR: boom"})
         assert CliRunner().invoke(main, ["db", "setup", "--tier", "panel"]).exit_code == 1

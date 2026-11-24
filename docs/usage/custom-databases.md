@@ -58,6 +58,24 @@ as sibling subdirectories of `default/` — `D1_marker/cpin` is the shipped
 example (git-tracked, validated by the same layout rules). Add yours next to
 it (`D1_marker/my-panel/`) or point `-d` at any directory path.
 
+**Database composition via `extends`**: a marker database can declare
+`extends: <name>` in its `metadata.yaml` to pool a sibling database in
+automatically at runtime. The bundled `cpin` extends `default`, so these two
+invocations are identical:
+
+```bash
+gside scan -m marker -d cpin sample.fna              # auto: cpin + default
+gside scan -m marker -d default -d cpin sample.fna   # explicit merge
+```
+
+Without `extends`, an explicit `-d` selection replaces the default tier —
+`-d cpin` alone would run ONLY the cpin rules (its 30 species), which is how
+species like Shigella can slip through. `extends` makes the extension
+database safe by construction: default updates propagate automatically (no
+copy to keep in sync), the `databases` array reports every database that
+ran, and cycle/missing targets degrade with a note. To test an extension in
+strict isolation, point `--marker-db` at a copy without the `extends` key.
+
 `gside db list` / `gside db status` enumerate them: every database `-d`
 can select appears as a `MODE / DATABASE` row (JSON: `modes`, plus
 installable `tiers`). Modes without local databases

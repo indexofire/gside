@@ -34,10 +34,10 @@ gside scan contigs.fna -m all                 # 全部基因组层
 
 ### 原理
 
-**FASTA**：对 contigs 执行一次 BLAST（vs markers 库，75 条序列）。
+**FASTA**：对 contigs 执行一次 BLAST（vs markers 库，182 条序列）。
 **FASTQ**：用 minimap2 比对读段（短读 `-x sr`，长读 `-x map-ont`），每个基因的
 breadth = 所有 primary 比对的参考区间并集 / 基因长度（与 gspec reads 模式相同的
-聚合算法）。随后把检出基因与 42 条组合规则匹配（数据驱动，`marker_rules.yaml`）。
+聚合算法）。随后把检出基因与 46 条组合规则匹配（数据驱动，`marker_rules.yaml`）。
 
 双端 mate 会从文件名识别（`_R1`/`_R2`、`_1`/`_2`、`.1`/`.2`）并在
 一次 minimap2 中一起比对，因此每基因 breadth 是两条 mate 的并集；它们算
@@ -69,6 +69,11 @@ breadth = 所有 primary 比对的参考区间并集 / 基因长度（与 gspec 
 - **exclude_genes**：排除规则防止近缘种误判（如 C.jejuni vs C.coli）
 - **tlh 近缘守卫**：单基因 <90% 命中 → 判定抑制为 Unknown（V.alginolyticus 案例）
 - **coverage 门槛**：全局 ≥60%（防短 HSP 高一致性误报）
+- **跨物种共检出**：多个物种的标记同时命中时，引擎按顺序仲裁——
+  命中门槛 → `min_hits`/`require` → `exclude_genes` → `priority_over` →
+  命中基因数得分——`detected_markers` 始终保留所有显著基因。示例
+  （芽孢杆菌、志贺菌、伯克霍尔德菌）见
+  [标记规则：跨物种共检出与仲裁](../reference/marker-rules.zh.md#cross-species-arbitration)。
 
 ### 适用场景
 

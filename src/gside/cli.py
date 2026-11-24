@@ -1132,6 +1132,12 @@ def _species_of(payload: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
 # the genus-fallback rule output.
 _GENUS_SCOPE_LABELS = frozenset({"Salmonella", "Shigella"})
 
+# Species-complex labels: chromosomally inseparable groups where the honest
+# call stops at complex level (the cereus group - B. anthracis vs B. cereus
+# vs B. thuringiensis share >99% chromosomal identity; only the anthracis
+# clade is separable via the lambdaBa03 marker).
+_COMPLEX_SCOPE_LABELS = frozenset({"Bacillus_cereus_group"})
+
 # Benchmark-informed close-relative groups. When successful methods disagree
 # inside one group, the winner stays in ``species`` for backward compatibility,
 # but the verdict gains ``scope: complex``, the competing labels in
@@ -1186,6 +1192,19 @@ _TAXONOMIC_COMPLEXES: tuple[tuple[frozenset[str], str], ...] = (
         ),
         "close_species_complex",
     ),
+    (
+        frozenset(
+            {
+                "Bacillus_anthracis",
+                "Bacillus_cereus",
+                "Bacillus_cereus_group",
+                "Bacillus_thuringiensis",
+                "Bacillus_mycoides",
+                "Bacillus_weihenstephanensis",
+            }
+        ),
+        "bacillus_cereus_group_complex",
+    ),
 )
 
 _VERDICT_EVIDENCE_KEYS = (
@@ -1211,6 +1230,8 @@ def _scope_for_species(species: str) -> VerdictScope:
         return VerdictScope.UNKNOWN
     if species in _GENUS_SCOPE_LABELS:
         return VerdictScope.GENUS
+    if species in _COMPLEX_SCOPE_LABELS:
+        return VerdictScope.COMPLEX
     return VerdictScope.SPECIES
 
 

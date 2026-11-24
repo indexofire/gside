@@ -63,6 +63,103 @@ class TestLoadRules:
         monkeypatch.setattr(mg, "_MARKER_RULES", tmp_path / "nope.yaml")
         assert _load_rules() == []
 
+    def test_yersinia_non_pathogenic_profile_note(self, monkeypatch):
+        monkeypatch.delenv("GSIDE_MARKER_DB", raising=False)
+        monkeypatch.setattr(
+            mg,
+            "_blast_contigs",
+            lambda path, threads=4, marker_db=None: [
+                {"gene": "glk-ye", "identity": 98.0, "coverage": 100.0}
+            ],
+        )
+        result = mg.identify_multigene("x.fna").to_dict()
+        assert result["species"] == "Yersinia_enterocolitica"
+        assert any("No pathogenicity markers" in n for n in result["notes"])
+
+    def test_yersinia_pathogenic_profile_no_note(self, monkeypatch):
+        monkeypatch.delenv("GSIDE_MARKER_DB", raising=False)
+        monkeypatch.setattr(
+            mg,
+            "_blast_contigs",
+            lambda path, threads=4, marker_db=None: [
+                {"gene": "glk-ye", "identity": 98.0, "coverage": 100.0},
+                {"gene": "ail", "identity": 99.0, "coverage": 100.0},
+            ],
+        )
+        result = mg.identify_multigene("x.fna").to_dict()
+        assert result["species"] == "Yersinia_enterocolitica"
+        assert not any("No pathogenicity markers" in n for n in result["notes"])
+
+
+class TestMarkerDbExtends:
+    def _make_db(self, root: Path, species: str, gene: str) -> Path:
+        root.mkdir(parents=True)
+        (root / "markers.fasta").write_text(
+            f">gside|db=test|gene={gene}|acc=t|func=primary\nACGTACGTACGTACGTACGTACGTACGT\n"
+        )
+        (root / "marker_rules.yaml").write_text(
+            f"rules:\n- species: {species}\n  genes: [{gene}]\n"
+        )
+        return root
+
+    def test_extends_pools_sibling_database(self, tmp_path, monkeypatch):
+        tier = tmp_path / "D1_marker"
+        parent = self._make_db(tier / "base", "Parentia_major", "pgene")
+        child = self._make_db(tier / "extra", "Childia_minor", "cgene")
+        (child / "metadata.yaml").write_text("schema: gside.marker-db/1\nextends: base\n")
+
+        expanded, _notes = mg._expand_extends(mg._coerce_marker_dbs(str(child)))
+        assert [d.root for d in expanded] == [child, parent]
+
+    def test_extends_dedupes_explicit_dual_selection(self, tmp_path):
+        tier = tmp_path / "D1_marker"
+        parent = self._make_db(tier / "base", "Parentia_major", "pgene")
+        child = self._make_db(tier / "extra", "Childia_minor", "cgene")
+        (child / "metadata.yaml").write_text("extends: base\n")
+
+        expanded, _notes = mg._expand_extends(
+            [mg.MarkerDatabase.from_path(parent), mg.MarkerDatabase.from_path(child)]
+        )
+        assert [d.root for d in expanded] == [parent, child]
+
+    def test_missing_extends_target_reports_and_continues(self, tmp_path):
+        tier = tmp_path / "D1_marker"
+        child = self._make_db(tier / "extra", "Childia_minor", "cgene")
+        (child / "metadata.yaml").write_text("extends: absent\n")
+
+        expanded, notes = mg._expand_extends([mg.MarkerDatabase.from_path(child)])
+        assert [d.root for d in expanded] == [child]
+        assert any("extends" in n and "absent" in n for n in notes)
+
+    def test_invalid_extends_target_reports_and_continues(self, tmp_path):
+        tier = tmp_path / "D1_marker"
+        child = self._make_db(tier / "extra", "Childia_minor", "cgene")
+        broken = tier / "broken"
+        broken.mkdir()  # 目录存在但缺少 markers.fasta / marker_rules.yaml
+        (child / "metadata.yaml").write_text("extends: broken\n")
+
+        expanded, notes = mg._expand_extends([mg.MarkerDatabase.from_path(child)])
+        assert [d.root for d in expanded] == [child]
+        assert any("invalid" in n for n in notes)
+
+    def test_circular_extends_terminates(self, tmp_path):
+        tier = tmp_path / "D1_marker"
+        a = self._make_db(tier / "dba", "SpeciesA", "genea")
+        b = self._make_db(tier / "dbb", "SpeciesB", "geneb")
+        (a / "metadata.yaml").write_text("extends: dbb\n")
+        (b / "metadata.yaml").write_text("extends: dba\n")
+
+        expanded, _notes = mg._expand_extends([mg.MarkerDatabase.from_path(a)])
+        assert len(expanded) == 2  # a -> b -> (a 已见过，终止)
+
+    def test_bundled_cpin_extends_default(self):
+        from gside.config import SPECIES_DB_DIR
+
+        cpin = mg.MarkerDatabase.from_path(SPECIES_DB_DIR / "D1_marker" / "cpin")
+        assert cpin.extends == "default"
+        expanded, _notes = mg._expand_extends([cpin])
+        assert [d.root.name for d in expanded] == ["cpin", "default"]
+
 
 class TestPriorityDeadCode:
     def test_priority_block_runs_without_effect(self, monkeypatch):
@@ -648,8 +745,32 @@ class TestRuleDesign:
         assert any("serotyp" in note.lower() for note in result.notes)
 
     def test_bordetella_pertussis_needs_both_targets(self):
-        assert _pick("ptxs1", "tcfa") == "Bordetella_pertussis"
+        assert _pick("cupin-bp", "ptxs1") == "Bordetella_pertussis"
+        assert _pick("cupin-bp", "tcfa5") == "Bordetella_pertussis"
+        # require 语义：无 cupin 锚（近缘种画像：ptxs1 交叉 96-99%）不触发
         assert _pick("ptxs1") == "Unknown"
+        assert _pick("ptxs1", "tcfa5", "tcfa3") == "Unknown"
+
+    def test_pseudomallei_anchor_design(self):
+        # GlgB anchor alone calls the species (BimA-negative / TTS-deleted
+        # genomes stay called); virulence reporters never gate the call.
+        assert _pick("glgb-bp") == "Burkholderia_pseudomallei"
+        assert _pick("glgb-bp", "bima-bp", "sctn-bp") == "Burkholderia_pseudomallei"
+        assert _pick("bima-bp", "sctn-bp") == "Unknown"
+
+    def test_yersinia_pestis_anchor_design(self):
+        # 种锚单独命中即可（pPCP1 丢失株无 pla 仍判种）
+        assert _pick("spi-yp") == "Yersinia_pestis"
+        assert _pick("spi-yp", "caf1", "pla") == "Yersinia_pestis"
+        # require 语义：质粒毒力标记单独在场不触发
+        assert _pick("caf1", "pla") == "Unknown"
+
+    def test_yersinia_enterocolitica_anchor_design(self):
+        # 种锚单独命中即可（1A 生物型非致病株无 ail/yada 仍判种）
+        assert _pick("glk-ye") == "Yersinia_enterocolitica"
+        assert _pick("glk-ye", "ail", "yada") == "Yersinia_enterocolitica"
+        # require 语义：毒力标记单独在场（近缘画像）不触发
+        assert _pick("ail", "yada") == "Unknown"
 
     def test_renamed_labels(self):
         assert _pick("tlh") == "Vibrio_parahaemolyticus"
@@ -924,6 +1045,10 @@ class TestCpinRuleDesign:
         rule = next(r for r in rules if r["species"] == "Burkholderia_mallei")
         assert rule["genes"] == ["bima-bm"]
         assert rule["priority_over"] == ["Burkholderia_pseudomallei"]
+        # The Bm-like allele is not private: 3/100 clinical pseudomallei
+        # genomes match at 96.2-96.4%, so the threshold must stay above the
+        # cross (true mallei measures 99.6-100%).
+        assert rule["min_identity"] == 98
 
     def test_enterobacteriaceae_barcodes_use_gyrb_not_rpob(self):
         _db, rules = self._cpin_rules()

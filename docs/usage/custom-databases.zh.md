@@ -56,6 +56,21 @@ data/db/
 (git 跟踪,同一套布局校验)。你的库放在旁边(`D1_marker/my-panel/`),
 或 `-d` 直接指向任意目录路径。
 
+**用 `extends` 组合数据库**:marker 数据库可在 `metadata.yaml` 里声明
+`extends: <名字>`,运行时自动把同 tier 目录下的兄弟库池化进来。随包的
+`cpin` 声明了 `extends: default`,因此下面两种调用**完全等价**:
+
+```bash
+gside scan -m marker -d cpin sample.fna              # 自动: cpin + default
+gside scan -m marker -d default -d cpin sample.fna   # 显式合并
+```
+
+没有 `extends` 时,显式 `-d` 选择会替换默认库——单独 `-d cpin` 只跑 cpin
+的 30 个物种规则,志贺菌等 default 物种会漏掉。`extends` 让扩展库天然
+安全:default 更新自动传播(无需同步拷贝),`databases` 数组如实报告参与
+运行的每个库,循环/缺失目标以 note 方式降级。要严格隔离测试某个扩展库,
+用 `--marker-db` 指向一份去掉 `extends` 键的拷贝。
+
 `gside db list` / `gside db status` 会枚举它们:`-d` 可选的每个数据库都
 以 `MODE / DATABASE` 行出现(JSON 为 `modes`,另附可安装的 `tiers`)。
 没有本地数据库的模式

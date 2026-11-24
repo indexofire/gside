@@ -77,7 +77,7 @@ gside/
 
 | Principle | Implementation |
 |-----------|---------------|
-| **Rules as data** | 38 species rules in YAML; new species without code changes |
+| **Rules as data** | 46 species rules in YAML; new species without code changes |
 | **Backends injected per method** | The analysis layer picks blastn / skani / mash / sourmash directly |
 | **JSON contract** | All output in one unified JSON format on stdout |
 | **Graceful degradation** | Missing database/binary returns clear error, never crashes |

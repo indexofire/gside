@@ -31,6 +31,8 @@ control_genes:
   - lpxa
   Bacillus_anthracis:
   - rpob-bacillus_anthracis
+  Bacillus_cereus_group:
+  - rpob-bacillus_anthracis
   Bordetella_pertussis:
   - rpob-bordetella_pertussis
   Clostridioides_difficile:

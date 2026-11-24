@@ -35,11 +35,11 @@ gside scan contigs.fna -m all                 # every genome tier
 ### Principle
 
 **FASTA**: one BLAST scan of the contigs against the markers database
-(75 sequences). **FASTQ**: reads are mapped with minimap2 (`-x sr` for short
+(182 sequences). **FASTQ**: reads are mapped with minimap2 (`-x sr` for short
 reads, `-x map-ont` for long) and each gene's breadth is the union of the
 reference intervals covered by its primary alignments, divided by gene
 length (the same aggregate-breadth recipe as gspec's reads mode). Detected
-genes are then matched against the 42 combination rules
+genes are then matched against the 46 combination rules
 (data-driven, `marker_rules.yaml`).
 
 Paired-end mates are detected from the file names (`_R1`/`_R2`, `_1`/`_2`,
@@ -76,6 +76,12 @@ genes are not assembled first, so a read set is never turned into contigs.
 - **tlh near-relative guard**: single-gene <90% hit → suppressed to Unknown
   (V.alginolyticus case study)
 - **coverage gate**: global ≥60% (prevents short-HSP high-identity false fires)
+- **cross-species co-detection**: when markers from several species fire, the
+  engine resolves them in order — hit gates → `min_hits`/`require` →
+  `exclude_genes` → `priority_over` → matched-gene score — while
+  `detected_markers` keeps every significant gene visible. See
+  [Marker Rules: Cross-species co-detection](../reference/marker-rules.md#cross-species-arbitration)
+  for worked examples (Bacillus, Shigella, Burkholderia).
 
 ### Use Cases
 

@@ -106,6 +106,49 @@ def _coerce_marker_dbs(
     return dbs
 
 
+def _expand_extends(
+    dbs: list[MarkerDatabase],
+) -> tuple[list[MarkerDatabase], list[str]]:
+    """Pool each database's ``extends`` targets in behind it (transitive).
+
+    ``extends: <name>`` in metadata.yaml names a sibling database under the
+    same tier directory that is pooled in automatically — so ``-d cpin``
+    (which extends default) and ``-d default -d cpin`` run identically.
+    Resolution is by path dedupe (first seen wins, so the selected database's
+    own control genes and metadata outrank the extended one's) and
+    cycle-safe; a missing or invalid target is reported as a note and the
+    run continues with what exists.
+    """
+    expanded: list[MarkerDatabase] = []
+    notes: list[str] = []
+    seen: set[Path] = set()
+    queue = list(dbs)
+    while queue:
+        db = queue.pop(0)
+        if db.root in seen:
+            continue
+        seen.add(db.root)
+        expanded.append(db)
+        target_name = db.extends
+        if not target_name:
+            continue
+        target = db.root.parent / target_name
+        if not target.is_dir():
+            notes.append(
+                f"{db.name} declares extends: {target_name}, but {target} does not"
+                " exist; continuing without it."
+            )
+            continue
+        try:
+            queue.append(MarkerDatabase.from_path(target))
+        except ValueError as exc:
+            notes.append(
+                f"{db.name} declares extends: {target_name}, but it is invalid"
+                f" ({exc}); continuing without it."
+            )
+    return expanded, notes
+
+
 def _ensure_default_marker_db() -> None:
     """Materialize the wheel-bundled marker DB when the default D1 is absent.
 
@@ -495,6 +538,7 @@ def identify_multigene(
     dbs = _coerce_marker_dbs(marker_db)
     if not dbs:
         _ensure_default_marker_db()
+    dbs, extend_notes = _expand_extends(dbs)
     multi = len(dbs) > 1
     db = dbs[0] if len(dbs) == 1 else None
     files = [contigs_fasta] if isinstance(contigs_fasta, str) else list(contigs_fasta)
@@ -573,6 +617,7 @@ def identify_multigene(
         database_version=database_version,
         database_name=database_name,
         databases=databases_meta,
+        notes=list(extend_notes),
         control_gene=gate.control_gene,
         control_depth=round(gate.control_depth, 2) if gate.control_depth is not None else None,
         control_source=gate.control_source,
@@ -596,6 +641,26 @@ def identify_multigene(
             "discrimination is not performed here. Use gspec for Shigella "
             "serotyping/typing."
         )
+    if result.species == "Bacillus_cereus_group":
+        virulence = sorted(g for g in ("paga", "capb") if g in significant)
+        if virulence:
+            result.notes.append(
+                "Anthrax-like virulence plasmid marker(s) detected ("
+                + ", ".join(virulence)
+                + ") without the B. anthracis chromosomal marker (ba5345): "
+                "B. cereus biovar anthracis / cross-over strain, or a "
+                "lambdaBa03-negative B. anthracis draft assembly. "
+                "Confirm at a reference laboratory."
+            )
+    if result.species == "Yersinia_enterocolitica":
+        virulence = sorted(g for g in ("ail", "yada") if g in significant)
+        if not virulence:
+            result.notes.append(
+                "No pathogenicity markers detected (ail absent, pYV yadA"
+                " absent): likely non-pathogenic biotype 1A or a plasmid-"
+                "cured strain. Pathogenic bioserotype confirmation requires"
+                " ail and/or pYV markers."
+            )
 
     all_control_genes = {gene for genes in controls.values() for gene in genes}
     rule_genes = {str(gene).lower() for rule in rules for gene in rule.get("genes", [])}

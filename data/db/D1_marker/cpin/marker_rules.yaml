@@ -96,11 +96,15 @@ rules:
 - species: Burkholderia_mallei
   genes: [bima-bm]
   min_hits: 1
-  min_identity: 95
+  min_identity: 98
   priority_over: [Burkholderia_pseudomallei]
-  note: BimA(Bm) allele (ATCC 23344). The pseudomallei BimA(Bp) allele is
-    <85% identical, so glanders keeps a specific allele call; priority_over
-    resolves samples whose genomes retain both branches.
+  note: >-
+    BimA(Bm) allele (ATCC 23344). The B. mallei allele is not fully private:
+    3/100 clinical B. pseudomallei genomes carry a Bm-like allele at
+    96.2-96.4% full-length identity. True B. mallei measures 99.6-100%
+    (ATCC 23344 and GCF_000959405.1), so the threshold sits at 98 between
+    the cross and the allele. priority_over resolves samples whose genomes
+    retain both branches.
 - species: Burkholderia_gladioli
   genes: [rpob-bg, gyrb-bg]
   min_hits: 2

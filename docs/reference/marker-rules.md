@@ -147,6 +147,13 @@ near-neighbour adversarial genomes (`Y. pestis` vs `Y. pseudotuberculosis`,
 `B. mallei` vs `B. pseudomallei`); see
 `tests/integration/test_cpin_markers.py`.
 
+The `B. mallei` BimA(Bm) rule sits at 98% identity: 3/100 clinical
+*B. pseudomallei* genomes carry a Bm-like allele at 96.2–96.4%, while true
+*B. mallei* measures 99.6–100%. At the old 95% threshold those three
+pseudomallei genomes were suppressed by `priority_over` and reported as
+`Burkholderia_mallei`. The two taxa are one genomic species (ANI ~99.5%);
+see the *Burkholderia pseudomallei* entry below.
+
 ## Reads-Mode Depth Gate (FASTQ input)
 
 On FASTQ input the marker engine applies a gspec-style abundance gate on top
@@ -181,6 +188,56 @@ if no control is available at all, the relative gate is disabled and only the
 absolute floor applies. Assembly (BLAST) input has no depth and keeps the
 legacy behaviour.
 
+## Cross-species co-detection and arbitration {: #cross-species-arbitration }
+
+A single genome can produce marker hits from more than one species even when
+it is a pure isolate. The usual causes are shared ancestry (conserved
+housekeeping genes), horizontal transfer (virulence plasmids, pathogenicity
+islands, prophages), multi-copy paralogs, and mixed or contaminated
+assemblies. Marker hits are evidence, not a conclusion; the engine arbitrates
+in a fixed order:
+
+1. **Hit gates** — a hit is discarded below the global floor (85% identity,
+   60% coverage). Each rule then applies its own `min_identity` (default 90)
+   and `min_coverage` (default 60) to every raw hit of its genes.
+2. **Rule quorum** — `min_hits` sets how many of the rule's genes must pass;
+   `require` genes must all be among them (hard AND). A rule that cannot
+   reach its quorum is not a candidate.
+3. **Exclusion guards** — `exclude_genes` suppresses a rule when a
+   cross-reactive gene is detected at the global floor, even if the rule's
+   own markers pass (e.g. *Campylobacter coli* is suppressed by hipo/cadf;
+   every Shigella species rule is lacY-negative, so EIEC stays *E. coli*).
+4. **Priority** — when a candidate rule declares `priority_over`, it wins
+   over the listed species regardless of score (*B. mallei* BimA(Bm) over
+   *B. pseudomallei*; Shigella species over Shigella/*E. coli*;
+   *S. bongori* over *S. enterica*). Priority is the documented way to
+   resolve shared-marker competition.
+5. **Score** — among the remaining candidates, the rule with the most
+   matched genes wins; a tie prefers high confidence (average identity
+   ≥90%), and a remaining tie is broken by rule order in the YAML.
+
+The output keeps the evidence visible: `detected_markers` lists every
+significant gene, `matched_rule` names the winning gene combination, and
+`notes` / `co_detect_note` explain mixed profiles. A profile with, say,
+*B. anthracis* plasmid genes but no chromosomal marker reports the cereus
+group plus an "Anthrax-like" note rather than forcing the species call.
+
+When marker, ANI and GTDB-Tk results disagree (`all` mode), arbitration is
+layer-first: GTDB-Tk (L3) > ANI/mash/sourmash (L2) > marker (L1); within a
+layer, high confidence beats medium, and `verdict.supporting` /
+`verdict.agreement` record cross-method corroboration. A marker hit never
+overrides a whole-genome ANI call, and a whole-genome ANI call never hides a
+marker profile — inspect both when they disagree.
+
+Interpretation guidance:
+
+- A single off-target marker with no rule quorum is background, not a mixed
+  sample.
+- Multiple virulence markers from a foreign species suggest horizontal
+  transfer or a pathotype hybrid; confirm with L2.
+- Broad, high-identity hits across unrelated genera suggest contamination or
+  a mixed assembly; re-check the input.
+
 ## Species-level Salmonella rules
 
 The bundled database distinguishes the two *Salmonella* species with three
@@ -202,6 +259,248 @@ resolves correctly. Known trade-off (deliberate): *S. enterica* isolates
 lacking SPI-2 (rare, historic subsp. arizonae) fall back to the genus label.
 Serovar/subspecies typing stays with gspec.
 
+## Bordetella pertussis: IS fragmentation-resistant design
+
+B. pertussis carries hundreds of IS481 copies, so draft assemblies fragment
+badly (700+ contigs are routine; 30% of RefSeq drafts in a 20-genome panel
+split tcfA across two contigs). The rule design absorbs that:
+
+| Gene | Role |
+|---|---|
+| `cupin-bp` (681bp, required) | chromosomal species anchor — 100% conserved across 20 diverse strains (incl. ptxP3 era), max 71% identity in near relatives (ptxS1 cross-reacts at 96–99% with B. parapertussis/holmesii/bronchiseptica and IS481 is shared with B. holmesii, so neither can anchor) |
+| `tcfa5` / `tcfa3` (~972bp each) | the 1944bp tcfA split in halves — each half survives on a single contig when an IS breakpoint fragments the gene |
+| `ptxs1` (810bp) | pertussis toxin S1 — virulence-locus reporting |
+
+Virulence in B. pertussis is chromosomal (no plasmid issue as in B. anthracis):
+Bvg⁻ phase variants and detoxified vaccine derivatives remain detectable —
+the historical misses were IS-fragmentation artifacts, not avirulence.
+
+## Yersinia pestis: chromosomal anchor + plasmid virulence reporting
+
+Y. pestis is a recently emerged clone of Y. pseudotuberculosis (chromosomal
+identity >97%), making chromosomal discrimination the hardest in the genus.
+A 50-strain real-world panel (spanning all three biovars) against 5
+near-relative genomes found only 4 chromosomal genes specific to Y. pestis —
+the species is extremely clonal (all candidates 100% conserved):
+
+| Gene | Role |
+|---|---|
+| `spi-yp` (987bp, required) | chromosomal sugar phosphate isomerase — species anchor, 100% conserved across 50 strains, zero homology in near relatives |
+| `btub-yp` (1878bp) | TonB-dependent BtuB — second chromosomal marker (literature precedent) |
+| `caf1` (pMT1) | F1 capsule antigen — virulence plasmid reporting |
+| `pla` (pPCP1) | plasminogen activator — virulence reporting; 13% of real-world strains have lost the small pPCP1 plasmid |
+
+The original `min_hits: 2` on `[caf1, pla]` made every pPCP1-negative strain
+Unknown. With the chromosomal anchor, plasmid loss no longer gates the
+species call.
+
+## Yersinia enterocolitica: species anchor + pathogenicity reporting
+
+The original `ail`/`yada` entries were corrupted sequences matching no genome
+(the rule never fired — 76/100 real-world genomes reported Unknown). The
+redesigned rule separates species identity from pathogenicity:
+
+| Gene | Role |
+|---|---|
+| `glk-ye` (1164bp, required) | glycerate kinase chromosomal anchor — 100% present at ≥96% across a 50-strain real-world panel (spanning subsp. enterocolitica/palearctica and biotype 1A), zero homology in Y. pseudotuberculosis/frederiksenii/intermedia/kristensenii/pestis and E. coli |
+| `yddg-ye` (888bp) | second chromosomal marker (redundancy rider) |
+| `ail` (537bp) | real AIL CDS — present only in pathogenic bioserotypes (1B/2–5); absent from non-pathogenic biotype 1A |
+| `yada` (1269bp) | real pYV-plasmid YadA — virulence reporting; the plasmid is easily cured |
+
+Non-pathogenic biotype 1A and pYV-cured strains therefore still report
+`Yersinia_enterocolitica` (anchor-only) with a note flagging the absence of
+pathogenicity markers.
+
+## Bacillus cereus group: species vs complex
+
+The cereus group (B. anthracis / B. cereus / B. thuringiensis / B. mycoides /
+B. weihenstephanensis / ...) shares >99% chromosomal identity; only the
+B. anthracis clade is chromosomally separable, via the lambdaBa03 prophage.
+The bundled rules mirror that biology (empirical basis: 404-genome panel —
+150 B. anthracis + 246 non-anthracis cereus group + 8 outgroups; ring-trial
+literature: Wielinga 2013, Bentahir 2018):
+
+| Rule | Genes | Threshold | Meaning |
+|---|---|---|---|
+| `Bacillus_anthracis` | `adk` (required) + `ba5345` (required), `paga`/`capb` ride along | 2 of 4, ≥ 90 | group anchor AND the lambdaBa03 chromosomal marker; the plasmid genes report virulence status but never gate the species call — plasmid-cured/vaccine strains (Sterne) stay anthracis |
+| `Bacillus_cereus_group` | `adk` | ≥ 90 | complex-level fallback: B. cereus, B. thuringiensis, other group members, and lambdaBa03-negative B. anthracis drafts (the prophage assembles poorly from short reads — 27% of RefSeq drafts) |
+
+When `paga`/`capb` fire without `ba5345` (the B. cereus biovar anthracis /
+cross-over profile, e.g. Bcbva CI, BcFL2013, 03BB87), the result carries an
+"Anthrax-like" note directing confirmation at a reference laboratory — the
+plasmid pair alone never fires `Bacillus_anthracis`. `verdict.scope` for the
+group label is `complex`.
+
+## Species Marker Reference (with pathogen biology)
+
+Each rule's marker set reflects the underlying pathogen biology. The tables
+below explain what each gene measures and why it was chosen, so users can
+interpret `detected_markers` and `notes` in the output with full context.
+
+### Salmonella (S. enterica vs S. bongori)
+
+| Gene | Role | Biology |
+|---|---|---|
+| `inva` | Genus anchor (required) | Invasion protein A; conserved across the genus (invA⁻ mutants are non-invasive lab constructs). Identity band separates species: ≥93% = S. enterica, 90–93% = S. bongori (verified 26-genome panel). |
+| `ssav` | S. enterica specific (required pair) | SPI-2 type III secretion system apparatus. SPI-2 is the intracellular survival island, absent from every S. bongori strain and outgroup screened. |
+| `ssec` | S. enterica specific (required pair) | SPI-2 translocon protein. Same island, independent gene for redundancy. |
+| `asst` | S. bongori specific | Aryl-sulfate sulfotransferase, chromosomal. Zero full-length homologs in S. enterica or outgroups. |
+| `zadh` | S. bongori specific | Zinc-dependent alcohol dehydrogenase. Same species specificity as asst. |
+
+**Interpretation**: `Salmonella_enterica` = genus signal + species-specific
+SPI-2 marker. `Salmonella_bongori` = genus signal + bongori metabolic marker.
+Bare `Salmonella` = invA-positive but neither species rule fired (partial
+assembly, divergent lineage). Serovar typing (Typhi, Enteritidis, etc.)
+belongs to **gspec**, not gside.
+
+### Bacillus cereus group
+
+| Gene | Role | Biology |
+|---|---|---|
+| `adk` | Group anchor (required for B. anthracis) | Adenylate kinase, conserved across the entire cereus group (>99% identity). Distinguishes the group from other Bacillus and outgroups. |
+| `ba5345` | B. anthracis specific (required) | λBa03 prophage chromosomal marker; the only validated chromosomal separator of B. anthracis from the cereus group (Wielinga 2013 ring trial, 134-genome in silico). |
+| `paga` | Virulence reporting (pXO1 plasmid) | Protective antigen, anthrax toxin component. Reports toxigenicity; plasmid-cured/vaccine strains (Sterne) remain B. anthracis without it. |
+| `capb` | Virulence reporting (pXO2 plasmid) | Capsule biosynthesis. Full virulence requires both plasmids. |
+
+**Interpretation**: `Bacillus_anthracis` = chromosomal identity confirmed.
+`Bacillus_cereus_group` = cereus-group member without the anthracis
+chromosome — if paga/capb are present, an "Anthrax-like" note is emitted
+(B. cereus biovar anthracis / cross-over strain, or λBa03-negative draft).
+The **scope** is `complex` (chromosomally inseparable group).
+
+### Bordetella pertussis
+
+| Gene | Role | Biology |
+|---|---|---|
+| `cupin-bp` | Species anchor (required) | Cupin-domain chromosomal protein; 100% conserved across diverse strains. S. pseudotuberculosis and other near relatives share ≤71% identity. |
+| `ptxs1` | Virulence reporting | Pertussis toxin S1 subunit (chromosomal, Bvg-regulated). Cross-reacts 96–99% with B. parapertussis/holmesii — reporting only, never gating. |
+| `tcfa5`/`tcfa3` | Virulence reporting (split) | Tracheal colonization factor, 1944bp split in halves. IS481 (hundreds of copies) fragments assemblies; each half survives on a single contig. |
+
+**Interpretation**: All B. pertussis (including Bvg⁻ phase variants and
+detoxified vaccine derivatives) carry the chromosomal anchor. ptxs1/tcfa
+report toxin locus presence. IS481-based assays were removed (shared with
+B. holmesii).
+
+### Yersinia pestis
+
+| Gene | Role | Biology |
+|---|---|---|
+| `spi-yp` | Species anchor (required) | Chromosomal sugar phosphate isomerase. Y. pestis is a recently emerged clone of Y. pseudotuberculosis (>97% chromosomal identity) — only 4 chromosomal genes distinguish them. |
+| `btub-yp` | Second chromosomal marker | Vitamin B12 receptor BtuB (literature precedent). |
+| `caf1` | Virulence reporting (pMT1 plasmid) | F1 capsule antigen. 13% of real-world strains have lost pMT1. |
+| `pla` | Virulence reporting (pPCP1 plasmid) | Plasminogen activator. The small 9.6kb pPCP1 is easily cured during lab passage. |
+
+**Interpretation**: Species identity from the chromosome, toxigenicity from
+plasmid status. A pPCP1-negative strain (common lab derivative) still
+reports as Y. pestis.
+
+### Yersinia enterocolitica
+
+| Gene | Role | Biology |
+|---|---|---|
+| `glk-ye` | Species anchor (required) | Glycerate kinase, chromosomal. 100% conserved across a 50-strain real-world panel (biotypes 1A–4). Zero homology in Y. pseudotuberculosis/frederiksenii/intermedia/kristensenii/pestis. |
+| `yddg-ye` | Second chromosomal marker | Aromatic amino acid transporter. Redundancy rider. |
+| `ail` | Pathogenicity reporting | Attachment-invasion locus, chromosomal. Present only in pathogenic bioserotypes (1B, 2–5); absent from non-pathogenic biotype 1A. |
+| `yada` | Virulence reporting (pYV plasmid) | Yersinia adhesin A. The 70kb pYV plasmid is easily cured. |
+
+**Interpretation**: Non-pathogenic biotype 1A strains (common in food
+surveys) still report as Y. enterocolitica with a note: "No pathogenicity
+markers detected". Pathogenic bioserotypes additionally show ail/yada.
+
+### Neisseria meningitidis
+
+| Gene | Role | Biology |
+|---|---|---|
+| `sodc` | Species anchor (required) | Periplasmic Cu/Zn superoxide dismutase. The classic N. meningitidis vs N. gonorrhoeae discriminator (Corless 2001). Present in all meningococci including capsule-null carriage isolates. |
+| `ctra` | Capsule reporting | Capsule transport protein. Non-groupable (NG) and capsule-null strains lack this; the species call remains N. meningitidis. |
+
+### Neisseria gonorrhoeae
+
+| Gene | Role | Biology |
+|---|---|---|
+| `pora` | Allele family 1 (porB1a) | Major porin, originally named "porA". Covers the porB1a/PIA allele family. |
+| `porb1b` | Allele family 2 (porB1b) | The second antigenically divergent porin allele family (~78% inter-family identity). Either family firing is sufficient. N. meningitidis porB tops at 87.8% (below threshold). |
+
+### Streptococcus pneumoniae
+
+| Gene | Role | Biology |
+|---|---|---|
+| `lyta5`/`lyta3` | Species markers (split) | Autolysin (N-acetylmuramoyl-L-alanine amidase), the gold-standard pneumococcal marker. 957bp split in halves for fragmentation resistance (S. pneumoniae's high recombination rate breaks the gene in 6/100 draft assemblies). |
+
+### Haemophilus influenzae
+
+| Gene | Role | Biology |
+|---|---|---|
+| `hpd` | Species marker | Hemoglobin-binding protein D. Specific to H. influenzae; H. parainfluenzae/haemolyticus/pittmaniae lack full-length homologs. |
+
+### Haemophilus parainfluenzae
+
+| Gene | Role | Biology |
+|---|---|---|
+| `ribf-hpi` | Species anchor (required) | GTP cyclohydrolase II (riboflavin biosynthesis). 98.6% in confirmed strain; max 83.4% in near relatives. H. parainfluenzae is commonly misidentified as H. influenzae in clinical labs. |
+| `sera-hpi` | Second marker | Phosphoglycerate dehydrogenase. |
+
+### Mycoplasma pneumoniae
+
+| Gene | Role | Biology |
+|---|---|---|
+| `tuf-mp` | Species anchor (required) | Elongation factor Tu, 1185bp. 100% conserved across 30 diverse strains; zero homology in M. genitalium/hominis. |
+| `gyrb-mp` | Second chromosomal marker | DNA topoisomerase B. |
+| `p1a`/`p1c` | Cytadherence reporting (2 of 4 quarters) | P1 adhesin (4884bp), split in quarters. The full gene requires 0.6% of the entire 810kb genome on one contig; quarters survive fragmentation. Virulence gene, not a species anchor. |
+
+### Corynebacterium diphtheriae
+
+| Gene | Role | Biology |
+|---|---|---|
+| `rela-cd` | Species anchor (required) | GTP pyrophosphokinase (stringent response). 98.3–100% across diverse strains; max 70.5% in C. sporogenes/tetani. |
+| `mena-cd` | Second chromosomal marker | o-Succinylbenzoate synthase (vitamin K2 biosynthesis). |
+| `tox` | Toxigenicity reporting | Diphtheria toxin, carried on β-corynephage. 37% of real-world strains are non-toxigenic (phage absent). Non-toxigenic C. diphtheriae causes invasive disease (reported since 1990s). |
+
+### Clostridium botulinum
+
+| Gene | Role | Biology |
+|---|---|---|
+| `bonta` | Neurotoxin type A | 3891bp from ATCC 3502 (type A1 reference). BoNT serotypes share only 30–40% inter-type identity — each type needs its own marker. |
+| `bontb` | Neurotoxin type B | Covers type B strains (some subtypes). |
+| `bonte` | Neurotoxin type E | Covers type E strains (foodborne, fish-associated). |
+| `bontc` | Neurotoxin type C | From phage c-st (D90210). Covers animal-associated type C strains. |
+| `bontd` | Neurotoxin type D | From X54254. Covers type D and C/D mosaic strains. |
+| `bontf` | Neurotoxin type F | From F634 (subtype F5). Covers rare but clinically important type F. |
+
+**Interpretation**: C. botulinum is a **toxotype**, not a genomic species —
+four genomic groups (I–IV) unified only by BoNT production. Species
+identity is toxin-based; the chromosomal background (C. botulinum vs
+C. sporogenes, ANI 93.4%) requires L2 ANI methods (`-m marker+mash`).
+Non-toxigenic Clostridium correctly reports Unknown.
+
+### Vibrio cholerae
+
+| Gene | Role | Biology |
+|---|---|---|
+| `ompw` | Species marker (identity 85%) | Outer membrane protein W. Non-O1/non-O139 environmental strains carry divergent alleles at 86–90% identity (the marker derives from an O1 strain). Nearest non-cholerae: V. mimicus at 80.8%. |
+
+**Interpretation**: Threshold lowered to 85% to accommodate non-O1
+environmental strain diversity. O1/O139 pandemic lineages hit at ~99–100%.
+
+### Burkholderia pseudomallei
+
+| Gene | Role | Biology |
+|---|---|---|
+| `glgb-bp` | Species anchor (required) | GlgB 1,4-alpha-glucan branching enzyme, 2217bp chromosomal. 99.6–100% identity and 100% coverage across 100 clinical melioidosis genomes; nearest cross *B. thailandensis* 73.3%, *B. cepacia* 82.5%. |
+| `bima-bp` | Virulence reporting | BimA(Bp) actin-nucleating factor; mediates actin-based motility and cell-to-cell spread. Present in 95/100 panel genomes (some strains carry Bm-like or divergent alleles); never gates the call. |
+| `sctn-bp` | Virulence reporting | T3SS ATPase SctN (TTS1 cluster). Present in 99/100 panel genomes at ≥95% (one TTS-cluster deletion); never gates the call. |
+
+**Interpretation**: *B. pseudomallei* (melioidosis) and *B. mallei*
+(glanders) are one genomic species (ANI ~99.5%) — *B. mallei* is a clone that
+lost ~1.5Mb and became host-restricted. The marker layer cannot separate
+them. The bundled `cpin` database adds a BimA(Bm) allele rule with
+`priority_over` for glanders, thresholded at 98% because 3/100 clinical
+pseudomallei genomes carry a Bm-like allele at 96.2–96.4%. GTDB rs226 labels
+the whole clade `s__Burkholderia mallei`; NCBI and clinical microbiology use
+*B. pseudomallei*, which this rule reports. A marker/ANI disagreement
+(pseudomallei vs mallei) reflects the naming convention, not a
+misidentification — confirm with L2 ANI and report both.
+
 ## Adding a New Species
 
 ```yaml
@@ -219,7 +518,8 @@ Serovar/subspecies typing stays with gspec.
 
 Then:
 1. Append corresponding gene sequences to `markers.fasta`
-   (format: `>markers~~~mpb64~~~ACCESSION description [species] role=primary`)
+   (format: `>gside|db=<database>|gene=<gene>|acc=<accession>|func=<role>|note=<text>`;
+   `func` is `primary`/`confirm`/`typing`/`virulence`/`control`)
 2. Rebuild BLAST database:
    `makeblastdb -in markers.fasta -dbtype nucl -out markers_blastdb`
 3. Run `gside scan test.fna -m marker` to verify

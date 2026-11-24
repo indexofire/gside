@@ -1,9 +1,12 @@
 schema: gside.marker-db/1
 name: cpin_markers
-description: CPIN (data/CPIN.txt) coverage extension - 17 bacterial targets from verified
-  RefSeq reference genomes plus 13 fungal ITS barcodes. Select with "gside scan -m
-  marker -d cpin" or merge with the default via repeatable -d selections (default
-  and cpin).
+extends: default
+description: >-
+  CPIN (data/CPIN.txt) coverage extension - 17 bacterial targets from verified
+  RefSeq reference genomes plus 13 fungal ITS barcodes. "extends: default"
+  pools the bundled database in automatically, so "-d cpin" and
+  "-d default -d cpin" run identically; single-database isolation is
+  available via --marker-db on a copy without the extends key.
 control_genes:
   Plesiomonas_shigelloides:
   - rpob-plesiomonas_shigelloides

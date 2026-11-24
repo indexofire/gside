@@ -54,6 +54,23 @@ rules:
   - tlh
   min_hits: 1
   min_identity: 90
+- species: Haemophilus_parainfluenzae
+  genes:
+  - ribf-hpi
+  - sera-hpi
+  require:
+  - ribf-hpi
+  min_hits: 1
+  min_identity: 90
+  note: >-
+    Species anchor = ribf-hpi (GTP cyclohydrolase II RibF, 648bp) - 98.6%
+    in the confirmed H. parainfluenzae strain (mash-verified), max 83.4%
+    in H. influenzae/haemolyticus/pittmaniae (6.6pt specificity margin).
+    sera-hpi (phosphoglycerate dehydrogenase) provides a second
+    chromosomal marker. H. parainfluenzae is commonly misidentified as
+    H. influenzae in clinical labs; this rule enables correct species
+    assignment for those strains (they previously reported Unknown
+    because hpd is H. influenzae-specific).
 - species: Listeria_monocytogenes
   genes:
   - hly
@@ -63,7 +80,13 @@ rules:
   genes:
   - ompw
   min_hits: 1
-  min_identity: 90
+  min_identity: 85
+  note: >-
+    ompW species marker lowered to 85% identity: non-O1/non-O139
+    environmental strains carry divergent ompW alleles at 86-90% identity
+    (the X51948.1 marker derives from an O1 strain at ~99%). Nearest
+    non-cholerae relative V. mimicus tops at 80.8%, leaving a 4.2pt
+    specificity margin above the threshold.
 - species: Vibrio_vulnificus
   genes:
   - vvha
@@ -101,9 +124,19 @@ rules:
   min_identity: 90
 - species: Streptococcus_pneumoniae
   genes:
-  - lyta
+  - lyta5
+  - lyta3
   min_hits: 1
   min_identity: 90
+  note: >-
+    lytA (the gold-standard pneumococcal marker) split into 5'/3' halves
+    (478/479bp): S. pneumoniae's high recombination rate creates assembly
+    breakpoints inside the 957bp gene (6/100 real-world draft genomes had
+    lytA fragmented across contigs at 4-59% single-HSP coverage, all at
+    100% identity). Each half survives on a single contig; min_hits 1
+    fires when either half is intact. The original 300bp entry
+    (PP971805.1) was a corrupted sequence at 81% identity to the real
+    gene - replaced with the TIGR4 CDS.
 - species: Streptococcus_pyogenes
   genes:
   - speb
@@ -116,20 +149,57 @@ rules:
   min_identity: 90
 - species: Neisseria_meningitidis
   genes:
+  - sodc
   - ctra
+  require:
+  - sodc
   min_hits: 1
   min_identity: 90
+  note: >-
+    Species anchor = sodC (periplasmic Cu/Zn superoxide dismutase, ~436bp)
+    - present in all N. meningitidis including capsule-null carriage and
+    lab strains, absent from N. gonorrhoeae (the classic species
+    discriminator, Corless et al. 2001). ctrA (capsule transport) rides
+    along reporting encapsulation status: capsule-null strains (natural
+    carriage isolates, lab-adapted) and capsule-switched variants remain
+    N. meningitidis without ctrA. Reference validation - MC58
+    (capsulated): sodC 99.8%/ctra 97.6% at full length; PartJ
+    (capsule-null): sodC 99.8% present, ctra absent.
 - species: Neisseria_gonorrhoeae
   genes:
   - pora
+  - porb1b
   min_hits: 1
   min_identity: 90
+  note: >-
+    N. gonorrhoeae porB has two antigenically divergent allele families
+    (~78% inter-family identity): porB1a/Por.IA and porB1b/Por.IB. The
+    original marker (M21289.1, named pora but actually porB1a) only
+    detected the porB1a family - 19/100 real-world genomes carrying
+    porB1b were Unknown. porb1b (from FA19, 984bp) covers the second
+    family; either allele firing is sufficient (min_hits 1). Nearest
+    cross-reaction: N. meningitidis porB tops at 87.8% vs porB1b,
+    below the 90% threshold.
 - species: Clostridioides_difficile
   genes:
+  - muri-cdf
+  - isph-cdf
   - tcda
   - tcdb
+  require:
+  - muri-cdf
   min_hits: 1
   min_identity: 90
+  note: >-
+    Species anchor = muri-cdf (glutamate racemase MurI, 807bp) - 100/100
+    diverse real-world strains (including 15 non-toxigenic PaLoc-negative
+    isolates) at 96.8-100%, zero homology in C. mangenotii/perfringens/
+    tetani. isph-cdf (IspH, 840bp) provides a second chromosomal marker.
+    tcdA/tcdB (PaLoc pathogenicity locus toxins) report toxigenicity:
+    15% of real-world strains are non-toxigenic (PaLoc-negative) and the
+    original toxin-only rule made them all Unknown. Non-toxigenic
+    C. difficile remains clinically relevant (colonization vs infection
+    distinction, infection control).
 - species: Cronobacter_sakazakii
   genes:
   - rpob-cs
@@ -145,9 +215,23 @@ rules:
   min_identity: 90
 - species: Mycoplasma_pneumoniae
   genes:
-  - p1
+  - tuf-mp
+  - gyrb-mp
+  - p1a
+  - p1c
+  require:
+  - tuf-mp
   min_hits: 1
   min_identity: 90
+  note: >-
+    Species anchor = tuf-mp (elongation factor Tu, 1185bp, 100% conserved
+    across 30 diverse real-world strains, zero homology in M. genitalium
+    and M. hominis). gyrb-mp provides a second chromosomal anchor. P1
+    adhesin (4884bp) is kept as two ~1221bp segments (p1a/p1c) for
+    cytadherence reporting - the original single full-length P1 marker
+    required the entire gene on one contig and missed 29/100 draft
+    assemblies to fragmentation. P1 is a virulence gene under immune
+    selection and should not anchor the species call.
 - species: Helicobacter_pylori
   genes:
   - urea
@@ -156,18 +240,43 @@ rules:
   min_identity: 90
 - species: Bordetella_pertussis
   genes:
+  - cupin-bp
   - ptxs1
-  - tcfa
+  - tcfa5
+  - tcfa3
+  require:
+  - cupin-bp
   min_hits: 2
   min_identity: 90
-  note: IS481 was removed (present in B. holmesii); ptxS1 alone cross-reacts with
-    B. bronchiseptica/B. parapertussis. tcfA is only 56% covered in those
-    neighbours, so requiring both genes is species-specific.
+  note: >-
+    Species anchor = cupin-bp (681bp chromosomal cupin-domain protein, 100%
+    conserved across 20 diverse B. pertussis incl. ptxP3 era, max 71% in the
+    12-strain near-relative panel - ptxS1 alone cross-reacts at 96-99% with
+    B. parapertussis/B. holmesii/B. bronchiseptica and IS481 was removed for
+    the same reason, so neither can anchor). tcfA is split into 5'/3' half
+    markers because IS-mediated assembly fragmentation (700+ contig drafts,
+    30% of RefSeq drafts) breaks the 1944bp full gene across contigs; each
+    half survives on a single contig. ptxS1/tcfa halves report virulence
+    locus presence; virulence is chromosomal and Bvg-phase variants remain
+    detectable.
 - species: Corynebacterium_diphtheriae
   genes:
+  - rela-cd
+  - mena-cd
   - tox
+  require:
+  - rela-cd
   min_hits: 1
   min_identity: 90
+  note: >-
+    Species anchor = rela-cd (GTP pyrophosphokinase, 1020bp) - 30/30 diverse
+    strains at 98.3-100%, near relatives (C. ulcerans/pseudotuberculosis/
+    striatum/glutamicum) max 70.5%. mena-cd (MenC, 963bp) provides a second
+    chromosomal marker. tox (diphtheria toxin, 1683bp) is carried on the
+    beta-corynephage and reports toxigenicity: 37/100 real-world genomes
+    are non-toxigenic (phage absent) and the original tox-only rule made
+    them all Unknown. Non-toxigenic C. diphtheriae remains clinically
+    important (invasive disease reports since 1990s).
 - species: Haemophilus_influenzae
   genes:
   - hpd
@@ -180,10 +289,25 @@ rules:
   min_identity: 90
 - species: Burkholderia_pseudomallei
   genes:
-  - tts1
-  - bimabp
+  - glgb-bp
+  - bima-bp
+  - sctn-bp
+  require:
+  - glgb-bp
   min_hits: 1
-  min_identity: 90
+  min_identity: 95
+  note: >-
+    Species anchor = glgb-bp (GlgB 1,4-alpha-glucan branching enzyme, 2217bp;
+    99.6-100% identity and 100% coverage across 100 clinical B. pseudomallei
+    genomes; nearest cross B. thailandensis 73.3%, B. cepacia 82.5%). The
+    anchor alone gates the species call. bima-bp (BimA(Bp) actin-nucleating
+    factor) and sctn-bp (T3SS ATPase SctN) are virulence reporters: BimA is
+    present in 95/100 panel genomes, SctN in 99/100 (one TTS-cluster
+    deletion); neither can create or block the call. B. mallei is a clone of
+    B. pseudomallei (ANI 99.5%) and cannot be separated at the marker layer;
+    the cpin database's BimA(Bm) rule uses priority_over when that allele is
+    present. GTDB rs226 labels the clade s__Burkholderia mallei, while
+    NCBI/clinical convention (and this rule) reports B. pseudomallei.
 - species: Leptospira_interrogans
   genes:
   - lipl32
@@ -196,22 +320,76 @@ rules:
   min_identity: 90
 - species: Bacillus_anthracis
   genes:
+  - adk
+  - ba5345
   - paga
   - capb
+  require:
+  - adk
+  - ba5345
   min_hits: 2
   min_identity: 90
-- species: Yersinia_pestis
+  priority_over:
+  - Bacillus_cereus_group
+  note: >-
+    Species call = cereus-group anchor (adk) AND the lambdaBa03 chromosomal
+    marker (ba5345, ring-trial validated). paga (pXO1) / capb (pXO2) ride
+    along as virulence-plasmid reporting, never gating the species call,
+    so plasmid-cured/vaccine strains (Sterne) stay Bacillus_anthracis and
+    Bcbva/cross-over cereus carrying pXO-like plasmids never fire it.
+    Empirical basis, 404-genome panel - adk 150/150 anthracis and 0/8
+    outgroup; ba5345 0/246 non-anthracis cereus group (Wielinga 2013 ring
+    trial; Bentahir 2018 RPA validation).
+- species: Bacillus_cereus_group
   genes:
-  - caf1
-  - pla
-  min_hits: 2
-  min_identity: 90
-- species: Yersinia_enterocolitica
-  genes:
-  - ail
-  - yada
+  - adk
   min_hits: 1
   min_identity: 90
+  note: Cereus-group fallback (B. cereus/B. thuringiensis/B. mycoides/etc. and
+    lambdaBa03-negative B. anthracis drafts - the prophage assembles poorly
+    from short reads, 27% of RefSeq drafts lack it). Anthrax-like profile
+    (paga/capb present without ba5345) indicates Bcbva or a cross-over
+    strain; see the note emitted with the result.
+- species: Yersinia_pestis
+  genes:
+  - spi-yp
+  - btub-yp
+  - caf1
+  - pla
+  require:
+  - spi-yp
+  min_hits: 1
+  min_identity: 90
+  note: >-
+    Species anchor = spi-yp (chromosomal sugar phosphate isomerase; 100%
+    conserved across 50 diverse real-world strains spanning all three
+    biovars, zero homology in Y. pseudotuberculosis/frederiksenii/
+    intermedia/kristensenii and E. coli). btub-yp (BtuB) is a second
+    chromosomal marker with literature precedent. caf1 (pMT1) and pla
+    (pPCP1) are plasmid virulence genes that report toxigenicity - 13% of
+    real-world strains have lost pPCP1 (pla-negative), and the original
+    min_hits:2 design made those Unknown. Virulence is now reported, never
+    gating the species call.
+- species: Yersinia_enterocolitica
+  genes:
+  - glk-ye
+  - yddg-ye
+  - ail
+  - yada
+  require:
+  - glk-ye
+  min_hits: 1
+  min_identity: 90
+  note: >-
+    Species anchor = glk-ye (glycerate kinase; 50-strain real-world panel
+    100% present at >=96%, zero homology in Y. pseudotuberculosis/
+    frederiksenii/intermedia/kristensenii/pestis and E. coli). The original
+    ail/yada entries were corrupted sequences that matched no genome - the
+    rule never fired. Replaced with the real CDS: ail (chromosomal,
+    PATHOGENIC bioserotypes only - absent from non-pathogenic biotype 1A)
+    and yada (pYV virulence plasmid, easily cured) now report pathogenicity
+    without gating the species call, so biotype 1A and pYV-cured strains
+    stay Yersinia_enterocolitica.
 - species: Aeromonas_hydrophila
   genes:
   - aera
@@ -220,11 +398,25 @@ rules:
   min_identity: 90
 - species: Clostridium_botulinum
   genes:
-  - bontA
-  - bontB
-  - bontE
+  - bonta
+  - bontb
+  - bonte
+  - bontc
+  - bontd
+  - bontf
   min_hits: 1
-  min_identity: 90
+  min_identity: 80
+  note: >-
+    C. botulinum is a toxotype, not a genomic species - four genomic groups
+    (I-IV) unified only by BoNT production. BoNT serotypes (A-G) share
+    only 30-40% inter-type identity, so each type needs its own marker.
+    bontA replaced with the real 3891bp CDS (the original 354bp entry was
+    corrupted - zero homology to the ATCC 3502 type A reference).
+    min_identity lowered to 80 to accommodate intra-serotype subtype
+    divergence (A1-A5 subtypes can differ by 10-15%). bontB/bontE retained
+    for serotype coverage; bontC/D/F/G markers and chromosomal group
+    anchors are future work. Non-toxigenic Clostridium (C. sporogenes
+    etc.) correctly reports Unknown.
 - species: Clostridium_perfringens
   genes:
   - cpa
@@ -401,8 +593,14 @@ rules:
   genes:
   - ceue
   min_hits: 1
-  min_identity: 90
+  min_identity: 85
   min_coverage: 50
-  exclude_genes: [mapa, hipo, cadf]
-  note: ceuE from C.coli reference (GCF_009730395.1); jejuni markers present
-    -> prefer C_jejuni (exclude guard).
+  exclude_genes: [hipo, cadf]
+  note: >-
+    ceuE (enterochelera esterase, 990bp) threshold lowered to 85% to cover
+    divergent alleles (86.5% in one strain, 100% coverage). mapa removed
+    from exclude_genes: it cross-reacts with some C. coli strains at
+    86-98% identity (mapA is not species-specific between C. jejuni and
+    C. coli). hipO (absent from all C. coli tested) and cadF (82% in
+    C. coli, below the 85% global detection floor) provide the exclusion
+    guard instead. C. jejuni reference: ceuE 87%, hipo 100% -> excluded.

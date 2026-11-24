@@ -463,6 +463,8 @@ class TestDomainStateEnums:
         assert _input_kind("readme.txt") is InputKind.UNKNOWN
         assert _scope_for_species("Escherichia_coli") is VerdictScope.SPECIES
         assert _scope_for_species("Salmonella") is VerdictScope.GENUS
+        assert _scope_for_species("Salmonella_enterica") is VerdictScope.SPECIES
+        assert _scope_for_species("Bacillus_cereus_group") is VerdictScope.COMPLEX
         assert _scope_for_species("Unknown") is VerdictScope.UNKNOWN
 
 
