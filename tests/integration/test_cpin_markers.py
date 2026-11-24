@@ -181,3 +181,19 @@ class TestCpinBarcodeRules:
         q.write_text(f">mtLSU\n{_cpin_gene_seq('mtlsu-pneumocystis')}\n")
         r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
         assert r["species"] == "Pneumocystis"
+
+    def test_cdsa_alone_calls_citrobacter(self, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        q = tmp_path / "citrobacter.fna"
+        q.write_text(f">cdsA\n{_cpin_gene_seq('cdsa-citrobacter')}\n")
+        r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+        assert r["species"] == "Citrobacter"
+
+    def test_is1081_calls_mtb_complex(self, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        q = tmp_path / "mtbc.fna"
+        q.write_text(f">IS1081\n{_cpin_gene_seq('is1081')}\n")
+        r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+        assert r["species"] == "Mycobacterium_tuberculosis"

@@ -1053,8 +1053,15 @@ class TestCpinRuleDesign:
     def test_enterobacteriaceae_barcodes_use_gyrb_not_rpob(self):
         _db, rules = self._cpin_rules()
         rules = {r["species"]: r for r in rules}
-        assert rules["Citrobacter"]["genes"] == ["gyrb-cf"]
+        # Citrobacter adds leuS + cdsA for the amalonaticus/farmeri clade;
+        # rpoB is still rejected (97% identity to E. coli).
+        assert rules["Citrobacter"]["genes"] == [
+            "gyrb-cf",
+            "leus-citrobacter",
+            "cdsa-citrobacter",
+        ]
         assert rules["Escherichia_albertii"]["genes"] == ["gyrb-eal"]
+        assert rules["Mycobacterium_tuberculosis"]["genes"] == ["is6110", "is1081"]
 
     def test_genus_family_rules_use_100_genome_thresholds(self):
         # Thresholds tuned against 100 random genomes per taxon: the old

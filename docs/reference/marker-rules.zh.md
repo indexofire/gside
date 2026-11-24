@@ -161,7 +161,7 @@ BimA(Bm) 规则的阈值为 98% 一致性：100 株临床类鼻疽中有 3 株�
 被 `priority_over` 压制、误报为 `Burkholderia_mallei`。两者为同一基因组种
 （ANI ~99.5%）；详见下文类鼻疽伯克霍尔德菌条目。
 
-### 属/科级条码的 100 株随机基因组验证
+### 属/科/MTBC 条码的 100 株随机基因组验证
 
 CPIN 的属/科规则已按每个类群 100 株随机基因组（RefSeq/GenBank，1–2 个
 靶基因）重新测试。原阈值按单株参考菌设定，漏检了大部分属内物种：
@@ -190,9 +190,15 @@ gltA/OmpB/GroEL 保留为特异性的佐证报告基因。
   （*B. anthropi*、*B. intermedia*、*B. pituitosa*、
   *B. pseudogrignonensis*），经典种（*B. abortus*、*B. melitensis*、
   *B. suis*、*B. canis*、*B. ovis*、*B. ceti*）为 100%。
-- *Citrobacter*：gyrB ≥91 命中 90/97（93%）；漏检为 *C. amalonaticus* 与
-  *C. farmeri*（gyrB 87–89%）。40 物种面板无假阳性；要覆盖全属仍需第二个
-  属特异标记。
+- *Citrobacter*：gyrB 单独 90/100；加 leuS（亮氨酸-tRNA 连接酶）升至
+  94/100，再加 cdsA（磷脂酸胞苷酰转移酶）覆盖分歧的
+  *C. amalonaticus*/*C. farmeri* 分支（95–100%），达到 **100/100**。
+  *E. coli*、*Salmonella*、*Klebsiella*、*Cronobacter*、*Enterobacter*、
+  *Serratia*、*Proteus*、*Yersinia* 对照均为 68–86%。
+- *M. tuberculosis*：IS6110 命中 95/100 随机 MTBC 基因组，IS1081 命中
+  96/100，并集 **99/100**。43 株非结核分枝杆菌面板除 *M. orygis* 与
+  *M. canetti*（均为 MTBC 成员）外全部阴性。1 株碎片化的
+  *M. tuberculosis* 组装缺失两个 IS 元件。
 - *Rickettsiaceae*：漏检多为未培养/内共生基因组与 *Orientia*；临床
   *Rickettsia*（斑疹伤寒群与斑点热群）已覆盖。*Anaplasmataceae* 漏检为
   *Wolbachia*/*Neorickettsia* 边缘株，临床 *Anaplasma*/*Ehrlichia* 已覆盖。

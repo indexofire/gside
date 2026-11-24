@@ -154,7 +154,7 @@ pseudomallei genomes were suppressed by `priority_over` and reported as
 `Burkholderia_mallei`. The two taxa are one genomic species (ANI ~99.5%);
 see the *Burkholderia pseudomallei* entry below.
 
-### Genus/family barcode validation (100 random genomes)
+### Genus/family/MTBC barcode validation (100 random genomes)
 
 The CPIN genus/family rules were re-tested against 100 random genomes per
 taxon (RefSeq/GenBank, one 1-2 gene rule each). The original thresholds were
@@ -186,10 +186,16 @@ Residual limits:
   *Ochrobactrum* species (*B. anthropi*, *B. intermedia*, *B. pituitosa*,
   *B. pseudogrignonensis*), while the classical species (*B. abortus*,
   *B. melitensis*, *B. suis*, *B. canis*, *B. ovis*, *B. ceti*) are 100%.
-- *Citrobacter*: gyrB ≥91 calls 90/97 (93%); the misses are *C. amalonaticus*
-  and *C. farmeri*, whose gyrB sits at 87-89%. No false positives across the
-  40-species panel; a second genus-specific marker is still needed for full
-  coverage.
+- *Citrobacter*: gyrB alone calls 90/100; leuS (leucine--tRNA ligase) lifts
+  the union to 94/100, and cdsA (phosphatidate cytidylyltransferase) covers
+  the divergent *C. amalonaticus*/*C. farmeri* clade at 95-100%, giving
+  **100/100**. Negative controls stay at 68-86% across *E. coli*,
+  *Salmonella*, *Klebsiella*, *Cronobacter*, *Enterobacter*, *Serratia*,
+  *Proteus* and *Yersinia*.
+- *M. tuberculosis*: IS6110 calls 95/100 random MTBC genomes and IS1081
+  96/100; the union is **99/100**. The 43-genome non-TB *Mycobacterium*
+  panel is negative except *M. orygis* and *M. canetti* (both MTBC members).
+  One fragmented *M. tuberculosis* draft lacks both IS elements.
 - *Rickettsiaceae*: the misses are mostly uncultured/endosymbiont genomes and
   *Orientia*; clinical *Rickettsia* (spotted-fever and typhus groups) are
   covered. *Anaplasmataceae* misses are *Wolbachia* and *Neorickettsia*
