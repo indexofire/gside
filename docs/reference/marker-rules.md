@@ -154,6 +154,83 @@ pseudomallei genomes were suppressed by `priority_over` and reported as
 `Burkholderia_mallei`. The two taxa are one genomic species (ANI ~99.5%);
 see the *Burkholderia pseudomallei* entry below.
 
+### Genus/family barcode validation (100 random genomes)
+
+The CPIN genus/family rules were re-tested against 100 random genomes per
+taxon (RefSeq/GenBank, one 1-2 gene rule each). The original thresholds were
+tuned on a single reference strain and missed most of the genus:
+
+| Rule | Old design | Sensitivity | New design | Sensitivity |
+|---|---|---|---|---|
+| `Bartonella` | gltA + rpoB, both ≥92 | 6/97 (6%) | both ≥85 | 92/97 (95%) |
+| `Nocardia` | hsp65 + gyrB, both ≥90 | 29/98 (30%) | hsp65 or gyrB, ≥91 | 87/98 (89%) |
+| `Rickettsiaceae` | gltA + OmpB, both ≥90 | 48/100 (48%) | + 16S rRNA, any ≥90 | 85/100 (85%) |
+| `Anaplasmataceae` | GroEL ≥90 | 1/99 (1%) | + 16S rRNA, any ≥85 | 96/99 (97%) |
+
+The added 16S barcodes are a 1427bp *Rickettsia rickettsii* fragment
+(PV716478.1) and a 1435bp *Ehrlichia chaffeensis* fragment (AF147752.2); 16S
+is the standard family-level marker when genus-level genes (`gltA`, `ompB`,
+`groEL`) are absent or divergent. The old gltA/OmpB/GroEL markers remain as
+specific confirmatory reporters.
+
+Specificity was checked against the other random panels: the 16S barcodes
+gave zero hits in the reciprocal family and in *Brucella* (99), *Bartonella*
+(97), *Citrobacter* (97) and *Nocardia* (98) at their thresholds. The
+*Nocardia* 91% floor sits above the highest full-length *Mycobacterium*
+cross (90.5%) and *Rhodococcus* cross (89.4%). *Bartonella* gltA/rpoB give
+no hits in *Brucella*/Ochrobactrum at 85%.
+
+Residual limits:
+
+- *Brucella*: bp26+omp25 calls 79/99; all misses are the former
+  *Ochrobactrum* species (*B. anthropi*, *B. intermedia*, *B. pituitosa*,
+  *B. pseudogrignonensis*), while the classical species (*B. abortus*,
+  *B. melitensis*, *B. suis*, *B. canis*, *B. ovis*, *B. ceti*) are 100%.
+- *Citrobacter*: gyrB ≥91 calls 90/97 (93%); the misses are *C. amalonaticus*
+  and *C. farmeri*, whose gyrB sits at 87-89%. No false positives across the
+  40-species panel; a second genus-specific marker is still needed for full
+  coverage.
+- *Rickettsiaceae*: the misses are mostly uncultured/endosymbiont genomes and
+  *Orientia*; clinical *Rickettsia* (spotted-fever and typhus groups) are
+  covered. *Anaplasmataceae* misses are *Wolbachia* and *Neorickettsia*
+  outliers, not the clinical *Anaplasma*/*Ehrlichia* species.
+
+### Fungal ITS barcode survey
+
+Whole-genome FTP downloads for the fungal genera were too slow for a
+100-genome panel (NCBI throttled the ~20-40Mb assemblies). The existing ITS
+markers were therefore tested against 100 NCBI Nucleotide ITS records per
+genus (full-length subset ≥500bp, marker identity ≥92% with ≥60% marker
+coverage):
+
+| Marker | Full-length records | ≥92% | Nearest cross at 92% |
+|---|---|---|---|
+| *Histoplasma* | 87 | 84 | — |
+| *Blastomyces* | 66 | 66 | — |
+| *Coccidioides* | 54 | 54 | — |
+| *Paracoccidioides* | 26 | 25 | — |
+| *Talaromyces marneffei* | 6 | 6 | — |
+| *Rhinocladiella mackenziei* | 19 | 19 | — |
+| *Cladophialophora bantiana* | 95 | 90 | — |
+| *Sporothrix* | 96 | 94 | *Ophiostoma* 0/86 |
+| *Cryptococcus* | 53 | 36 | *Rhodotorula* 0/90 |
+| *Candida* | 33 | 17 | *Saccharomyces/Pichia* 0 |
+| *Aspergillus* | 92 | 32 | *Penicillium* 4/87 at 92, 85/87 at 85 |
+| *Fusarium* | 71 | 25 | *Trichoderma* 0/94 at 88, 47/94 at 85 |
+| *Pneumocystis* | 59 | 9 | — |
+
+The single-gene ITS rule is already adequate for the endemic dimorphic fungi
+and for *Cladophialophora*. *Sporothrix* (94/96) and *Cryptococcus* (36/53)
+can move to 88% without crossing their nearest neighbours; *Candida* can
+move to 85% in the tested neighbour set. *Aspergillus* and *Fusarium* cannot:
+at 85% their ITS markers cross *Penicillium* and *Trichoderma* respectively,
+so they need a second locus (β-tubulin/calmodulin for *Aspergillus*, TEF1 or
+RPB2 for *Fusarium*). *Pneumocystis* ITS is too divergent at genus level
+(9/59) and should use mtLSU rRNA or 18S.
+
+These are Nucleotide-record estimates, not whole-genome panels; the three
+threshold changes should be confirmed on assembled genomes before shipping.
+
 ## Reads-Mode Depth Gate (FASTQ input)
 
 On FASTQ input the marker engine applies a gspec-style abundance gate on top

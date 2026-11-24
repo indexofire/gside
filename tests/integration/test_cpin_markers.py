@@ -111,3 +111,49 @@ def test_reference_genome_calls_expected_species(accession: str, expected: str):
         f"{accession} called {result['species']} "
         f"(confidence={result['confidence']}, rule={result['matched_rule']!r})"
     )
+
+
+def _cpin_gene_seq(gene: str) -> str:
+    blocks = (_CPIN_DB / "markers.fasta").read_text(encoding="utf-8").split(">")
+    prefix = f"gside|db=cpin_markers|gene={gene}|"
+    block = next(b for b in blocks if b.startswith(prefix))
+    return block.split("\n", 1)[1].replace("\n", "")
+
+
+@pytest.mark.skipif(not _HAS_BLASTN, reason="blastn not available")
+class TestCpinBarcodeRules:
+    """The 1-2 gene genus/family barcodes fire on their own marker sequences."""
+
+    def test_16s_rickettsiaceae_calls_family(self, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        q = tmp_path / "rickettsiaceae.fna"
+        q.write_text(f">r16s\n{_cpin_gene_seq('16s-rickettsiaceae')}\n")
+        r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+        assert r["species"] == "Rickettsiaceae"
+
+    def test_16s_anaplasmataceae_calls_family(self, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        q = tmp_path / "anaplasmataceae.fna"
+        q.write_text(f">a16s\n{_cpin_gene_seq('16s-anaplasmataceae')}\n")
+        r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+        assert r["species"] == "Anaplasmataceae"
+
+    def test_hsp65_alone_calls_nocardia(self, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        q = tmp_path / "nocardia.fna"
+        q.write_text(f">hsp65\n{_cpin_gene_seq('hsp65')}\n")
+        r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+        assert r["species"] == "Nocardia"
+
+    def test_bartonella_pair_calls_genus(self, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        q = tmp_path / "bartonella.fna"
+        q.write_text(
+            f">gltA\n{_cpin_gene_seq('glta-bartonella')}\n>rpoB\n{_cpin_gene_seq('rpob-bh')}\n"
+        )
+        r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+        assert r["species"] == "Bartonella"

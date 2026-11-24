@@ -161,6 +161,75 @@ BimA(Bm) 规则的阈值为 98% 一致性：100 株临床类鼻疽中有 3 株�
 被 `priority_over` 压制、误报为 `Burkholderia_mallei`。两者为同一基因组种
 （ANI ~99.5%）；详见下文类鼻疽伯克霍尔德菌条目。
 
+### 属/科级条码的 100 株随机基因组验证
+
+CPIN 的属/科规则已按每个类群 100 株随机基因组（RefSeq/GenBank，1–2 个
+靶基因）重新测试。原阈值按单株参考菌设定，漏检了大部分属内物种：
+
+| 规则 | 原设计 | 灵敏度 | 新设计 | 灵敏度 |
+|---|---|---|---|---|
+| `Bartonella` | gltA + rpoB，均 ≥92 | 6/97 (6%) | 均 ≥85 | 92/97 (95%) |
+| `Nocardia` | hsp65 + gyrB，均 ≥90 | 29/98 (30%) | hsp65 或 gyrB，≥91 | 87/98 (89%) |
+| `Rickettsiaceae` | gltA + OmpB，均 ≥90 | 48/100 (48%) | + 16S rRNA，任一 ≥90 | 85/100 (85%) |
+| `Anaplasmataceae` | GroEL ≥90 | 1/99 (1%) | + 16S rRNA，任一 ≥85 | 96/99 (97%) |
+
+新增 16S 条码为 *Rickettsia rickettsii* 1427bp 片段（PV716478.1）与
+*Ehrlichia chaffeensis* 1435bp 片段（AF147752.2）；当属级基因（`gltA`、
+`ompB`、`groEL`）缺失或分歧时，16S 是科级鉴定的标准标记。原
+gltA/OmpB/GroEL 保留为特异性的佐证报告基因。
+
+特异性已在其他随机面板中核对：16S 条码在互测科、*Brucella*（99）、
+*Bartonella*（97）、*Citrobacter*（97）、*Nocardia*（98）中零命中。
+*Nocardia* 的 91% 门槛高于 *Mycobacterium* 全长最高交叉（90.5%）与
+*Rhodococcus*（89.4%）。*Bartonella* 的 gltA/rpoB 在 85% 对
+*Brucella*/Ochrobactrum 零命中。
+
+残余局限：
+
+- *Brucella*：bp26+omp25 命中 79/99；漏检全部为原 *Ochrobactrum* 物种
+  （*B. anthropi*、*B. intermedia*、*B. pituitosa*、
+  *B. pseudogrignonensis*），经典种（*B. abortus*、*B. melitensis*、
+  *B. suis*、*B. canis*、*B. ovis*、*B. ceti*）为 100%。
+- *Citrobacter*：gyrB ≥91 命中 90/97（93%）；漏检为 *C. amalonaticus* 与
+  *C. farmeri*（gyrB 87–89%）。40 物种面板无假阳性；要覆盖全属仍需第二个
+  属特异标记。
+- *Rickettsiaceae*：漏检多为未培养/内共生基因组与 *Orientia*；临床
+  *Rickettsia*（斑疹伤寒群与斑点热群）已覆盖。*Anaplasmataceae* 漏检为
+  *Wolbachia*/*Neorickettsia* 边缘株，临床 *Anaplasma*/*Ehrlichia* 已覆盖。
+
+### 真菌 ITS 条码调查
+
+真菌基因组的 NCBI FTP 下载过慢（~20–40Mb 组装被限速），未能在本轮完成
+100 株全基因组面板。改用每个属 100 条 NCBI Nucleotide ITS 记录测试现有
+ITS 标记（仅统计 ≥500bp 全长记录；标记一致性 ≥92%、标记覆盖率 ≥60%）：
+
+| 标记 | 全长记录 | ≥92% | 92% 下最近交叉 |
+|---|---|---|---|
+| *Histoplasma* | 87 | 84 | — |
+| *Blastomyces* | 66 | 66 | — |
+| *Coccidioides* | 54 | 54 | — |
+| *Paracoccidioides* | 26 | 25 | — |
+| *Talaromyces marneffei* | 6 | 6 | — |
+| *Rhinocladiella mackenziei* | 19 | 19 | — |
+| *Cladophialophora bantiana* | 95 | 90 | — |
+| *Sporothrix* | 96 | 94 | *Ophiostoma* 0/86 |
+| *Cryptococcus* | 53 | 36 | *Rhodotorula* 0/90 |
+| *Candida* | 33 | 17 | *Saccharomyces/Pichia* 0 |
+| *Aspergillus* | 92 | 32 | *Penicillium* 92% 时 4/87，85% 时 85/87 |
+| *Fusarium* | 71 | 25 | *Trichoderma* 88% 时 0/94，85% 时 47/94 |
+| *Pneumocystis* | 59 | 9 | — |
+
+地方性双相真菌与 *Cladophialophora* 的单基因 ITS 规则已经足够。
+*Sporothrix*（94/96）与 *Cryptococcus*（36/53）可降至 88% 而不交叉最近
+邻属；*Candida* 在已测近邻中可降至 85%。*Aspergillus* 与 *Fusarium*
+不行：85% 时 ITS 分别交叉 *Penicillium* 与 *Trichoderma*，需要第二个
+位点（*Aspergillus* 用 β-tubulin/calmodulin，*Fusarium* 用 TEF1 或
+RPB2）。*Pneumocystis* 的 ITS 属级分歧过大（9/59），应改用 mtLSU rRNA
+或 18S。
+
+以上为 Nucleotide 记录估计，不是全基因组面板；三个阈值调整在正式发布
+前应在组装基因组上确认。
+
 ## Reads 模式深度门控（FASTQ 输入） {: #reads-mode-depth-gate }
 
 FASTQ 输入时，标记引擎在一致性/覆盖规则之上叠加 gspec 风格的丰度门控。

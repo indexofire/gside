@@ -1056,6 +1056,27 @@ class TestCpinRuleDesign:
         assert rules["Citrobacter"]["genes"] == ["gyrb-cf"]
         assert rules["Escherichia_albertii"]["genes"] == ["gyrb-eal"]
 
+    def test_genus_family_rules_use_100_genome_thresholds(self):
+        # Thresholds tuned against 100 random genomes per taxon: the old
+        # 92% Bartonella pair called 6/97; the Rickettsiaceae OmpB pair
+        # 48/100; Nocardia's gyrB AND-gate 29/98; Anaplasmataceae GroEL 1/99.
+        _db, rules = self._cpin_rules()
+        rules = {r["species"]: r for r in rules}
+        assert rules["Bartonella"]["min_identity"] == 85
+        assert set(rules["Rickettsiaceae"]["genes"]) >= {
+            "glta-rickettsia",
+            "ompb",
+            "16s-rickettsiaceae",
+        }
+        assert rules["Rickettsiaceae"]["min_hits"] == 1
+        assert set(rules["Anaplasmataceae"]["genes"]) >= {
+            "groel-anaplasma",
+            "16s-anaplasmataceae",
+        }
+        assert rules["Anaplasmataceae"]["min_identity"] == 85
+        assert rules["Nocardia"]["min_hits"] == 1
+        assert rules["Nocardia"]["min_identity"] == 91
+
     def test_cpin_rule_genes_exist_in_markers_fasta(self):
         genes = self._cpin_genes()
         _db, rules = self._cpin_rules()

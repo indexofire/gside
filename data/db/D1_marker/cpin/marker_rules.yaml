@@ -40,22 +40,38 @@ rules:
 - species: Bartonella
   genes: [glta-bartonella, rpob-bh]
   min_hits: 2
-  min_identity: 92
-  note: Genus rule (B. henselae citrate synthase + rpoB) - the standard
-    bartonella genotyping pair.
+  min_identity: 85
+  note: >-
+    Genus rule (B. henselae citrate synthase + rpoB) - the standard
+    bartonella genotyping pair. At 92% only 6/97 random Bartonella genomes
+    called (B. quintana/bacilliformis/elizabethae cross at 85-92%); the
+    genus floor is 85% with both genes (92/97 = 95%). No hits in Brucella/
+    Ochrobactrum, Citrobacter, Nocardia, Rickettsiaceae or Anaplasmataceae
+    at 85% (100-genome panels).
 - species: Rickettsiaceae
-  genes: [glta-rickettsia, ompb]
-  min_hits: 2
-  min_identity: 90
-  min_coverage: 55
-  note: Family rule (R. rickettsii gltA + OmpB) covering the spotted-fever
-    group; typhus group crosses at 88-92% and stays below the threshold.
-- species: Anaplasmataceae
-  genes: [groel-anaplasma]
+  genes: [glta-rickettsia, ompb, 16s-rickettsiaceae]
   min_hits: 1
   min_identity: 90
-  note: Family rule (A. phagocytophilum GroEL); groEL is the conserved
-    anaplasma/ehrlichia serotyping target.
+  min_coverage: 55
+  note: >-
+    Family rule. The old gltA+OmpB pair (min_hits 2) called only 48/100
+    random family genomes: OmpB is absent from the typhus group and most
+    non-Rickettsia genera. A 1427bp R. rickettsii 16S rRNA barcode
+    (PV716478.1) calls 79/100 family genomes at 90% and has zero hits in
+    Anaplasmataceae, Brucella, Bartonella, Citrobacter and Nocardia panels;
+    gltA/OmpB remain as confirmatory reporters. Orientia and divergent
+    endosymbionts may stay below the threshold.
+- species: Anaplasmataceae
+  genes: [groel-anaplasma, 16s-anaplasmataceae]
+  min_hits: 1
+  min_identity: 85
+  note: >-
+    Family rule. The A. phagocytophilum GroEL marker alone called only 1/99
+    random family genomes (GroEL is genus/species-level, not pan-family).
+    A 1435bp E. chaffeensis 16S rRNA barcode (AF147752.2) calls 94/99
+    family genomes at 85% with zero hits in Rickettsiaceae, Brucella,
+    Bartonella, Citrobacter and Nocardia panels; groEL is retained as a
+    specific confirmatory reporter.
 - species: Chlamydia_psittaci
   genes: [ompa-cps, ompa-cps2]
   min_hits: 1
@@ -112,11 +128,16 @@ rules:
   note: BSR3 dual barcode; nearest cross (B. pertussis rpoB) sits at 84.9%.
 - species: Nocardia
   genes: [hsp65, gyrb-no]
-  min_hits: 2
-  min_identity: 90
+  min_hits: 1
+  min_identity: 91
   min_coverage: 55
-  note: Genus rule (N. farcinica hsp65/GroEL paralog NFA_RS26175 + gyrB);
-    hsp65 is the standard nocardia sequencing barcode.
+  note: >-
+    Genus rule (N. farcinica hsp65/GroEL paralog NFA_RS26175 + gyrB); hsp65
+    is the standard nocardia sequencing barcode. Requiring both genes at
+    90% called only 29/98 random Nocardia genomes because gyrB is more
+    divergent. With min_hits 1 and a 91% floor, hsp65 alone calls 87/98
+    (88.8%); the nearest full-length cross is Mycobacterium at 90.5% and
+    Rhodococcus at 89.4%, so 91% is the specificity boundary.
 - species: Cryptococcus
   genes: [its-cryptococcus]
   min_hits: 1
