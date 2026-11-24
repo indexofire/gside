@@ -220,8 +220,9 @@ ITS 标记（仅统计 ≥500bp 全长记录；标记一致性 ≥92%、标记�
 | *Pneumocystis* | 59 | 9 | — |
 
 地方性双相真菌与 *Cladophialophora* 的单基因 ITS 规则已经足够。
-*Sporothrix*（94/96）与 *Cryptococcus*（36/53）可降至 88% 而不交叉最近
-邻属；*Candida* 在已测近邻中可降至 85%。*Aspergillus* 与 *Fusarium*
+*Sporothrix* 在 92% 已工作良好（94/96）；*Cryptococcus* 可降至 88%
+（36/53 → 46/53）而不交叉 *Rhodotorula*；*Candida* 在已测近邻中可降至
+85%。*Aspergillus* 与 *Fusarium*
 不行：85% 时 ITS 分别交叉 *Penicillium* 与 *Trichoderma*，需要第二个
 位点（*Aspergillus* 用 β-tubulin/calmodulin，*Fusarium* 用 TEF1 或
 RPB2）。*Pneumocystis* 的 ITS 属级分歧过大（9/59），应改用 mtLSU rRNA

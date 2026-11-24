@@ -220,9 +220,9 @@ coverage):
 | *Pneumocystis* | 59 | 9 | — |
 
 The single-gene ITS rule is already adequate for the endemic dimorphic fungi
-and for *Cladophialophora*. *Sporothrix* (94/96) and *Cryptococcus* (36/53)
-can move to 88% without crossing their nearest neighbours; *Candida* can
-move to 85% in the tested neighbour set. *Aspergillus* and *Fusarium* cannot:
+and for *Cladophialophora*. *Sporothrix* already works at 92% (94/96);
+*Cryptococcus* can move to 88% (36/53 -> 46/53) without crossing
+*Rhodotorula*; *Candida* can move to 85% in the tested neighbour set. *Aspergillus* and *Fusarium* cannot:
 at 85% their ITS markers cross *Penicillium* and *Trichoderma* respectively,
 so they need a second locus (β-tubulin/calmodulin for *Aspergillus*, TEF1 or
 RPB2 for *Fusarium*). *Pneumocystis* ITS is too divergent at genus level
