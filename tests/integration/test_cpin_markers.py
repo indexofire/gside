@@ -157,3 +157,27 @@ class TestCpinBarcodeRules:
         )
         r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
         assert r["species"] == "Bartonella"
+
+    def test_bena_alone_calls_aspergillus(self, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        q = tmp_path / "aspergillus.fna"
+        q.write_text(f">benA\n{_cpin_gene_seq('bena-aspergillus')}\n")
+        r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+        assert r["species"] == "Aspergillus"
+
+    def test_tef1_alone_calls_fusarium(self, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        q = tmp_path / "fusarium.fna"
+        q.write_text(f">tef1\n{_cpin_gene_seq('tef1-fusarium')}\n")
+        r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+        assert r["species"] == "Fusarium"
+
+    def test_mtlsu_alone_calls_pneumocystis(self, tmp_path):
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        q = tmp_path / "pneumocystis.fna"
+        q.write_text(f">mtLSU\n{_cpin_gene_seq('mtlsu-pneumocystis')}\n")
+        r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+        assert r["species"] == "Pneumocystis"

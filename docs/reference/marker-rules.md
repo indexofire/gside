@@ -221,15 +221,22 @@ coverage):
 
 The single-gene ITS rule is already adequate for the endemic dimorphic fungi
 and for *Cladophialophora*. *Sporothrix* already works at 92% (94/96);
-*Cryptococcus* can move to 88% (36/53 -> 46/53) without crossing
-*Rhodotorula*; *Candida* can move to 85% in the tested neighbour set. *Aspergillus* and *Fusarium* cannot:
-at 85% their ITS markers cross *Penicillium* and *Trichoderma* respectively,
-so they need a second locus (β-tubulin/calmodulin for *Aspergillus*, TEF1 or
-RPB2 for *Fusarium*). *Pneumocystis* ITS is too divergent at genus level
-(9/59) and should use mtLSU rRNA or 18S.
+*Cryptococcus* moved to 88% (36/53 -> 46/53) without crossing *Rhodotorula*;
+*Candida* moved to 85% in the tested neighbour set (17/33 -> 29/33, zero
+*Saccharomyces*/*Pichia*). *Aspergillus* and *Fusarium* cannot lower their
+ITS threshold: at 85% they cross *Penicillium* (85/87) and *Trichoderma*
+(47/94). They now carry a second locus:
 
-These are Nucleotide-record estimates, not whole-genome panels; the three
-threshold changes should be confirmed on assembled genomes before shipping.
+- *Aspergillus* + `bena-aspergillus` (β-tubulin, 506bp; PZ612096.1): 0/199
+  *Penicillium*+*Talaromyces* records at 85-95%.
+- *Fusarium* + `tef1-fusarium` (TEF1-α, 683bp; QB150418.1): 35/92 *Fusarium*
+  records at 92% with 0/87 *Trichoderma* at 85-95%.
+- *Pneumocystis* + `mtlsu-pneumocystis` (mtLSU rRNA, 255bp; PZ378845.1):
+  42/100 records, retained alongside the weak ITS marker.
+
+These are Nucleotide-record estimates, not whole-genome panels; the
+Cryptococcus/Candida threshold changes and the new second markers should
+still be confirmed on assembled genomes.
 
 ## Reads-Mode Depth Gate (FASTQ input)
 

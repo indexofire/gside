@@ -220,16 +220,21 @@ ITS 标记（仅统计 ≥500bp 全长记录；标记一致性 ≥92%、标记�
 | *Pneumocystis* | 59 | 9 | — |
 
 地方性双相真菌与 *Cladophialophora* 的单基因 ITS 规则已经足够。
-*Sporothrix* 在 92% 已工作良好（94/96）；*Cryptococcus* 可降至 88%
-（36/53 → 46/53）而不交叉 *Rhodotorula*；*Candida* 在已测近邻中可降至
-85%。*Aspergillus* 与 *Fusarium*
-不行：85% 时 ITS 分别交叉 *Penicillium* 与 *Trichoderma*，需要第二个
-位点（*Aspergillus* 用 β-tubulin/calmodulin，*Fusarium* 用 TEF1 或
-RPB2）。*Pneumocystis* 的 ITS 属级分歧过大（9/59），应改用 mtLSU rRNA
-或 18S。
+*Sporothrix* 在 92% 已工作良好（94/96）；*Cryptococcus* 已降至 88%
+（36/53 → 46/53）而不交叉 *Rhodotorula*；*Candida* 已降至 85%（17/33 →
+29/33，*Saccharomyces*/*Pichia* 零命中）。*Aspergillus* 与 *Fusarium*
+不能降低 ITS 阈值：85% 时分别交叉 *Penicillium*（85/87）与
+*Trichoderma*（47/94）。现改为双条码：
 
-以上为 Nucleotide 记录估计，不是全基因组面板；三个阈值调整在正式发布
-前应在组装基因组上确认。
+- *Aspergillus* + `bena-aspergillus`（β-tubulin，506bp；PZ612096.1）：
+  85–95% 对 *Penicillium*+*Talaromyces* 199 条记录零命中。
+- *Fusarium* + `tef1-fusarium`（TEF1-α，683bp；QB150418.1）：92% 命中
+  35/92 条 *Fusarium* 记录，85–95% 对 *Trichoderma* 87 条零命中。
+- *Pneumocystis* + `mtlsu-pneumocystis`（mtLSU rRNA，255bp；
+  PZ378845.1）：命中 42/100 条记录，与较弱的 ITS 标记并用。
+
+以上为 Nucleotide 记录估计，不是全基因组面板；*Cryptococcus*/*Candida*
+阈值调整与新双条码仍应在组装基因组上确认。
 
 ## Reads 模式深度门控（FASTQ 输入） {: #reads-mode-depth-gate }
 

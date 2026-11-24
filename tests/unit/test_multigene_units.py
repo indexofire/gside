@@ -1076,6 +1076,12 @@ class TestCpinRuleDesign:
         assert rules["Anaplasmataceae"]["min_identity"] == 85
         assert rules["Nocardia"]["min_hits"] == 1
         assert rules["Nocardia"]["min_identity"] == 91
+        # Fungal second barcodes and lowered ITS thresholds (ITS-record survey).
+        assert rules["Cryptococcus"]["min_identity"] == 88
+        assert rules["Candida"]["min_identity"] == 85
+        assert "bena-aspergillus" in rules["Aspergillus"]["genes"]
+        assert "tef1-fusarium" in rules["Fusarium"]["genes"]
+        assert "mtlsu-pneumocystis" in rules["Pneumocystis"]["genes"]
 
     def test_cpin_rule_genes_exist_in_markers_fasta(self):
         genes = self._cpin_genes()
