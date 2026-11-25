@@ -203,6 +203,12 @@ gltA/OmpB/GroEL 保留为特异性的佐证报告基因。
   *Rickettsia*（斑疹伤寒群与斑点热群）已覆盖。*Anaplasmataceae* 漏检为
   *Wolbachia*/*Neorickettsia* 边缘株，临床 *Anaplasma*/*Ehrlichia* 已覆盖。
 
+*Rhodococcus* **不是** CPIN 目标：50 株面板是 *Nocardia* 的特异性对照。
+其 hsp65 一致性为 85–89.5%，低于 *Nocardia* 的 91% 门槛；若降至 90%，
+49/50 株 *Rhodococcus* 会被误报为 *Nocardia*。用现有单基因构建
+*Rhodococcus* 属规则只能覆盖约 72%（36/50，groL+rpoB+gyrB，90%），
+因此继续作为阴性对照，待设计属特异 16S 可变区或泛基因组标记后再启用。
+
 ### 真菌 ITS 条码调查
 
 真菌基因组的 NCBI FTP 下载过慢（~20–40Mb 组装被限速），未能在本轮完成

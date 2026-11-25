@@ -201,6 +201,14 @@ Residual limits:
   covered. *Anaplasmataceae* misses are *Wolbachia* and *Neorickettsia*
   outliers, not the clinical *Anaplasma*/*Ehrlichia* species.
 
+*Rhodococcus* is deliberately **not** a CPIN target: the 50-genome panel is a
+*Nocardia* specificity control. Its hsp65 identity sits at 85-89.5%, below the
+*Nocardia* 91% floor; lowering that floor to 90% would misclassify 49/50
+*Rhodococcus* genomes as *Nocardia*. A Rhodococcus genus rule using the
+available single markers would reach only ~72% (36/50, groL+rpoB+gyrB at 90%),
+so it stays a negative control until a genus-specific 16S variable region or
+pangenome marker is developed.
+
 ### Fungal ITS barcode survey
 
 Whole-genome FTP downloads for the fungal genera were too slow for a
