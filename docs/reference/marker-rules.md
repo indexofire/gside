@@ -141,8 +141,10 @@ The block below describes the cpin-only targets.
   neighbours: Enterobacteriaceae `rpoB` cross-identity reaches 97%, so
   `gyrB` (≤89.5% cross) carries those rules instead.
 - **Fungal ITS barcodes** (`its-*`, ITS1/ITS1-5.8S-ITS2 from type or
-  clinical-strain records) provide genus-level calls at 92% identity — the
-  Onygenales genera cross at up to 90.5%.
+  clinical-strain records) provide genus-level calls; thresholds are
+  per-rule (92% for most, 88% *Cryptococcus*, 85% *Candida*).
+  *Aspergillus*, *Fusarium* and *Pneumocystis* add a second locus (benA,
+  TEF1, mtLSU) to keep genus specificity.
 
 Every rule was validated end-to-end against its reference genome plus
 near-neighbour adversarial genomes (`Y. pestis` vs `Y. pseudotuberculosis`,

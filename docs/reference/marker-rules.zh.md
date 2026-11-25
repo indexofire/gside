@@ -153,7 +153,9 @@ cpin 专有靶标。
   `Bartonella` 用 `gltA+rpoB`）：经典靶点无法区分近邻时使用 ——
   肠杆菌科 `rpoB` 交叉高达 97%，因此改由 `gyrB`（交叉 ≤89.5%）承担。
 - **真菌 ITS 条码**（`its-*`，来自类型株/临床株记录的 ITS1 或
-  ITS1-5.8S-ITS2）：属级判定，92% 阈值 —— Onygenales 各属间交叉最高 90.5%。
+  ITS1-5.8S-ITS2）：属级判定，阈值按规则设定（多数 92%，*Cryptococcus*
+  88%，*Candida* 85%）。*Aspergillus*、*Fusarium*、*Pneumocystis* 另加
+  第二靶点（benA、TEF1、mtLSU）以保持属特异性。
 
 每条规则都经参考基因组端到端验证 + 近缘对抗基因组验证
 （鼠疫杆菌 vs 假结核耶尔森氏菌、鼻疽伯克霍尔德菌 vs 类鼻疽伯克霍尔德菌），
