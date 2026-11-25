@@ -126,14 +126,16 @@ a Shigella call.
 
 ## CPIN coverage block
 
-The rules file carries a marked block covering the `data/CPIN.txt` species
-list. Its entries follow two patterns:
+`cpin` is the uncommon-target extension. Common enteric/respiratory rules
+(`Citrobacter`, `Mycobacterium_tuberculosis`, `Chlamydia_pneumoniae`) live
+in `default`; because `cpin` extends `default`, `-d cpin` still runs them.
+The block below describes the cpin-only targets.
 
 - **Classical targets** extracted from verified RefSeq reference genomes by
-  `locus_tag` (IS6110, TUL4/FopA, invasin+VirF, BimA(Bm), ompA, hugA,
+  `locus_tag` (TUL4/FopA, invasin+VirF, BimA(Bm), ompA, hugA,
   BCSP31-family genes, …). Rule notes record the reference strain and the
   measured nearest cross-identity; thresholds sit above the measured cross.
-- **Barcodes** (`gyrB` for `Citrobacter`/`Escherichia_albertii`,
+- **Barcodes** (`gyrB` for `Escherichia_albertii`,
   `rpoB+gyrB` for `Vibrio_fluvialis`/`Burkholderia_gladioli`,
   `gltA+rpoB` for `Bartonella`) where classical targets do not separate
   neighbours: Enterobacteriaceae `rpoB` cross-identity reaches 97%, so

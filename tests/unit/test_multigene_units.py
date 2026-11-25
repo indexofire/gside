@@ -983,6 +983,13 @@ class TestCpinRuleDesign:
         return db, _load_rules(db)
 
     @staticmethod
+    def _default_rules():
+        from gside.marker_db import MarkerDatabase
+
+        db = MarkerDatabase.from_path(config.SPECIES_DB_DIR / "D1_marker" / "default")
+        return db, _load_rules(db)
+
+    @staticmethod
     def _cpin_genes():
         fasta = config.SPECIES_DB_DIR / "D1_marker" / "cpin" / "markers.fasta"
         return {
@@ -995,21 +1002,18 @@ class TestCpinRuleDesign:
         db, rules = self._cpin_rules()
         assert db.name == "cpin_markers"
         assert db.custom is True
-        assert len(rules) == 30
+        assert len(rules) == 27
 
     def test_cpin_species_ship(self):
         _db, rules = self._cpin_rules()
         expected = {
             "Brucella",
-            "Mycobacterium_tuberculosis",
             "Borrelia_burgdorferi",
             "Yersinia_pseudotuberculosis",
-            "Citrobacter",
             "Bartonella",
             "Rickettsiaceae",
             "Anaplasmataceae",
             "Chlamydia_psittaci",
-            "Chlamydia_pneumoniae",
             "Escherichia_albertii",
             "Plesiomonas_shigelloides",
             "Vibrio_fluvialis",
@@ -1051,17 +1055,33 @@ class TestCpinRuleDesign:
         assert rule["min_identity"] == 98
 
     def test_enterobacteriaceae_barcodes_use_gyrb_not_rpob(self):
-        _db, rules = self._cpin_rules()
-        rules = {r["species"]: r for r in rules}
+        _db, cpin_rules = self._cpin_rules()
+        _db, default_rules = self._default_rules()
+        cpin = {r["species"]: r for r in cpin_rules}
+        default = {r["species"]: r for r in default_rules}
+        # Citrobacter/MTBC moved to default; E. albertii stays in cpin.
         # Citrobacter adds leuS + cdsA for the amalonaticus/farmeri clade;
         # rpoB is still rejected (97% identity to E. coli).
-        assert rules["Citrobacter"]["genes"] == [
+        assert default["Citrobacter"]["genes"] == [
             "gyrb-cf",
             "leus-citrobacter",
             "cdsa-citrobacter",
         ]
-        assert rules["Escherichia_albertii"]["genes"] == ["gyrb-eal"]
-        assert rules["Mycobacterium_tuberculosis"]["genes"] == ["is6110", "is1081"]
+        assert cpin["Escherichia_albertii"]["genes"] == ["gyrb-eal"]
+        assert default["Mycobacterium_tuberculosis"]["genes"] == ["is6110", "is1081"]
+
+    def test_default_common_enteric_respiratory_rules_ship(self):
+        _db, default_rules = self._default_rules()
+        _db, cpin_rules = self._cpin_rules()
+        default = {r["species"] for r in default_rules}
+        cpin = {r["species"] for r in cpin_rules}
+        moved = {"Citrobacter", "Mycobacterium_tuberculosis", "Chlamydia_pneumoniae"}
+        assert moved <= default
+        assert not (moved & cpin)
+        # cpin still extends default, so -d cpin keeps the common rules.
+        assert "Brucella" in cpin
+        assert "Rickettsiaceae" in cpin
+        assert "Aspergillus" in cpin
 
     def test_genus_family_rules_use_100_genome_thresholds(self):
         # Thresholds tuned against 100 random genomes per taxon: the old
@@ -1095,15 +1115,12 @@ class TestCpinRuleDesign:
         _db, rules = self._cpin_rules()
         cpin_species = {
             "Brucella",
-            "Mycobacterium_tuberculosis",
             "Borrelia_burgdorferi",
             "Yersinia_pseudotuberculosis",
-            "Citrobacter",
             "Bartonella",
             "Rickettsiaceae",
             "Anaplasmataceae",
             "Chlamydia_psittaci",
-            "Chlamydia_pneumoniae",
             "Escherichia_albertii",
             "Plesiomonas_shigelloides",
             "Vibrio_fluvialis",
@@ -1157,15 +1174,12 @@ class TestCpinRuleDesign:
         }
         bacterial = {
             "Brucella",
-            "Mycobacterium_tuberculosis",
             "Borrelia_burgdorferi",
             "Yersinia_pseudotuberculosis",
-            "Citrobacter",
             "Bartonella",
             "Rickettsiaceae",
             "Anaplasmataceae",
             "Chlamydia_psittaci",
-            "Chlamydia_pneumoniae",
             "Escherichia_albertii",
             "Plesiomonas_shigelloides",
             "Vibrio_fluvialis",

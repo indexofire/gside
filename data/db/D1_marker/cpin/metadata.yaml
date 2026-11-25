@@ -2,8 +2,10 @@ schema: gside.marker-db/1
 name: cpin_markers
 extends: default
 description: >-
-  CPIN (data/CPIN.txt) coverage extension - 17 bacterial targets from verified
-  RefSeq reference genomes plus 13 fungal ITS barcodes. "extends: default"
+  CPIN (data/CPIN.txt) coverage extension - 14 bacterial targets from verified
+  RefSeq reference genomes plus 13 fungal ITS barcodes. The common enteric/
+  respiratory rules Citrobacter, Mycobacterium_tuberculosis and
+  Chlamydia_pneumoniae now live in the default database. "extends: default"
   pools the bundled database in automatically, so "-d cpin" and
   "-d default -d cpin" run identically; single-database isolation is
   available via --marker-db on a copy without the extends key.
@@ -12,8 +14,6 @@ control_genes:
   - rpob-plesiomonas_shigelloides
   Yersinia_pseudotuberculosis:
   - rpob-yersinia_pseudotuberculosis
-  Citrobacter:
-  - gyrb-cf
   Escherichia_albertii:
   - gyrb-eal
   Vibrio_fluvialis:
@@ -24,16 +24,12 @@ control_genes:
   - gyrb-no
   Brucella:
   - rpob-brucella
-  Mycobacterium_tuberculosis:
-  - rpob-mycobacterium_tuberculosis
   Borrelia_burgdorferi:
   - rpob-borrelia_burgdorferi
   Burkholderia_mallei:
   - rpob-burkholderia_mallei
   Chlamydia_psittaci:
   - rpob-chlamydia_psittaci
-  Chlamydia_pneumoniae:
-  - rpob-chlamydia_pneumoniae
   Bartonella:
   - rpob-bartonella
   Rickettsiaceae:

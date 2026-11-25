@@ -604,3 +604,35 @@ rules:
     C. coli). hipO (absent from all C. coli tested) and cadF (82% in
     C. coli, below the 85% global detection floor) provide the exclusion
     guard instead. C. jejuni reference: ceuE 87%, hipo 100% -> excluded.
+- species: Mycobacterium_tuberculosis
+  genes: [is6110, is1081]
+  min_hits: 1
+  min_identity: 96
+  note: >-
+    MTB-complex insertion sequences: IS6110 (longest H37Rv copy) plus a 300bp
+    IS1081 transposase fragment. Against 100 random MTBC genomes (96
+    M. tuberculosis + 4 M. canetti), IS6110 calls 95/100 and IS1081 96/100;
+    the union is 96/100. The misses are IS-element-poor/fragmented M. canetti
+    and two low-copy M. tuberculosis drafts. The 43-genome non-TB
+    Mycobacterium panel is correctly negative except M. orygis (an MTBC
+    member). Serotyping/DR typing belongs to gspec-lineage tools.
+- species: Citrobacter
+  genes: [gyrb-cf, leus-citrobacter, cdsa-citrobacter]
+  min_hits: 1
+  min_identity: 91
+  note: >-
+    Three housekeeping barcodes. gyrB alone calls 90/100 random Citrobacter
+    genomes; leuS (leucine--tRNA ligase, 2583bp; G4551_RS07165) lifts the
+    union to 94/100; cdsA (phosphatidate cytidylyltransferase, 858bp;
+    U4W25_RS05535) covers the divergent C. amalonaticus (5) and C. farmeri
+    (1) clade at 95-100%, taking the union to 100/100. Negative controls:
+    leuS/cdsA stay at 68-86% in 400 E. coli/Salmonella/Klebsiella/
+    Cronobacter genomes plus Enterobacter (17), Serratia (10), Proteus (18)
+    and Yersinia (100); rpoB was rejected because of 97% identity to E. coli.
+- species: Chlamydia_pneumoniae
+  genes: [ompa-cp, ompa-cpn2]
+  min_hits: 1
+  min_identity: 94
+  min_coverage: 55
+  note: MOMP/ompA (Z31593.1 allele + J138 fresh extract); the species is
+    exceptionally uniform.

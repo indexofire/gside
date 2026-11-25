@@ -114,10 +114,19 @@ def test_reference_genome_calls_expected_species(accession: str, expected: str):
 
 
 def _cpin_gene_seq(gene: str) -> str:
-    blocks = (_CPIN_DB / "markers.fasta").read_text(encoding="utf-8").split(">")
-    prefix = f"gside|db=cpin_markers|gene={gene}|"
-    block = next(b for b in blocks if b.startswith(prefix))
-    return block.split("\n", 1)[1].replace("\n", "")
+    """Gene sequence from cpin, falling back to the default database.
+
+    Citrobacter/MTBC/C. pneumoniae moved to default while cpin still
+    extends it, so the shared rules must be testable from either DB.
+    """
+    default_db = _REPO / "data" / "db" / "D1_marker" / "default"
+    for root, prefix in ((_CPIN_DB, "cpin_markers"), (default_db, "species_markers_v2")):
+        blocks = (root / "markers.fasta").read_text(encoding="utf-8").split(">")
+        start = f"gside|db={prefix}|gene={gene}|"
+        block = next((b for b in blocks if b.startswith(start)), None)
+        if block is not None:
+            return block.split("\n", 1)[1].replace("\n", "")
+    raise KeyError(gene)
 
 
 @pytest.mark.skipif(not _HAS_BLASTN, reason="blastn not available")
@@ -187,7 +196,8 @@ class TestCpinBarcodeRules:
 
         q = tmp_path / "citrobacter.fna"
         q.write_text(f">cdsA\n{_cpin_gene_seq('cdsa-citrobacter')}\n")
-        r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+        default_db = _REPO / "data" / "db" / "D1_marker" / "default"
+        r = identify_multigene(str(q), marker_db=str(default_db)).to_dict()
         assert r["species"] == "Citrobacter"
 
     def test_is1081_calls_mtb_complex(self, tmp_path):
@@ -195,5 +205,6 @@ class TestCpinBarcodeRules:
 
         q = tmp_path / "mtbc.fna"
         q.write_text(f">IS1081\n{_cpin_gene_seq('is1081')}\n")
-        r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+        default_db = _REPO / "data" / "db" / "D1_marker" / "default"
+        r = identify_multigene(str(q), marker_db=str(default_db)).to_dict()
         assert r["species"] == "Mycobacterium_tuberculosis"

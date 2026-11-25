@@ -5,6 +5,12 @@ description: Bundled species marker database. Control genes are conserved single
   Species without a dedicated control fall back to the sample median depth of detected
   markers.
 control_genes:
+  Citrobacter:
+  - gyrb-cf
+  Mycobacterium_tuberculosis:
+  - rpob-mycobacterium_tuberculosis
+  Chlamydia_pneumoniae:
+  - rpob-chlamydia_pneumoniae
   Salmonella:
   - rpoD
   Salmonella_enterica:

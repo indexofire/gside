@@ -140,12 +140,15 @@ GTDB-Tk（L3）> ANI/mash/sourmash（L2）> marker（L1）；同层高置信度
 
 ## CPIN 覆盖块
 
-规则文件中有一段标注的块，覆盖 `data/CPIN.txt` 物种清单。条目分三类：
+`cpin` 是不常见靶标的扩展库。常见肠道/呼吸道规则（`Citrobacter`、
+`Mycobacterium_tuberculosis`、`Chlamydia_pneumoniae`）已移入 `default`；
+由于 `cpin` extends `default`，`-d cpin` 仍会运行这些规则。下面的块只描述
+cpin 专有靶标。
 
 - **经典靶基因**：按 `locus_tag` 从经核验的 RefSeq 参考基因组提取
-  （IS6110、TUL4/FopA、侵袭素+VirF、BimA(Bm)、ompA、hugA、BP26/Omp25 等）。
+  （TUL4/FopA、侵袭素+VirF、BimA(Bm)、ompA、hugA、BP26/Omp25 等）。
   规则 note 记录参考株与实测最近邻交叉同一性；阈值设在交叉之上。
-- **条码基因**（`Citrobacter`/`Escherichia_albertii` 用 `gyrB`，
+- **条码基因**（`Escherichia_albertii` 用 `gyrB`，
   `Vibrio_fluvialis`/`Burkholderia_gladioli` 用 `rpoB+gyrB`，
   `Bartonella` 用 `gltA+rpoB`）：经典靶点无法区分近邻时使用 ——
   肠杆菌科 `rpoB` 交叉高达 97%，因此改由 `gyrB`（交叉 ≤89.5%）承担。

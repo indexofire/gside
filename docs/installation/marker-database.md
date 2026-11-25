@@ -2,7 +2,7 @@
 
 The marker database (`data/db/D1_marker/`, the bundled **mini** tier) powers the
 default `-m marker` identification: `blastn` maps query contigs against
-182 curated reference sequences, and 46 species rules turn the hits into a
+190 curated reference sequences, and 49 species rules turn the hits into a
 verdict. gside is a species-identification engine: every reference is anchored
 to a verifiable NCBI/RefSeq accession and was validated by blast against its
 reference genome and, where available, a 100-genome real-world panel.
@@ -43,13 +43,13 @@ against ANI methods.
 
 | Role | Meaning | Count |
 |---|---|---|
-| `primary` | Species-defining marker; a rule's `genes` draw from these | 136 |
-| `confirm` | Corroborating evidence reported alongside the verdict | 25 |
+| `primary` | Species-defining marker; a rule's `genes` draw from these | 140 |
+| `confirm` | Corroborating evidence reported alongside the verdict | 27 |
 | `typing` | Subtype/toxin-type reporting (e.g. BoNT serotypes) | 3 |
 | `virulence` | Virulence/toxigenicity reporting; never gates the species call | 2 |
-| `control` | Single-copy reads-mode depth controls; never rule genes | 16 |
+| `control` | Single-copy reads-mode depth controls; never rule genes | 18 |
 
-## Gene inventory (182 sequences)
+## Gene inventory (190 sequences)
 
 | Gene | Role | Reference |
 |---|---|---|
@@ -76,6 +76,7 @@ against ANI methods.
 | `gdh` | primary | MT542692.1 glutamate dehydrogenase gdh [Streptococcus suis] |
 | `glgb-bp` | primary | NZ_AP028077.1:1548836-1551052 GlgB 1,4-alpha-glucan branching enzyme (species anchor); 99.6-100% identity in 100 clinical B. pseudomallei genomes; nearest cross B. thailandensis 73.3%, B. cepacia 82.5% |
 | `glk-ye` | primary | NC_008800.1:412574-413737 glycerate kinase, chromosomal species anchor [Yersinia enterocolitica 8081] |
+| `gyrb-cf` | primary | GCF_011064845.1:G4551_RS00020 ref locus |
 | `gyrb-mp` | primary | NZ_LR214945.1:810714-812666 DNA topoisomerase subunit B, second chromosomal marker [Mycoplasma pneumoniae NCTC10119] |
 | `gyrb-ps` | primary | AB015801.1 DNA gyrase subunit B [Plesiomonas shigelloides] |
 | `hipo` | primary | GCF_000009085.1 hipo [Campylobacter jejuni] |
@@ -83,6 +84,8 @@ against ANI methods.
 | `hpd` | primary | U32723.1 hemoglobin-binding protein D [Haemophilus influenzae] |
 | `inva` | primary | M90846.1 invasion protein A [Salmonella enterica] |
 | `ipah` | primary | NC_004851.1:182187-182294 invasion plasmid antigen H ipaH conserved amplicon [Shigella flexneri] |
+| `is1081` | primary | PZ498641.1 IS1081 family transposase fragment (300bp); MTBC 96/100 at 95%, non-TB Mycobacterium 2/43 (MTBC members) |
+| `is6110` | primary | cpin-build insertion sequence IS6110 [GCF_000195955.2] |
 | `isph-cdf` | primary | NZ_CP076401.1:1943117-1943956 4-hydroxy-3-methylbut-2-enyl diphosphate reductase IspH, second chromosomal marker [Clostridioides difficile CD6] |
 | `khe` | primary | PZ143400.1 hemolysin khe [Klebsiella pneumoniae] |
 | `lipl32` | primary | PZ599989.1 lipoprotein lipL32 [Leptospira interrogans] |
@@ -94,6 +97,7 @@ against ANI methods.
 | `muri-cdf` | primary | NZ_CP076401.1:3962663-3963469 glutamate racemase MurI, chromosomal species anchor [Clostridioides difficile CD6] |
 | `nuc` | primary | V01281.1 thermonuclease nuc [Staphylococcus aureus] |
 | `ompa-cp` | primary | Z31593.1 major outer membrane protein [Chlamydia pneumoniae] |
+| `ompa-cpn2` | primary | cpin-build major outer membrane protein [C. pneumoniae J138] |
 | `ompa-cps` | primary | PZ860298.1 major outer membrane protein ompA [Chlamydia psittaci] |
 | `ompw` | primary | X51948.1 outer membrane protein W [Vibrio cholerae] |
 | `oxa51` | primary | MZ351777.1 beta-lactamase blaOXA-51 [Acinetobacter baumannii] |
@@ -193,6 +197,7 @@ against ANI methods.
 | `ahh1` | confirm | PZ301496.1 hemolysin ahh1 [Aeromonas hydrophila] |
 | `capb` | confirm | NC_007323.3:55599-56993 capsule biosynthesis capB on pXO2 [Bacillus anthracis Ames Ancestor] |
 | `cards` | confirm | AF390408.1 CARDS toxin [Mycoplasma pneumoniae] |
+| `cdsa-citrobacter` | confirm | GCF_033726075.1:U4W25_RS05535 Citrobacter cdsA phosphatidate cytidylyltransferase (858bp); covers C. amalonaticus/farmeri at 95-100%, Enterobacteriaceae max 68-86% |
 | `dota` | confirm | MW092166.1 dotA [Legionella pneumophila] |
 | `fema` | confirm | X17688.1 methicillin resistance femA [Staphylococcus aureus] |
 | `gyrb-kpn` | confirm | PZ127011.1 DNA gyrase subunit B gyrB [Klebsiella pneumoniae] |
@@ -200,6 +205,7 @@ against ANI methods.
 | `inlj` | confirm | AL592102.1 internalin J inlJ [Listeria monocytogenes] |
 | `irob` | confirm | PV799927.1 glycosyltransferase iroB [Salmonella enterica] |
 | `lacy` | confirm | NC_000913.3:361918-362218 lactose permease lacY 5' region [Escherichia coli] |
+| `leus-citrobacter` | confirm | GCF_011064845.1:G4551_RS07165 Citrobacter leuS leucine--tRNA ligase (2583bp); E. coli/Salmonella/Klebsiella/Cronobacter max 85-89% at 400 genomes |
 | `pla` | confirm | PX130171.1 plasminogen activator pla pPCP1 [Yersinia pestis] |
 | `prs` | confirm | LC700425.1 phosphoribosyl pyrophosphate synthetase prs [Listeria monocytogenes] |
 | `psaa` | confirm | AF030366.1 manganese transport psaA [Streptococcus pneumoniae] |
@@ -223,6 +229,7 @@ against ANI methods.
 | `lpxa` | control | lpxA_2 lpxA [Campylobacter coli] |
 | `rpob-bacillus_anthracis` | control | NC_007530.2:108391-111924 RNA polymerase beta subunit rpoB, single-copy chromosome control [Bacillus anthracis Ames Ancestor] |
 | `rpob-bordetella_pertussis` | control | NC_002929.2:12806-13978 rpoB [Bordetella pertussis] |
+| `rpob-chlamydia_pneumoniae` | control | cpin-build rpoB window [GCF_000008745.1; CPN_RS00410] |
 | `rpob-clostridioides_difficile` | control | NC_009089.1:91896-92362 rpoB [Clostridioides difficile] |
 | `rpob-clostridium_perfringens` | control | NZ_CP065681.1:591382-592221 rpoB [Clostridium perfringens] |
 | `rpob-corynebacterium_diphtheriae` | control | NC_002935.2:410798-411818 rpoB [Corynebacterium diphtheriae] |
@@ -230,13 +237,14 @@ against ANI methods.
 | `rpob-escherichia_coli` | control | NC_002695.2:4991564-4992488 rpoB [Escherichia coli] |
 | `rpob-haemophilus_influenzae` | control | NC_000907.1:536660-537984 rpoB [Haemophilus influenzae] |
 | `rpob-legionella_pneumophila` | control | NC_002942.5:371299-372178 rpoB [Legionella pneumophila] |
+| `rpob-mycobacterium_tuberculosis` | control | cpin-build rpoB window [GCF_000195955.2; Rv0667] |
 | `rpob-neisseria_gonorrhoeae` | control | NC_002946.2:1821201-1822430 rpoB [Neisseria gonorrhoeae] |
 | `rpob-shigella` | control | NC_004337.2:4202294-4203218 rpoB [Shigella] |
 | `rpob-streptococcus_agalactiae` | control | NC_004116.1:180465-181082 rpoB [Streptococcus agalactiae] |
 | `rpob-streptococcus_pyogenes` | control | NC_002737.1:94763-95380 rpoB [Streptococcus pyogenes] |
 | `rpob-vibrio_parahaemolyticus` | control | NC_004603.1:3114701-3115624 rpoB [Vibrio parahaemolyticus] |
 
-## Species coverage (46 rules)
+## Species coverage (49 rules)
 
 | Species | Rule genes | min hits | min identity | Constraints |
 |---|---|---|---|---|
@@ -286,6 +294,9 @@ against ANI methods.
 | *Shigella* | `uida`, `ipah` | 2 | 95% | exclude `lacy`; priority over *Escherichia coli* |
 | *Campylobacter jejuni* | `mapa`, `hipo`, `cadf` | 2 | 90% | — |
 | *Campylobacter coli* | `ceue` | 1 | 85% | exclude `hipo`, `cadf` |
+| *Mycobacterium tuberculosis* | `is6110`, `is1081` | 1 | 96% | — |
+| *Citrobacter* | `gyrb-cf`, `leus-citrobacter`, `cdsa-citrobacter` | 1 | 91% | — |
+| *Chlamydia pneumoniae* | `ompa-cp`, `ompa-cpn2` | 1 | 94% | — |
 
 ## Customizing
 
