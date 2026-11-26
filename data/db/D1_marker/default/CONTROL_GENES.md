@@ -70,11 +70,17 @@ sequence when a verified reference genome is available.
 | Helicobacter_pylori | rpoB / gyrB |
 | Streptococcus_suis | rpoB / gyrB (gdh is the rule gene) |
 | Burkholderia_pseudomallei | rpoB / gyrB |
-| Leptospira_interrogans | rpoB / gyrB |
+| Leptospira | rpoB / gyrB |
 | Treponema_pallidum | rpoB / gyrB |
 | Yersinia_pestis | rpoB / gyrB |
 | Yersinia_enterocolitica | rpoB / gyrB |
 | Aeromonas_hydrophila | rpoB / gyrB |
+| Aeromonas_caviae | rpoB / gyrB |
+| Aeromonas_veronii | rpoB / gyrB |
+| Aeromonas_dhakensis | rpoB / gyrB |
+| Aeromonas_jandaei | rpoB / gyrB |
+| Aeromonas_schubertii | rpoB / gyrB |
+| Aeromonas_salmonicida | rpoB / gyrB |
 | Clostridium_botulinum | rpoB / gyrB |
 
 ## Implementation notes

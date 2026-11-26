@@ -603,6 +603,23 @@ the whole clade `s__Burkholderia mallei`; NCBI and clinical microbiology use
 (pseudomallei vs mallei) reflects the naming convention, not a
 misidentification — confirm with L2 ANI and report both.
 
+### Coverage scope notes (enteric/respiratory)
+
+- *Cronobacter*: only *C. sakazakii* is targeted; other *Cronobacter*
+  species report Unknown by design.
+- *Campylobacter*: only *C. jejuni* and *C. coli* are targeted.
+- *Aeromonas*: species-level `gyrB`/`rpoB` barcodes for *A. hydrophila*,
+  *A. caviae*, *A. veronii*, *A. dhakensis*, *A. jandaei*,
+  *A. schubertii* and *A. salmonicida*. The 100-genome panels call
+  98-100% for most species with no cross-species calls; *A. jandaei*
+  uses a gyrB floor above the *A. veronii* cross, and *A. hydrophila*
+  requires its gyrB anchor because `ahh1` is shared with *A. dhakensis*.
+- *Leptospira*: `lipl32` reports the pathogenic group `Leptospira`
+  (*L. interrogans* 100/100, *L. borgpetersenii* 41/41,
+  *L. kirschneri* 37/37, *L. noguchii* 32/32; saprophytic *L. biflexa*
+  0/8). Species-level typing (interrogans/borgpetersenii/kirschneri/
+  noguchii/weilii) requires `secY`/`rpoB` MLST and is not attempted here.
+
 ## Adding a New Species
 
 ```yaml

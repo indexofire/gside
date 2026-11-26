@@ -35,11 +35,11 @@ gside scan contigs.fna -m all                 # every genome tier
 ### Principle
 
 **FASTA**: one BLAST scan of the contigs against the markers database
-(190 sequences). **FASTQ**: reads are mapped with minimap2 (`-x sr` for short
+(196 sequences). **FASTQ**: reads are mapped with minimap2 (`-x sr` for short
 reads, `-x map-ont` for long) and each gene's breadth is the union of the
 reference intervals covered by its primary alignments, divided by gene
 length (the same aggregate-breadth recipe as gspec's reads mode). Detected
-genes are then matched against the 49 combination rules
+genes are then matched against the 55 combination rules
 (data-driven, `marker_rules.yaml`).
 
 Paired-end mates are detected from the file names (`_R1`/`_R2`, `_1`/`_2`,

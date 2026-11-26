@@ -521,6 +521,22 @@ BoNT 产毒统一。种级身份基于毒素；染色体背景（肉毒 vs 生�
 本规则报告后者。marker 与 ANI 结果不一致（pseudomallei vs mallei）反映的是
 命名体系差异，不是误判——用 L2 ANI 确认并同时报告两者。
 
+### 覆盖范围说明（肠道/呼吸道）
+
+- *Cronobacter*：仅覆盖 *C. sakazakii*，其他 *Cronobacter* 种按设计报
+  Unknown。
+- *Campylobacter*：仅覆盖 *C. jejuni* 与 *C. coli*。
+- *Aeromonas*：为 *A. hydrophila*、*A. caviae*、*A. veronii*、
+  *A. dhakensis*、*A. jandaei*、*A. schubertii*、*A. salmonicida*
+  增加种级 `gyrB`/`rpoB` 条码。100 株面板对多数种命中 98–100%，无跨种
+  误报；*A. jandaei* 的 gyrB 门槛高于 *A. veronii* 交叉，*A. hydrophila*
+  因 `ahh1` 与 *A. dhakensis* 共享而要求 gyrB 锚定。
+- *Leptospira*：`lipl32` 报告致病群 `Leptospira`（*L. interrogans*
+  100/100、*L. borgpetersenii* 41/41、*L. kirschneri* 37/37、
+  *L. noguchii* 32/32；腐生 *L. biflexa* 0/8）。种级分型
+  （interrogans/borgpetersenii/kirschneri/noguchii/weilii）需要
+  `secY`/`rpoB` MLST，本轮不做。
+
 ## 新增物种示例
 
 ```yaml

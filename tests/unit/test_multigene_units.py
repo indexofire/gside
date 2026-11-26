@@ -1083,6 +1083,30 @@ class TestCpinRuleDesign:
         assert "Rickettsiaceae" in cpin
         assert "Aspergillus" in cpin
 
+    def test_aeromonas_species_and_leptospira_rules_ship(self):
+        _db, default_rules = self._default_rules()
+        rules = {r["species"]: r for r in default_rules}
+        # Cronobacter/Campylobacter stay species-scoped.
+        assert "Cronobacter_sakazakii" in rules
+        assert "Campylobacter_jejuni" in rules
+        assert "Campylobacter_coli" in rules
+        # Aeromonas species expansion; aera was misassigned and removed.
+        for species in (
+            "Aeromonas_hydrophila",
+            "Aeromonas_caviae",
+            "Aeromonas_veronii",
+            "Aeromonas_dhakensis",
+            "Aeromonas_jandaei",
+            "Aeromonas_schubertii",
+            "Aeromonas_salmonicida",
+        ):
+            assert species in rules
+        assert rules["Aeromonas_hydrophila"]["require"] == ["gyrb-ahyd"]
+        assert "aera" not in rules["Aeromonas_hydrophila"]["genes"]
+        # Leptospira is now a pathogenic-group call, not interrogans-only.
+        assert rules["Leptospira"]["genes"] == ["lipl32"]
+        assert "Leptospira_interrogans" not in rules
+
     def test_genus_family_rules_use_100_genome_thresholds(self):
         # Thresholds tuned against 100 random genomes per taxon: the old
         # 92% Bartonella pair called 6/97; the Rickettsiaceae OmpB pair

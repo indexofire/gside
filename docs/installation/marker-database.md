@@ -2,7 +2,7 @@
 
 The marker database (`data/db/D1_marker/`, the bundled **mini** tier) powers the
 default `-m marker` identification: `blastn` maps query contigs against
-190 curated reference sequences, and 49 species rules turn the hits into a
+196 curated reference sequences, and 55 species rules turn the hits into a
 verdict. gside is a species-identification engine: every reference is anchored
 to a verifiable NCBI/RefSeq accession and was validated by blast against its
 reference genome and, where available, a 100-genome real-world panel.
@@ -43,17 +43,16 @@ against ANI methods.
 
 | Role | Meaning | Count |
 |---|---|---|
-| `primary` | Species-defining marker; a rule's `genes` draw from these | 140 |
+| `primary` | Species-defining marker; a rule's `genes` draw from these | 146 |
 | `confirm` | Corroborating evidence reported alongside the verdict | 27 |
 | `typing` | Subtype/toxin-type reporting (e.g. BoNT serotypes) | 3 |
 | `virulence` | Virulence/toxigenicity reporting; never gates the species call | 2 |
 | `control` | Single-copy reads-mode depth controls; never rule genes | 18 |
 
-## Gene inventory (190 sequences)
+## Gene inventory (196 sequences)
 
 | Gene | Role | Reference |
 |---|---|---|
-| `aera` | primary | PQ871546.1 aerolysin aerA [Aeromonas hydrophila] |
 | `ail` | primary | NC_008800.1:2007722-2008258 attachment invasion locus ail, pathogenic-bioserotype marker [Yersinia enterocolitica 8081] |
 | `asst` | primary | NC_015761.1:34270-35988 aryl-sulfate sulfotransferase [Salmonella bongori NCTC 12419] |
 | `ba5345` | primary | CP009981.1:4873800-4874400 lambdaBa03 prophage chromosomal marker BA_5345 [Bacillus anthracis Ames BA1004] |
@@ -76,6 +75,12 @@ against ANI methods.
 | `gdh` | primary | MT542692.1 glutamate dehydrogenase gdh [Streptococcus suis] |
 | `glgb-bp` | primary | NZ_AP028077.1:1548836-1551052 GlgB 1,4-alpha-glucan branching enzyme (species anchor); 99.6-100% identity in 100 clinical B. pseudomallei genomes; nearest cross B. thailandensis 73.3%, B. cepacia 82.5% |
 | `glk-ye` | primary | NC_008800.1:412574-413737 glycerate kinase, chromosomal species anchor [Yersinia enterocolitica 8081] |
+| `gyrb-acav` | primary | GCF_056863505.1:ASM5686350v1 Aeromonas caviae gyrB (2412bp); 100/100 panel at 96%, other Aeromonas max 94.7% |
+| `gyrb-adha` | primary | GCF_057395915.1:ASM5739591v1 Aeromonas dhakensis gyrB (2412bp); 95/100 panel at 97%, A. hydrophila max 95.8% |
+| `gyrb-ahyd` | primary | GCF_000586055.1:ASM58605v1 Aeromonas hydrophila gyrB (2412bp); 100/100 panel at 97%, nearest A. dhakensis max 95.7% |
+| `gyrb-ajan` | primary | GCF_016127195.1:ASM1612719v1 Aeromonas jandaei gyrB (2412bp); 48/96 panel at 98%, A. veronii max 95.9% |
+| `gyrb-asal` | primary | GCF_028358575.1:ASM2835857v1 Aeromonas salmonicida gyrB (2415bp); 95/95 panel at 93%, other Aeromonas max 92.7% |
+| `gyrb-asch` | primary | GCF_001447335.1:ASM144733v1 Aeromonas schubertii gyrB (2412bp); 16/16 panel at 90%, other Aeromonas max 88.9% |
 | `gyrb-cf` | primary | GCF_011064845.1:G4551_RS00020 ref locus |
 | `gyrb-mp` | primary | NZ_LR214945.1:810714-812666 DNA topoisomerase subunit B, second chromosomal marker [Mycoplasma pneumoniae NCTC10119] |
 | `gyrb-ps` | primary | AB015801.1 DNA gyrase subunit B [Plesiomonas shigelloides] |
@@ -112,6 +117,7 @@ against ANI methods.
 | `rfc` | primary | NC_004337.2:2110959-2112107 O-antigen polymerase rfc [Shigella flexneri] |
 | `rfpb` | primary | CP000640.1:2979-4112 glycosyltransferase rfpB [Shigella dysenteriae] |
 | `ribf-hpi` | primary | NZ_CP065991.1:1099665-1100312 GTP cyclohydrolase II RibF, chromosomal species anchor [Haemophilus parainfluenzae FDAARGOS_1000] |
+| `rpob-aver` | primary | GCF_026016025.1:ASM2601602v1 Aeromonas veronii rpoB (4305bp); 48/99 panel at 98%, other Aeromonas max 95.6% (jandaei 97.3%) |
 | `rpob-cs` | primary | MW380341.1 RNA polymerase beta rpoB [Cronobacter sakazakii] |
 | `sb11_wzx` | primary | ShigaTyper ShigellaRef5 Sb11_wzx [Shigella boydii] |
 | `sb11_wzy` | primary | ShigaTyper ShigellaRef5 Sb11_wzy [Shigella boydii] |
@@ -244,7 +250,7 @@ against ANI methods.
 | `rpob-streptococcus_pyogenes` | control | NC_002737.1:94763-95380 rpoB [Streptococcus pyogenes] |
 | `rpob-vibrio_parahaemolyticus` | control | NC_004603.1:3114701-3115624 rpoB [Vibrio parahaemolyticus] |
 
-## Species coverage (49 rules)
+## Species coverage (55 rules)
 
 | Species | Rule genes | min hits | min identity | Constraints |
 |---|---|---|---|---|
@@ -277,13 +283,19 @@ against ANI methods.
 | *Haemophilus influenzae* | `hpd` | 1 | 90% | — |
 | *Streptococcus suis* | `gdh` | 1 | 90% | — |
 | *Burkholderia pseudomallei* | `glgb-bp`, `bima-bp`, `sctn-bp` | 1 | 95% | require `glgb-bp` |
-| *Leptospira interrogans* | `lipl32` | 1 | 90% | — |
+| *Leptospira* | `lipl32` | 1 | 90% | — |
 | *Treponema pallidum* | `tpp47` | 1 | 90% | — |
 | *Bacillus anthracis* | `adk`, `ba5345`, `paga`, `capb` | 2 | 90% | require `adk`, `ba5345`; priority over *Bacillus cereus group* |
 | *Bacillus cereus group* | `adk` | 1 | 90% | — |
 | *Yersinia pestis* | `spi-yp`, `btub-yp`, `caf1`, `pla` | 1 | 90% | require `spi-yp` |
 | *Yersinia enterocolitica* | `glk-ye`, `yddg-ye`, `ail`, `yada` | 1 | 90% | require `glk-ye` |
-| *Aeromonas hydrophila* | `aera`, `ahh1` | 1 | 90% | — |
+| *Aeromonas hydrophila* | `gyrb-ahyd`, `ahh1` | 1 | 97% | require `gyrb-ahyd` |
+| *Aeromonas caviae* | `gyrb-acav` | 1 | 96% | — |
+| *Aeromonas veronii* | `rpob-aver` | 1 | 98% | — |
+| *Aeromonas dhakensis* | `gyrb-adha` | 1 | 97% | — |
+| *Aeromonas jandaei* | `gyrb-ajan` | 1 | 97% | — |
+| *Aeromonas schubertii* | `gyrb-asch` | 1 | 90% | — |
+| *Aeromonas salmonicida* | `gyrb-asal` | 1 | 93% | — |
 | *Clostridium botulinum* | `bonta`, `bontb`, `bonte`, `bontc`, `bontd`, `bontf` | 1 | 80% | — |
 | *Clostridium perfringens* | `cpa` | 1 | 90% | — |
 | *Escherichia coli* | `uida`, `lacy` | 2 | 95% | — |
