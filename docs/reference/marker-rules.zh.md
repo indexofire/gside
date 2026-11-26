@@ -142,8 +142,8 @@ GTDB-Tk（L3）> ANI/mash/sourmash（L2）> marker（L1）；同层高置信度
 
 `cpin` 是不常见靶标的扩展库。常见肠道/呼吸道规则（`Citrobacter`、
 `Mycobacterium_tuberculosis`、`Chlamydia_pneumoniae`）已移入 `default`；
-由于 `cpin` extends `default`，`-d cpin` 仍会运行这些规则。下面的块只描述
-cpin 专有靶标。
+由于 `cpin` extends `default`，`-d cpin` 仍会运行这些规则。全部
+*Aeromonas* 种级条码也已移入 `cpin`。下面的块只描述 cpin 专有靶标。
 
 - **经典靶基因**：按 `locus_tag` 从经核验的 RefSeq 参考基因组提取
   （TUL4/FopA、侵袭素+VirF、BimA(Bm)、ompA、hugA、BP26/Omp25 等）。
@@ -526,7 +526,7 @@ BoNT 产毒统一。种级身份基于毒素；染色体背景（肉毒 vs 生�
 - *Cronobacter*：仅覆盖 *C. sakazakii*，其他 *Cronobacter* 种按设计报
   Unknown。
 - *Campylobacter*：仅覆盖 *C. jejuni* 与 *C. coli*。
-- *Aeromonas*：为 *A. hydrophila*、*A. caviae*、*A. veronii*、
+- *Aeromonas*（cpin）：为 *A. hydrophila*、*A. caviae*、*A. veronii*、
   *A. dhakensis*、*A. jandaei*、*A. schubertii*、*A. salmonicida*
   增加种级 `gyrB`/`rpoB` 条码。100 株面板对多数种命中 98–100%，无跨种
   误报；*A. jandaei* 的 gyrB 门槛高于 *A. veronii* 交叉，*A. hydrophila*

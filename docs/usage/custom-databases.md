@@ -69,7 +69,7 @@ gside scan -m marker -d default -d cpin sample.fna   # explicit merge
 ```
 
 Without `extends`, an explicit `-d` selection replaces the default tier —
-`-d cpin` alone would run ONLY the cpin rules (27 rules), so default species
+`-d cpin` alone would run ONLY the cpin rules (34 rules), so default species
 such as Shigella, Citrobacter, M. tuberculosis and C. pneumoniae would slip
 through. `extends` makes the extension
 database safe by construction: default updates propagate automatically (no

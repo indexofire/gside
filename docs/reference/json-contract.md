@@ -10,7 +10,7 @@ Example with `-m marker` (marker results are flat; no `result` wrapper):
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": {
@@ -77,7 +77,7 @@ A single-database selection (the default) omits `databases` entirely.
 {
   "analysis_type": "species_identification",
   "tool": "gside",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "contigs": "/path/to/contigs.fasta",
   "methods": {
     "marker": {},
@@ -269,7 +269,7 @@ gather CSV has no ANI column, the hash-fraction fallback (0.90/0.70) applies.
   "schema": "gside.validate/1",
   "genome": {"name": "GCF_000006945.2_ASM694v2_genomic", "path": "/abs/contigs.fna"},
   "parameters": {"threads": 4, "checkm2_db": "/db/checkm2", "gtdbtk_db": "/db/gtdb"},
-  "software": {"gside": "0.2.4", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
+  "software": {"gside": "0.2.5", "checkm2": "1.0.2", "gtdbtk": "2.4.0"},
   "tools": {"checkm2": "ok", "gtdbtk": "ok"},
   "quality": {"completeness": 99.1, "contamination": 0.5, "verdict": "PASS"},
   "taxonomy": {"classification": "d__Bacteria;p__...;s__Salmonella enterica", "note": ""},

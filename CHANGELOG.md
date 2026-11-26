@@ -6,6 +6,26 @@
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-26
+
+### Added
+
+- **Species-level *Aeromonas* panel (cpin)**: `gyrB`/`rpoB` barcodes for *A. hydrophila*, *A. caviae*, *A. veronii*, *A. dhakensis*, *A. jandaei*, *A. schubertii* and *A. salmonicida*, validated on 16–100 random genomes per species with no cross-species calls. The old `aera` marker was misassigned to *A. veronii* and `ahh1` is shared with *A. dhakensis*; *A. hydrophila* now requires its `gyrB` anchor.
+- **Pathogenic *Leptospira* group**: `lipl32` now reports `Leptospira` (not `Leptospira_interrogans`), covering *L. interrogans* 100/100, *L. borgpetersenii* 41/41, *L. kirschneri* 37/37 and *L. noguchii* 32/32; saprophytic *L. biflexa* is negative. Species-level typing needs `secY`/`rpoB` MLST.
+- **Genus/family barcodes**: 16S rRNA markers for Rickettsiaceae and Anaplasmataceae; benA/TEF1/mtLSU second markers for *Aspergillus*/*Fusarium*/*Pneumocystis*; *Citrobacter* `gyrB+leuS+cdsA` (100/100); MTBC `IS6110+IS1081` (99/100).
+- **`default`/`cpin` split**: default carries common enteric/respiratory and natural-focus pathogens; cpin is the uncommon extension and extends default. *Citrobacter*, *M. tuberculosis* and *C. pneumoniae* moved to default; all *Aeromonas* moved to cpin.
+
+### Changed
+
+- `default` is now **48 rules / 188 markers**; `cpin` is **34 rules / 62 markers** (21 bacterial + 13 fungal) and still pools default automatically.
+- Marker database docs regenerated (gene inventory, species coverage, control genes); en/zh coverage notes added for Cronobacter, Campylobacter, Aeromonas and Leptospira.
+
+### Fixed
+
+- Replaced corrupted marker sets (B. anthracis, Y. enterocolitica, S. pneumoniae, C. botulinum, B. pseudomallei) and added chromosomal species anchors so virulence/toxin genes only report pathogenicity.
+- *B. pseudomallei* 100/100 with `glgb-bp`, `bima-bp`, `sctn-bp`; cpin BimA(Bm) threshold raised to 98% to stop 3/100 pseudomallei mislabels.
+- *Nocardia* hsp65/gyrB threshold 91%, *Bartonella* 85%, *Rickettsiaceae*/*Anaplasmataceae* 16S rules; *Rhodococcus* documented as a negative control.
+
 ## [0.2.4] - 2026-11-10
 
 ### Added

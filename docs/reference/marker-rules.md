@@ -129,7 +129,8 @@ a Shigella call.
 `cpin` is the uncommon-target extension. Common enteric/respiratory rules
 (`Citrobacter`, `Mycobacterium_tuberculosis`, `Chlamydia_pneumoniae`) live
 in `default`; because `cpin` extends `default`, `-d cpin` still runs them.
-The block below describes the cpin-only targets.
+All *Aeromonas* species barcodes also live in `cpin`. The block below
+describes the cpin-only targets.
 
 - **Classical targets** extracted from verified RefSeq reference genomes by
   `locus_tag` (TUL4/FopA, invasin+VirF, BimA(Bm), ompA, hugA,
@@ -608,7 +609,7 @@ misidentification — confirm with L2 ANI and report both.
 - *Cronobacter*: only *C. sakazakii* is targeted; other *Cronobacter*
   species report Unknown by design.
 - *Campylobacter*: only *C. jejuni* and *C. coli* are targeted.
-- *Aeromonas*: species-level `gyrB`/`rpoB` barcodes for *A. hydrophila*,
+- *Aeromonas* (cpin): species-level `gyrB`/`rpoB` barcodes for *A. hydrophila*,
   *A. caviae*, *A. veronii*, *A. dhakensis*, *A. jandaei*,
   *A. schubertii* and *A. salmonicida*. The 100-genome panels call
   98-100% for most species with no cross-species calls; *A. jandaei*

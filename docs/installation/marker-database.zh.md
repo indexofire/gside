@@ -1,8 +1,8 @@
 # 标记基因数据库
 
 标记基因数据库（`data/db/D1_marker/`，随仓库分发的 **mini** 层）驱动默认的
-`-m marker` 鉴定：`blastn` 将查询 contigs 比对到 196 条精选参考序列，
-再由 55 条物种规则把命中转化为判定。gside 是物种鉴定引擎：每条参考均
+`-m marker` 鉴定：`blastn` 将查询 contigs 比对到 188 条精选参考序列，
+再由 48 条物种规则把命中转化为判定。gside 是物种鉴定引擎：每条参考均
 锚定可核查的 NCBI/RefSeq accession，并经参考基因组及（如有）100 株
 真实世界面板 blast 验证。种下分型是 gspec 的职责——霍乱弧菌 O1/O139
 血清群库已移交该处
@@ -31,13 +31,13 @@
 
 | 角色 | 含义 | 数量 |
 |---|---|---|
-| `primary` | 定义物种的标记；规则的 `genes` 从这里选 | 146 |
-| `confirm` | 与判定一起报告的佐证 | 27 |
+| `primary` | 定义物种的标记；规则的 `genes` 从这里选 | 139 |
+| `confirm` | 与判定一起报告的佐证 | 26 |
 | `typing` | 亚型/毒素型报告（如 BoNT 血清型） | 3 |
 | `virulence` | 毒力/产毒状态报告；不参与种级判定 | 2 |
 | `control` | reads 模式单拷贝深度对照；不进入规则 | 18 |
 
-## 基因清单（196 条序列）
+## 基因清单（188 条序列）
 
 | 基因 | 角色 | 参考序列 |
 |---|---|---|
@@ -63,12 +63,6 @@
 | `gdh` | primary | MT542692.1 glutamate dehydrogenase gdh [Streptococcus suis] |
 | `glgb-bp` | primary | NZ_AP028077.1:1548836-1551052 GlgB 1,4-alpha-glucan branching enzyme (species anchor); 99.6-100% identity in 100 clinical B. pseudomallei genomes; nearest cross B. thailandensis 73.3%, B. cepacia 82.5% |
 | `glk-ye` | primary | NC_008800.1:412574-413737 glycerate kinase, chromosomal species anchor [Yersinia enterocolitica 8081] |
-| `gyrb-acav` | primary | GCF_056863505.1:ASM5686350v1 Aeromonas caviae gyrB (2412bp); 100/100 panel at 96%, other Aeromonas max 94.7% |
-| `gyrb-adha` | primary | GCF_057395915.1:ASM5739591v1 Aeromonas dhakensis gyrB (2412bp); 95/100 panel at 97%, A. hydrophila max 95.8% |
-| `gyrb-ahyd` | primary | GCF_000586055.1:ASM58605v1 Aeromonas hydrophila gyrB (2412bp); 100/100 panel at 97%, nearest A. dhakensis max 95.7% |
-| `gyrb-ajan` | primary | GCF_016127195.1:ASM1612719v1 Aeromonas jandaei gyrB (2412bp); 48/96 panel at 98%, A. veronii max 95.9% |
-| `gyrb-asal` | primary | GCF_028358575.1:ASM2835857v1 Aeromonas salmonicida gyrB (2415bp); 95/95 panel at 93%, other Aeromonas max 92.7% |
-| `gyrb-asch` | primary | GCF_001447335.1:ASM144733v1 Aeromonas schubertii gyrB (2412bp); 16/16 panel at 90%, other Aeromonas max 88.9% |
 | `gyrb-cf` | primary | GCF_011064845.1:G4551_RS00020 ref locus |
 | `gyrb-mp` | primary | NZ_LR214945.1:810714-812666 DNA topoisomerase subunit B, second chromosomal marker [Mycoplasma pneumoniae NCTC10119] |
 | `gyrb-ps` | primary | AB015801.1 DNA gyrase subunit B [Plesiomonas shigelloides] |
@@ -105,7 +99,6 @@
 | `rfc` | primary | NC_004337.2:2110959-2112107 O-antigen polymerase rfc [Shigella flexneri] |
 | `rfpb` | primary | CP000640.1:2979-4112 glycosyltransferase rfpB [Shigella dysenteriae] |
 | `ribf-hpi` | primary | NZ_CP065991.1:1099665-1100312 GTP cyclohydrolase II RibF, chromosomal species anchor [Haemophilus parainfluenzae FDAARGOS_1000] |
-| `rpob-aver` | primary | GCF_026016025.1:ASM2601602v1 Aeromonas veronii rpoB (4305bp); 48/99 panel at 98%, other Aeromonas max 95.6% (jandaei 97.3%) |
 | `rpob-cs` | primary | MW380341.1 RNA polymerase beta rpoB [Cronobacter sakazakii] |
 | `sb11_wzx` | primary | ShigaTyper ShigellaRef5 Sb11_wzx [Shigella boydii] |
 | `sb11_wzy` | primary | ShigaTyper ShigellaRef5 Sb11_wzy [Shigella boydii] |
@@ -188,7 +181,6 @@
 | `wbgz` | primary | CP000039.1:204752-206671 putative epimerase/dehydratase wbgZ [Shigella sonnei] |
 | `zadh` | primary | NC_015761.1:1659167-1660180 zinc-dependent alcohol dehydrogenase [Salmonella bongori NCTC 12419] |
 | `adk` | confirm | CP009981.1:4359650-4360300 adenylate kinase adk, Bacillus cereus group common marker [Bacillus anthracis Ames BA1004] |
-| `ahh1` | confirm | PZ301496.1 hemolysin ahh1 [Aeromonas hydrophila] |
 | `capb` | confirm | NC_007323.3:55599-56993 capsule biosynthesis capB on pXO2 [Bacillus anthracis Ames Ancestor] |
 | `cards` | confirm | AF390408.1 CARDS toxin [Mycoplasma pneumoniae] |
 | `cdsa-citrobacter` | confirm | GCF_033726075.1:U4W25_RS05535 Citrobacter cdsA phosphatidate cytidylyltransferase (858bp); covers C. amalonaticus/farmeri at 95-100%, Enterobacteriaceae max 68-86% |
@@ -238,7 +230,7 @@
 | `rpob-streptococcus_pyogenes` | control | NC_002737.1:94763-95380 rpoB [Streptococcus pyogenes] |
 | `rpob-vibrio_parahaemolyticus` | control | NC_004603.1:3114701-3115624 rpoB [Vibrio parahaemolyticus] |
 
-## 物种覆盖（55 条规则）
+## 物种覆盖（48 条规则）
 
 | 物种 | 规则基因 | 最少命中 | 最低一致性 | 约束 |
 |---|---|---|---|---|
@@ -277,13 +269,6 @@
 | *Bacillus cereus group* | `adk` | 1 | 90% | — |
 | *Yersinia pestis* | `spi-yp`, `btub-yp`, `caf1`, `pla` | 1 | 90% | require `spi-yp` |
 | *Yersinia enterocolitica* | `glk-ye`, `yddg-ye`, `ail`, `yada` | 1 | 90% | require `glk-ye` |
-| *Aeromonas hydrophila* | `gyrb-ahyd`, `ahh1` | 1 | 97% | require `gyrb-ahyd` |
-| *Aeromonas caviae* | `gyrb-acav` | 1 | 96% | — |
-| *Aeromonas veronii* | `rpob-aver` | 1 | 98% | — |
-| *Aeromonas dhakensis* | `gyrb-adha` | 1 | 97% | — |
-| *Aeromonas jandaei* | `gyrb-ajan` | 1 | 97% | — |
-| *Aeromonas schubertii* | `gyrb-asch` | 1 | 90% | — |
-| *Aeromonas salmonicida* | `gyrb-asal` | 1 | 93% | — |
 | *Clostridium botulinum* | `bonta`, `bontb`, `bonte`, `bontc`, `bontd`, `bontf` | 1 | 80% | — |
 | *Clostridium perfringens* | `cpa` | 1 | 90% | — |
 | *Escherichia coli* | `uida`, `lacy` | 2 | 95% | — |

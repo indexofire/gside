@@ -66,7 +66,7 @@ gside scan -m marker -d default -d cpin sample.fna   # 显式合并
 ```
 
 没有 `extends` 时,显式 `-d` 选择会替换默认库——单独 `-d cpin` 只跑 cpin
-的 27 条规则,志贺菌、Citrobacter、结核分枝杆菌、肺炎衣原体等 default
+的 34 条规则,志贺菌、Citrobacter、结核分枝杆菌、肺炎衣原体等 default
 物种会漏掉。`extends` 让扩展库天然
 安全:default 更新自动传播(无需同步拷贝),`databases` 数组如实报告参与
 运行的每个库,循环/缺失目标以 note 方式降级。要严格隔离测试某个扩展库,

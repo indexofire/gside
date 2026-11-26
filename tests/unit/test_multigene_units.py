@@ -1002,7 +1002,7 @@ class TestCpinRuleDesign:
         db, rules = self._cpin_rules()
         assert db.name == "cpin_markers"
         assert db.custom is True
-        assert len(rules) == 27
+        assert len(rules) == 34
 
     def test_cpin_species_ship(self):
         _db, rules = self._cpin_rules()
@@ -1011,6 +1011,13 @@ class TestCpinRuleDesign:
             "Borrelia_burgdorferi",
             "Yersinia_pseudotuberculosis",
             "Bartonella",
+            "Aeromonas_hydrophila",
+            "Aeromonas_caviae",
+            "Aeromonas_veronii",
+            "Aeromonas_dhakensis",
+            "Aeromonas_jandaei",
+            "Aeromonas_schubertii",
+            "Aeromonas_salmonicida",
             "Rickettsiaceae",
             "Anaplasmataceae",
             "Chlamydia_psittaci",
@@ -1085,13 +1092,15 @@ class TestCpinRuleDesign:
 
     def test_aeromonas_species_and_leptospira_rules_ship(self):
         _db, default_rules = self._default_rules()
-        rules = {r["species"]: r for r in default_rules}
-        # Cronobacter/Campylobacter stay species-scoped.
-        assert "Cronobacter_sakazakii" in rules
-        assert "Campylobacter_jejuni" in rules
-        assert "Campylobacter_coli" in rules
-        # Aeromonas species expansion; aera was misassigned and removed.
-        for species in (
+        _db, cpin_rules = self._cpin_rules()
+        default = {r["species"]: r for r in default_rules}
+        cpin = {r["species"]: r for r in cpin_rules}
+        # Cronobacter/Campylobacter stay species-scoped in default.
+        assert "Cronobacter_sakazakii" in default
+        assert "Campylobacter_jejuni" in default
+        assert "Campylobacter_coli" in default
+        # Aeromonas species barcodes live in cpin; aera was misassigned.
+        aeromonas = {
             "Aeromonas_hydrophila",
             "Aeromonas_caviae",
             "Aeromonas_veronii",
@@ -1099,13 +1108,14 @@ class TestCpinRuleDesign:
             "Aeromonas_jandaei",
             "Aeromonas_schubertii",
             "Aeromonas_salmonicida",
-        ):
-            assert species in rules
-        assert rules["Aeromonas_hydrophila"]["require"] == ["gyrb-ahyd"]
-        assert "aera" not in rules["Aeromonas_hydrophila"]["genes"]
-        # Leptospira is now a pathogenic-group call, not interrogans-only.
-        assert rules["Leptospira"]["genes"] == ["lipl32"]
-        assert "Leptospira_interrogans" not in rules
+        }
+        assert aeromonas <= set(cpin)
+        assert not (aeromonas & set(default))
+        assert cpin["Aeromonas_hydrophila"]["require"] == ["gyrb-ahyd"]
+        assert "aera" not in cpin["Aeromonas_hydrophila"]["genes"]
+        # Leptospira is a pathogenic-group call in default, not interrogans-only.
+        assert default["Leptospira"]["genes"] == ["lipl32"]
+        assert "Leptospira_interrogans" not in default
 
     def test_genus_family_rules_use_100_genome_thresholds(self):
         # Thresholds tuned against 100 random genomes per taxon: the old
@@ -1142,6 +1152,13 @@ class TestCpinRuleDesign:
             "Borrelia_burgdorferi",
             "Yersinia_pseudotuberculosis",
             "Bartonella",
+            "Aeromonas_hydrophila",
+            "Aeromonas_caviae",
+            "Aeromonas_veronii",
+            "Aeromonas_dhakensis",
+            "Aeromonas_jandaei",
+            "Aeromonas_schubertii",
+            "Aeromonas_salmonicida",
             "Rickettsiaceae",
             "Anaplasmataceae",
             "Chlamydia_psittaci",
@@ -1191,9 +1208,15 @@ class TestCpinRuleDesign:
         db = MarkerDatabase.from_path(config.SPECIES_DB_DIR / "D1_marker" / "cpin")
         meta = yaml.safe_load((db.root / "metadata.yaml").read_text())
         controls = meta.get("control_genes", {})
+        default_fasta = config.SPECIES_DB_DIR / "D1_marker" / "default" / "markers.fasta"
         genes = {
             gene_from_seqid(line[1:])
             for line in db.fasta.read_text().splitlines()
+            if line.startswith(">")
+        }
+        genes |= {
+            gene_from_seqid(line[1:])
+            for line in default_fasta.read_text().splitlines()
             if line.startswith(">")
         }
         bacterial = {
@@ -1201,6 +1224,13 @@ class TestCpinRuleDesign:
             "Borrelia_burgdorferi",
             "Yersinia_pseudotuberculosis",
             "Bartonella",
+            "Aeromonas_hydrophila",
+            "Aeromonas_caviae",
+            "Aeromonas_veronii",
+            "Aeromonas_dhakensis",
+            "Aeromonas_jandaei",
+            "Aeromonas_schubertii",
+            "Aeromonas_salmonicida",
             "Rickettsiaceae",
             "Anaplasmataceae",
             "Chlamydia_psittaci",

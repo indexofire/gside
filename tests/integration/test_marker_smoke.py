@@ -184,25 +184,6 @@ class TestSpeciesMarker:
         assert r["confidence"] == "high"
         assert any("gspec" in note.lower() for note in r["notes"])
 
-    def test_aeromonas_species_barcodes(self, tmp_path):
-        """Each Aeromonas species marker calls its own species, not the genus."""
-        from gside.analysis.multigene_identifier import identify_multigene
-
-        markers = {
-            "Aeromonas_hydrophila": "gyrb-ahyd",
-            "Aeromonas_caviae": "gyrb-acav",
-            "Aeromonas_veronii": "rpob-aver",
-            "Aeromonas_dhakensis": "gyrb-adha",
-            "Aeromonas_jandaei": "gyrb-ajan",
-            "Aeromonas_schubertii": "gyrb-asch",
-            "Aeromonas_salmonicida": "gyrb-asal",
-        }
-        for expected, gene in markers.items():
-            q = tmp_path / f"{gene}.fna"
-            q.write_text(f">{gene}\n{_gene_seq(f'gside|db=species_markers_v2|gene={gene}|acc=')}\n")
-            r = identify_multigene(str(q)).to_dict()
-            assert r["species"] == expected
-
     def test_lipl32_calls_pathogenic_leptospira_group(self, tmp_path):
         """lipl32 reports the pathogenic group; species typing is MLST."""
         from gside.analysis.multigene_identifier import identify_multigene

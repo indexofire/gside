@@ -183,6 +183,25 @@ class TestCpinBarcodeRules:
         r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
         assert r["species"] == "Fusarium"
 
+    def test_aeromonas_species_barcodes(self, tmp_path):
+        """Each Aeromonas species marker calls its own species, not the genus."""
+        from gside.analysis.multigene_identifier import identify_multigene
+
+        markers = {
+            "Aeromonas_hydrophila": "gyrb-ahyd",
+            "Aeromonas_caviae": "gyrb-acav",
+            "Aeromonas_veronii": "rpob-aver",
+            "Aeromonas_dhakensis": "gyrb-adha",
+            "Aeromonas_jandaei": "gyrb-ajan",
+            "Aeromonas_schubertii": "gyrb-asch",
+            "Aeromonas_salmonicida": "gyrb-asal",
+        }
+        for expected, gene in markers.items():
+            q = tmp_path / f"{gene}.fna"
+            q.write_text(f">{gene}\n{_cpin_gene_seq(gene)}\n")
+            r = identify_multigene(str(q), marker_db=str(_CPIN_DB)).to_dict()
+            assert r["species"] == expected
+
     def test_mtlsu_alone_calls_pneumocystis(self, tmp_path):
         from gside.analysis.multigene_identifier import identify_multigene
 
